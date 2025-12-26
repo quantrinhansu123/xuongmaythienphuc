@@ -143,7 +143,7 @@ export default function TransferWarehousePage() {
           <Button
             type="link"
             size="small"
-            onClick={() => window.open(`/api/inventory/transfer/${record.id}/pdf`, "_blank")}
+            onClick={() => window.open(`/api/inventory/transfer/${record.id}/pdf`, "_blank", "noopener,noreferrer")}
           >
             In
           </Button>
@@ -234,13 +234,13 @@ export default function TransferWarehousePage() {
           refetchDataWithKeys: ["inventory", "transfer", warehouseId],
           buttonEnds: can("inventory.transfer", "create")
             ? [
-                {
-                  type: "primary",
-                  name: "Tạo phiếu chuyển kho",
-                  onClick: () => router.push(`/inventory/transfer/${warehouseId}/create`),
-                  icon: <PlusOutlined />,
-                },
-              ]
+              {
+                type: "primary",
+                name: "Tạo phiếu chuyển kho",
+                onClick: () => router.push(`/inventory/transfer/${warehouseId}/create`),
+                icon: <PlusOutlined />,
+              },
+            ]
             : undefined,
           searchInput: {
             placeholder: "Tìm kiếm phiếu chuyển kho",

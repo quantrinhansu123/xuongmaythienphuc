@@ -8,6 +8,7 @@ import { CalendarOutlined, DownloadOutlined, ReloadOutlined, UploadOutlined } fr
 import { DatePicker, Select } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
+import * as XLSX from 'xlsx';
 
 const { RangePicker } = DatePicker;
 
@@ -234,7 +235,21 @@ export default function SupplierDebtsPage() {
             {
               type: "default",
               name: "Xuất Excel",
-              onClick: () => alert("Chức năng xuất Excel đang được phát triển"),
+              onClick: () => {
+                const dataToExport = filteredSupplierSummaries.map(s => ({
+                  'Mã NCC': s.supplierCode,
+                  'Nhà cung cấp': s.supplierName,
+                  'Điện thoại': s.phone || '',
+                  'Số đơn (đã TT / tổng)': `${s.totalOrders - s.unpaidOrders}/${s.totalOrders}`,
+                  'Tổng tiền': s.totalAmount,
+                  'Đã thanh toán': s.paidAmount,
+                  'Còn nợ': s.remainingAmount
+                }));
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "CongNoNCC");
+                XLSX.writeFile(wb, `CongNoNCC_${dayjs().format('YYYY-MM-DD')}.xlsx`);
+              },
               icon: <DownloadOutlined />,
             },
           ],

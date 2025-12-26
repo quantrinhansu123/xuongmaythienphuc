@@ -13,17 +13,17 @@ import { formatCurrency, formatQuantity } from "@/utils/format";
 import { DeleteOutlined, DownloadOutlined, PlusOutlined, SettingOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    App,
-    Button,
-    Descriptions,
-    Form,
-    Input,
-    InputNumber,
-    Modal,
-    Select,
-    Switch,
-    Table,
-    Tag
+  App,
+  Button,
+  Descriptions,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Switch,
+  Table,
+  Tag
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -573,7 +573,7 @@ export default function ItemsPage() {
 
   // Handle download template
   const handleDownloadTemplate = () => {
-    window.open('/templates/import-hang-hoa.csv', '_blank');
+    window.open('/templates/import-hang-hoa.csv', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -964,9 +964,9 @@ export default function ItemsPage() {
                 rules={[{ required: true, message: "Chọn NVL" }]}
                 style={{ width: 300 }}
               >
-                <Select 
-                  placeholder="Chọn nguyên vật liệu" 
-                  showSearch 
+                <Select
+                  placeholder="Chọn nguyên vật liệu"
+                  showSearch
                   filterOption={(input, option) =>
                     String(option?.children ?? '').toLowerCase().includes(input.toLowerCase())
                   }

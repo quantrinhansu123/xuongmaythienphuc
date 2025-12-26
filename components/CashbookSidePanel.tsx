@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 
 interface CashBook {
   id: number;
@@ -44,7 +43,7 @@ export default function CashbookSidePanel({
 }: Props) {
 
   const handlePrint = () => {
-    window.open(`/api/finance/cashbooks/${cashbook.id}/pdf`, '_blank');
+    window.open(`/api/finance/cashbooks/${cashbook.id}/pdf`, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -68,76 +67,75 @@ export default function CashbookSidePanel({
       {/* Content */}
       <div className="p-6 space-y-6">
         {/* View Mode */}
-            <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Ngày giao dịch:</span>
-                <span className="font-medium">
-                  {new Date(cashbook.transactionDate).toLocaleDateString('vi-VN')}
-                </span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Loại:</span>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  cashbook.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {cashbook.transactionType}
-                </span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Danh mục:</span>
-                <span className="font-medium">{cashbook.categoryName}</span>
-              </div>
-              
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-sm text-gray-600">Số tiền:</span>
-                <span className="text-xl font-bold text-blue-600">
-                  {parseFloat(cashbook.amount.toString()).toLocaleString('vi-VN')} đ
-                </span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Phương thức:</span>
-                <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                  {cashbook.paymentMethod === 'CASH' ? 'Tiền mặt' : 
-                   cashbook.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
-                </span>
-              </div>
-              
-              {cashbook.bankAccountNumber && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Tài khoản:</span>
-                  <span className="text-sm">
-                    {cashbook.bankName} - {cashbook.bankAccountNumber}
-                  </span>
-                </div>
-              )}
-              
-              {cashbook.description && (
-                <div className="pt-2 border-t">
-                  <span className="text-sm text-gray-600">Mô tả:</span>
-                  <p className="mt-1 text-sm">{cashbook.description}</p>
-                </div>
-              )}
-              
-              <div className="flex justify-between pt-2 border-t">
-                <span className="text-sm text-gray-600">Chi nhánh:</span>
-                <span className="text-sm">{cashbook.branchName}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Người tạo:</span>
-                <span className="text-sm">{cashbook.createdByName}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Ngày tạo:</span>
-                <span className="text-sm">
-                  {new Date(cashbook.createdAt).toLocaleString('vi-VN')}
-                </span>
-              </div>
+        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Ngày giao dịch:</span>
+            <span className="font-medium">
+              {new Date(cashbook.transactionDate).toLocaleDateString('vi-VN')}
+            </span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Loại:</span>
+            <span className={`px-2 py-1 rounded text-xs ${cashbook.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+              {cashbook.transactionType}
+            </span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Danh mục:</span>
+            <span className="font-medium">{cashbook.categoryName}</span>
+          </div>
+
+          <div className="flex justify-between items-center pt-2 border-t">
+            <span className="text-sm text-gray-600">Số tiền:</span>
+            <span className="text-xl font-bold text-blue-600">
+              {parseFloat(cashbook.amount.toString()).toLocaleString('vi-VN')} đ
+            </span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Phương thức:</span>
+            <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+              {cashbook.paymentMethod === 'CASH' ? 'Tiền mặt' :
+                cashbook.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
+            </span>
+          </div>
+
+          {cashbook.bankAccountNumber && (
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Tài khoản:</span>
+              <span className="text-sm">
+                {cashbook.bankName} - {cashbook.bankAccountNumber}
+              </span>
             </div>
+          )}
+
+          {cashbook.description && (
+            <div className="pt-2 border-t">
+              <span className="text-sm text-gray-600">Mô tả:</span>
+              <p className="mt-1 text-sm">{cashbook.description}</p>
+            </div>
+          )}
+
+          <div className="flex justify-between pt-2 border-t">
+            <span className="text-sm text-gray-600">Chi nhánh:</span>
+            <span className="text-sm">{cashbook.branchName}</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Người tạo:</span>
+            <span className="text-sm">{cashbook.createdByName}</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Ngày tạo:</span>
+            <span className="text-sm">
+              {new Date(cashbook.createdAt).toLocaleString('vi-VN')}
+            </span>
+          </div>
+        </div>
 
         {/* Actions */}
         <div className="flex gap-2">

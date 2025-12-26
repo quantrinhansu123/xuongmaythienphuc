@@ -294,12 +294,10 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             return;
         }
 
-        const selectedItems = data.items.filter((item: any) => 
+        const selectedItems = data.items.filter((item: any) =>
             selectedItemsForPrint.includes(item.id)
         );
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
 
         // Hàm tạo dòng field - không có dấu chấm khi có giá trị
         const fieldRow = (label: string, value: string = '') => {
@@ -322,7 +320,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
         const renderGrid3Col = (items: { label: string; value: string }[]) => {
             const chunks = chunkArray(items, 3);
             return chunks.map(chunk => {
-                const cols = chunk.map(item => 
+                const cols = chunk.map(item =>
                     `<div class="col"><span class="label">${item.label}:</span> <span class="val">${item.value}</span></div>`
                 ).join('');
                 // Thêm cột trống nếu không đủ 3
@@ -333,32 +331,32 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
 
         const pagesHtml = selectedItems.map((item: any) => {
             const m = item.measurements || [];
-            
+
             // Tìm Mã Invoice trong measurements
-            const invoiceMeasurement = m.find((measurement: any) => 
-                measurement.attributeName?.toLowerCase().includes('invoice') || 
+            const invoiceMeasurement = m.find((measurement: any) =>
+                measurement.attributeName?.toLowerCase().includes('invoice') ||
                 measurement.attributeName?.toLowerCase().includes('mã invoice')
             );
             const invoiceCode = invoiceMeasurement?.value || '';
-            
+
             // Lấy định mức NVL cho sản phẩm này
             const itemMaterials = materialRequirements?.filter((mat: any) => mat.productId === item.itemId) || [];
             const materialsData = itemMaterials.map((mat: any) => ({
                 label: mat.materialName,
                 value: mat.materialCode
             }));
-            
+
             // Chỉ hiển thị thông số đã được nhập (có giá trị), loại bỏ Mã Invoice
             const measurementsData = m
-                .filter((measurement: any) => 
-                    measurement.value && 
+                .filter((measurement: any) =>
+                    measurement.value &&
                     !measurement.attributeName?.toLowerCase().includes('invoice')
                 )
                 .map((measurement: any) => ({
                     label: measurement.attributeName,
                     value: measurement.value
                 }));
-            
+
             return `
                 <div class="page">
                     <div class="header">
@@ -406,6 +404,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             <html>
             <head>
                 <title>Phiếu Sản Xuất A5 - ${data.orderCode}</title>
+                <meta charset="UTF-8">
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Times New Roman', Times, serif; font-size: 12px; }
@@ -540,14 +539,16 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             <body>
                 ${pagesHtml}
                 <script>
-                    window.onload = function() { window.print(); }
+                    window.onload = function() { setTimeout(function() { window.print(); }, 500); }
                 </script>
             </body>
             </html>
         `;
 
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener,noreferrer');
+
         setShowPrintModal(false);
         setSelectedItemsForPrint([]);
     };
@@ -579,11 +580,11 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 </Col>
 
                 <Col span={24}>
-                    <Card 
+                    <Card
                         title="Thông tin chung"
                         extra={
-                            <Button 
-                                icon={<CalendarOutlined />} 
+                            <Button
+                                icon={<CalendarOutlined />}
                                 onClick={() => {
                                     datesForm.setFieldsValue({
                                         workerHandoverDate: data.workerHandoverDate ? dayjs(data.workerHandoverDate) : null,
@@ -611,9 +612,9 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                 {data.sourceWarehouseName ? (
                                     <Tag color="blue">📦 {data.sourceWarehouseName}</Tag>
                                 ) : (
-                                    <Button 
-                                        type="link" 
-                                        size="small" 
+                                    <Button
+                                        type="link"
+                                        size="small"
                                         onClick={() => {
                                             warehouseForm.setFieldsValue({
                                                 sourceWarehouseId: data.sourceWarehouseId,
@@ -630,9 +631,9 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                 {data.targetWarehouseName ? (
                                     <Tag color="green">🏭 {data.targetWarehouseName}</Tag>
                                 ) : (
-                                    <Button 
-                                        type="link" 
-                                        size="small" 
+                                    <Button
+                                        type="link"
+                                        size="small"
                                         onClick={() => {
                                             warehouseForm.setFieldsValue({
                                                 sourceWarehouseId: data.sourceWarehouseId,
@@ -708,7 +709,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     <Card title="Định mức vật tư (Dự kiến)" loading={isLoadingMaterials}>
                         <Table
                             dataSource={materialRequirements}
-                            rowKey={(record: any) => `${record.materialId}_${record.productId}`}
+                            rowKey={(record: any) => `${record.materialId}_${record.productId} `}
                             pagination={false}
                             columns={[
                                 {
@@ -764,13 +765,13 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 </Col>
 
                 <Col span={24}>
-                    <Card 
-                        title="Nhân viên sản xuất" 
+                    <Card
+                        title="Nhân viên sản xuất"
                         loading={isLoadingWorkers}
                         extra={
-                            <Button 
-                                type="primary" 
-                                icon={<UserAddOutlined />} 
+                            <Button
+                                type="primary"
+                                icon={<UserAddOutlined />}
                                 onClick={() => setShowWorkerModal(true)}
                             >
                                 Thêm nhân viên
@@ -955,7 +956,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                 String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                             }
                             options={allWorkers.map((w: any) => ({
-                                label: `${w.worker_code} - ${w.full_name}${w.category_name ? ` (${w.category_name})` : ''}`,
+                                label: `${w.worker_code} - ${w.full_name}${w.category_name ? ` (${w.category_name})` : ''} `,
                                 value: w.id,
                             }))}
                         />
@@ -1061,8 +1062,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     layout="vertical"
                     onFinish={(values) => updateWarehousesMutation.mutate(values)}
                 >
-                    <Form.Item 
-                        name="sourceWarehouseId" 
+                    <Form.Item
+                        name="sourceWarehouseId"
                         label="Kho lấy NVL"
                         rules={[{ required: true, message: "Vui lòng chọn kho NVL" }]}
                     >
@@ -1077,8 +1078,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                 }))}
                         />
                     </Form.Item>
-                    <Form.Item 
-                        name="targetWarehouseId" 
+                    <Form.Item
+                        name="targetWarehouseId"
                         label="Kho nhận thành phẩm"
                         rules={[{ required: true, message: "Vui lòng chọn kho thành phẩm" }]}
                     >

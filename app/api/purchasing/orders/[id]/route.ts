@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
@@ -30,6 +30,8 @@ export async function GET(
         po.order_date as "orderDate",
         po.expected_date as "expectedDate",
         po.total_amount as "totalAmount",
+        COALESCE(po.paid_amount, 0) as "paidAmount",
+        po.payment_status as "paymentStatus",
         po.status,
         po.notes,
         u.full_name as "createdBy",

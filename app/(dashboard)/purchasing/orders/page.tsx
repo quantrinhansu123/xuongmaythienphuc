@@ -14,9 +14,14 @@ interface PurchaseOrder {
   orderDate: string;
   expectedDate: string;
   totalAmount: number;
+  paidAmount: number;
+  paymentStatus: string;
   status: string;
   createdBy: string;
 }
+
+import { useRef } from 'react';
+import * as XLSX from 'xlsx';
 
 export default function PurchaseOrdersPage() {
   const { can, loading: permLoading } = usePermissions();
@@ -39,8 +44,21 @@ export default function PurchaseOrdersPage() {
     notes: '',
   });
   const [orderItems, setOrderItems] = useState<any[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
+
+  // Payment States
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 0,
+    paymentMethod: 'CASH',
+    bankAccountId: '',
+    notes: ''
+  });
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!permLoading && can('purchasing.orders', 'view')) {
@@ -49,6 +67,7 @@ export default function PurchaseOrdersPage() {
       fetchMaterials();
       fetchItems();
       fetchWarehouses();
+      fetchPaymentAccounts();
     } else if (!permLoading) {
       setLoading(false);
     }
@@ -125,6 +144,7 @@ export default function PurchaseOrdersPage() {
       if (data.success) {
         setSelectedOrder(data.data);
         setShowDetail(true);
+        fetchPaymentHistory(id); // Fetch history
       }
     } catch (error) {
       console.error(error);
@@ -154,7 +174,7 @@ export default function PurchaseOrdersPage() {
       unit: '',
       totalAmount: 0,
       notes: '',
-      isCustom: false, // false = chọn từ danh sách, true = nhập tự do
+      // isCustom removed
     }]);
   };
 
@@ -165,24 +185,7 @@ export default function PurchaseOrdersPage() {
   const updateOrderItem = (index: number, field: string, value: any) => {
     const newItems = [...orderItems];
 
-    if (field === 'isCustom') {
-      // Chuyển đổi giữa chọn từ danh sách và nhập tự do
-      newItems[index].isCustom = value;
-      if (!value) {
-        // Reset về chọn từ danh sách
-        newItems[index].materialId = '';
-        newItems[index].itemId = '';
-        newItems[index].itemCode = '';
-        newItems[index].itemName = '';
-        newItems[index].unit = '';
-        newItems[index].unitPrice = 0;
-        newItems[index].totalAmount = 0;
-      } else {
-        // Reset về nhập tự do
-        newItems[index].materialId = '';
-        newItems[index].itemId = '';
-      }
-    } else if (field === 'itemId') {
+    if (field === 'itemId') {
       // Chọn từ danh sách items (có giá)
       const item = Array.isArray(items) ? items.find(i => i.id === parseInt(value)) : null;
       if (item) {
@@ -313,12 +316,213 @@ export default function PurchaseOrdersPage() {
     setFilterStatus('ALL');
   };
 
+  const fetchPaymentHistory = async (orderId: number) => {
+    try {
+      const res = await fetch(`/api/finance/cashbooks?referenceType=PURCHASE_ORDER&referenceId=${orderId}`);
+      const data = await res.json();
+      if (data.success) {
+        setPaymentHistory(data.data);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchPaymentAccounts = async () => {
+    try {
+      const res = await fetch('/api/finance/bank-accounts?isActive=true');
+      const data = await res.json();
+      if (data.success) {
+        setPaymentAccounts(data.data);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrder) return;
+
+    if (paymentForm.amount <= 0) {
+      alert('Số tiền thanh toán phải lớn hơn 0');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/purchasing/orders/${selectedOrder.id}/payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentAmount: paymentForm.amount,
+          paymentMethod: paymentForm.paymentMethod,
+          bankAccountId: paymentForm.bankAccountId,
+          notes: paymentForm.notes
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert('Thanh toán thành công');
+        setShowPaymentModal(false);
+        viewDetail(selectedOrder.id); // Refresh detail
+        fetchOrders(); // Refresh list
+        fetchPaymentHistory(selectedOrder.id);
+      } else {
+        alert(data.error || 'Có lỗi xảy ra');
+      }
+    } catch (error) {
+      alert('Có lỗi xảy ra');
+    }
+  };
+
   const handleExportExcel = () => {
-    alert('Chức năng xuất Excel đang được phát triển');
+    const dataToExport = filteredOrders.map(o => ({
+      'Mã đơn': o.poCode,
+      'Nhà cung cấp': o.supplierName,
+      'Ngày đặt': new Date(o.orderDate).toLocaleDateString('vi-VN'),
+      'Ngày dự kiến': o.expectedDate ? new Date(o.expectedDate).toLocaleDateString('vi-VN') : '',
+      'Tổng tiền': o.totalAmount,
+      'Đã thanh toán': o.paidAmount,
+      'Còn nợ': o.totalAmount - (o.paidAmount || 0),
+      'Trạng thái': o.status,
+      'Người tạo': o.createdBy
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "DonDatHang");
+    XLSX.writeFile(wb, `DonDatHang_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const handleImportExcel = () => {
-    alert('Chức năng nhập Excel đang được phát triển');
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const processImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data: any[] = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          alert('File Excel không có dữ liệu');
+          return;
+        }
+
+        const requiredCols = ['Nhà cung cấp', 'Ngày đặt', 'Mã hàng', 'Số lượng', 'Đơn giá'];
+        const firstRow = data[0];
+        const missingCols = requiredCols.filter(col => !(col in firstRow));
+        if (missingCols.length > 0) {
+          alert(`File thiếu các cột bắt buộc: ${missingCols.join(', ')}`);
+          return;
+        }
+
+        const groupedOrders: Record<string, any> = {};
+
+        data.forEach((row, index) => {
+          const groupKey = row['Mã đơn'] ? row['Mã đơn'] : `${row['Nhà cung cấp']}_${row['Ngày đặt']}`;
+
+          if (!groupedOrders[groupKey]) {
+            groupedOrders[groupKey] = {
+              supplierName: row['Nhà cung cấp'],
+              orderDate: row['Ngày đặt'],
+              expectedDate: row['Ngày dự kiến'],
+              notes: row['Ghi chú'],
+              items: []
+            };
+          }
+          groupedOrders[groupKey].items.push(row);
+        });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const key in groupedOrders) {
+          const orderData = groupedOrders[key];
+
+          const supplier = suppliers.find(s => s.supplierName.toLowerCase() === orderData.supplierName.toString().toLowerCase());
+          if (!supplier) {
+            console.error(`Không tìm thấy nhà cung cấp: ${orderData.supplierName}`);
+            failCount++;
+            continue;
+          }
+
+          const mappedItems = orderData.items.map((row: any) => {
+            const itemCode = row['Mã hàng'];
+            const foundItem = items.find(i => i.itemCode === itemCode);
+            return {
+              itemId: foundItem?.id || null,
+              itemCode: itemCode,
+              itemName: row['Tên hàng'] || foundItem?.itemName || 'Unknown',
+              quantity: parseFloat(row['Số lượng'] || '0'),
+              unitPrice: parseFloat(row['Đơn giá'] || '0'),
+              unit: row['ĐVT'] || foundItem?.unit || '',
+              notes: row['Ghi chú dòng']
+            };
+          }).filter((i: any) => i.quantity > 0 && i.itemId);
+
+          if (mappedItems.length === 0) {
+            console.error(`Order ${key}: Không có mặt hàng hợp lệ`);
+            failCount++;
+            continue;
+          }
+
+          const defaultWarehouse = warehouses.find(w => w.warehouseType === 'NVL') || warehouses[0];
+          if (!defaultWarehouse) {
+            alert('Không tìm thấy kho mặc định để nhập hàng');
+            return;
+          }
+
+          const response = await fetch('/api/purchasing/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              supplierId: supplier.id,
+              warehouseId: defaultWarehouse.id,
+              orderDate: parseExcelDate(orderData.orderDate),
+              expectedDate: orderData.expectedDate ? parseExcelDate(orderData.expectedDate) : null,
+              notes: orderData.notes || 'Imported via Excel',
+              items: mappedItems
+            })
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        }
+
+        alert(`Đã nhập xong! Thành công: ${successCount}. Thất bại: ${failCount} (xem console)`);
+        fetchOrders();
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('Lỗi xử lý file Excel');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
+  const parseExcelDate = (dateVal: any): string => {
+    if (!dateVal) return new Date().toISOString().split('T')[0];
+    if (typeof dateVal === 'number') {
+      const date = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
+      return date.toISOString().split('T')[0];
+    }
+    const date = new Date(dateVal);
+    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
   };
 
   const filteredOrders = orders.filter(o => {
@@ -450,6 +654,8 @@ export default function PurchaseOrdersPage() {
                       <th className="px-4 py-3 text-left w-48">Nhà cung cấp</th>
                       <th className="px-4 py-3 text-left w-32">Ngày đặt</th>
                       <th className="px-4 py-3 text-right w-36">Tổng tiền</th>
+                      <th className="px-4 py-3 text-right w-36">Đã TT</th>
+                      <th className="px-4 py-3 text-right w-36">Còn nợ</th>
                       <th className="px-4 py-3 text-left w-40">Trạng thái</th>
                     </tr>
                   </thead>
@@ -464,13 +670,18 @@ export default function PurchaseOrdersPage() {
                         <td className="px-4 py-3">{order.supplierName}</td>
                         <td className="px-4 py-3">{new Date(order.orderDate).toLocaleDateString('vi-VN')}</td>
                         <td className="px-4 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
+                        <td className="px-4 py-3 text-right text-green-600">{formatCurrency(order.paidAmount || 0)}</td>
+                        <td className="px-4 py-3 text-right text-red-600">{formatCurrency(order.totalAmount - (order.paidAmount || 0))}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded text-xs ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
                             order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
                               order.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
                                 'bg-red-100 text-red-800'
                             }`}>
-                            {order.status}
+                            {order.status === 'PENDING' ? 'Chờ xác nhận' :
+                              order.status === 'CONFIRMED' ? 'Đã xác nhận' :
+                                order.status === 'DELIVERED' ? 'Đã giao hàng' :
+                                  order.status === 'CANCELLED' ? 'Đã hủy' : order.status}
                           </span>
                         </td>
                       </tr>
@@ -496,7 +707,12 @@ export default function PurchaseOrdersPage() {
                       selectedOrder.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
                         selectedOrder.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
                           'bg-red-100 text-red-800'
-                      }`}>{selectedOrder.status}</span></div>
+                      }`}>
+                      {selectedOrder.status === 'PENDING' ? 'Chờ xác nhận' :
+                        selectedOrder.status === 'CONFIRMED' ? 'Đã xác nhận' :
+                          selectedOrder.status === 'DELIVERED' ? 'Đã giao hàng' :
+                            selectedOrder.status === 'CANCELLED' ? 'Đã hủy' : selectedOrder.status}
+                    </span></div>
                     <div><span className="text-gray-600">Nhà cung cấp:</span> {selectedOrder.supplierName}</div>
                     <div><span className="text-gray-600">Ngày đặt:</span> {new Date(selectedOrder.orderDate).toLocaleDateString('vi-VN')}</div>
                     {selectedOrder.expectedDate && (
@@ -504,6 +720,23 @@ export default function PurchaseOrdersPage() {
                     )}
                     <div><span className="text-gray-600">Người tạo:</span> {selectedOrder.createdBy}</div>
                   </div>
+
+                  {/* Payment Info in Detail */}
+                  <div className="mt-4 border-t pt-4 grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-xs text-gray-500">Tổng tiền</div>
+                      <div className="font-bold text-blue-600">{formatCurrency(selectedOrder.totalAmount)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Đã thanh toán</div>
+                      <div className="font-bold text-green-600">{formatCurrency(selectedOrder.paidAmount || 0)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Còn nợ</div>
+                      <div className="font-bold text-red-600">{formatCurrency(selectedOrder.totalAmount - (selectedOrder.paidAmount || 0))}</div>
+                    </div>
+                  </div>
+
                   {selectedOrder.notes && (
                     <div className="mt-3 text-sm"><span className="text-gray-600">Ghi chú:</span> {selectedOrder.notes}</div>
                   )}
@@ -540,13 +773,58 @@ export default function PurchaseOrdersPage() {
                   </div>
                 </div>
 
+                {/* Payment History Section with Translation - HIDDEN AS REQUESTED */}
+                {/* {paymentHistory.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3">Lịch sử thanh toán</h4>
+                    <div className="bg-gray-50 rounded p-4 space-y-3">
+                      {paymentHistory.map((ph, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0">
+                          <div>
+                            <div className="font-medium">
+                              {new Date(ph.transactionDate).toLocaleDateString('vi-VN')} - {ph.transactionCode}
+                            </div>
+                            <div className="text-gray-500 text-xs">
+                              {ph.categoryName || ph.description}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-green-600">{formatCurrency(ph.amount)}</div>
+                            <div className="text-xs text-gray-500">{ph.paymentMethod === 'BANK' ? 'Chuyển khoản' : 'Tiền mặt'}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )} */}
+
+                {/* Button Section */}
                 <div className="flex gap-2 justify-end border-t pt-4">
                   <button
-                    onClick={() => window.open(`/api/purchasing/orders/${selectedOrder.id}/pdf`, '_blank')}
+                    onClick={() => window.open(`/api/purchasing/orders/${selectedOrder.id}/pdf`, '_blank', 'noopener,noreferrer')}
                     className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                   >
                     🖨️ In PDF
                   </button>
+
+                  {/* Payment Button */}
+                  {(selectedOrder.status === 'CONFIRMED' || selectedOrder.status === 'DELIVERED') &&
+                    selectedOrder.paymentStatus !== 'PAID' && can('finance.cashbooks', 'create') && (
+                      <button
+                        onClick={() => {
+                          setPaymentForm({
+                            ...paymentForm,
+                            amount: selectedOrder.totalAmount - (selectedOrder.paidAmount || 0),
+                            paymentMethod: 'CASH' // Default, will change based on account
+                          });
+                          setShowPaymentModal(true);
+                        }}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                      >
+                        💳 Thanh toán
+                      </button>
+                    )}
+
                   {selectedOrder.status === 'PENDING' && can('purchasing.orders', 'edit') && (
                     <>
                       <button
@@ -691,9 +969,10 @@ export default function PurchaseOrdersPage() {
                                     value={item.isCustom ? 'custom' : 'list'}
                                     onChange={(e) => updateOrderItem(idx, 'isCustom', e.target.value === 'custom')}
                                     className="w-24 px-2 py-1 border rounded text-xs"
+                                    disabled={true} // Strict selection
                                   >
                                     <option value="list">📋 Danh sách</option>
-                                    <option value="custom">✏️ Tự nhập</option>
+                                    {/* <option value="custom">✏️ Tự nhập</option> */}
                                   </select>
                                 </td>
                                 <td className="px-2 py-2">
@@ -829,8 +1108,143 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
           )}
+
+          {/* Payment Modal Refined */}
+          {showPaymentModal && (
+            <div className="fixed inset-0 bg-gray-500/50 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+                <h3 className="text-lg font-bold mb-4">Thanh toán đơn hàng</h3>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  // Determine payment method from account type
+                  const selectedAcc = paymentAccounts.find(a => a.id.toString() === paymentForm.bankAccountId);
+                  const method = selectedAcc?.accountType === 'BANK' ? 'BANK' : 'CASH';
+
+                  // Update form state with correct method before submitting
+                  // We do this via a temporary object because setState is async
+                  const finalForm = {
+                    ...paymentForm,
+                    paymentMethod: method
+                  };
+
+                  // Logic copied from handleCreatePayment but using finalForm
+                  if (!selectedOrder) return;
+                  if (finalForm.amount <= 0) {
+                    alert('Số tiền thanh toán phải lớn hơn 0');
+                    return;
+                  }
+
+                  try {
+                    const res = await fetch(`/api/purchasing/orders/${selectedOrder.id}/payment`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        paymentAmount: finalForm.amount,
+                        paymentMethod: finalForm.paymentMethod,
+                        bankAccountId: finalForm.bankAccountId,
+                        notes: finalForm.notes
+                      }),
+                    });
+
+                    const data = await res.json();
+                    if (data.success) {
+                      alert('Thanh toán thành công');
+                      setShowPaymentModal(false);
+                      viewDetail(selectedOrder.id);
+                      fetchOrders();
+                      fetchPaymentHistory(selectedOrder.id);
+                    } else {
+                      alert(data.error || 'Có lỗi xảy ra');
+                    }
+                  } catch (error) {
+                    alert('Có lỗi xảy ra');
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Số tiền thanh toán</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={paymentForm.amount}
+                        onChange={e => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+                        max={selectedOrder ? selectedOrder.totalAmount - (selectedOrder.paidAmount || 0) : 0}
+                        className="w-full border rounded px-3 py-2"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm({
+                          ...paymentForm,
+                          amount: selectedOrder ? selectedOrder.totalAmount - (selectedOrder.paidAmount || 0) : 0
+                        })}
+                        className="whitespace-nowrap px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        Trả hết
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Còn nợ: {selectedOrder ? formatCurrency(selectedOrder.totalAmount - (selectedOrder.paidAmount || 0)) : 0}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Nguồn tiền / Tài khoản</label>
+                    <select
+                      value={paymentForm.bankAccountId}
+                      onChange={e => setPaymentForm({ ...paymentForm, bankAccountId: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                      required
+                    >
+                      <option value="">-- Chọn tài khoản --</option>
+                      {paymentAccounts.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.accountName || a.bankName}
+                          {a.accountNumber ? ` - ${a.accountNumber}` : ''}
+                          ({a.accountType === 'BANK' ? 'Ngân hàng' : 'Tiền mặt'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Ghi chú</label>
+                    <textarea
+                      value={paymentForm.notes}
+                      onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowPaymentModal(false)}
+                      className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Xác nhận thanh toán
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Hidden File Input for Import */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={processImportExcel}
+            className="hidden"
+            accept=".xlsx, .xls"
+          />
         </div>
-      </WrapperContent>
+      </WrapperContent >
     </>
   );
 }

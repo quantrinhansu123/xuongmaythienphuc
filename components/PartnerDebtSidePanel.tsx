@@ -184,7 +184,8 @@ export default function PartnerDebtSidePanel({
     if (!partnerId || !partnerType) return;
     window.open(
       `/api/finance/debts/partners/${partnerId}/pdf?type=${partnerType}`,
-      "_blank"
+      "_blank",
+      "noopener,noreferrer"
     );
   };
 

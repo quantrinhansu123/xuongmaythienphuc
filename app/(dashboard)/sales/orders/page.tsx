@@ -876,7 +876,7 @@ function OrderDetailDrawer({
       >
         <Button
           onClick={() =>
-            window.open(`/api/sales/orders/${data.id}/pdf`, "_blank")
+            window.open(`/api/sales/orders/${data.id}/pdf`, "_blank", "noopener,noreferrer")
           }
           icon={<span>🖨️</span>}
         >
@@ -2023,7 +2023,12 @@ export default function OrdersPage() {
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
-      printWindow.print();
+      // Delay print to avoid blocking thread immediately and ensure render
+      setTimeout(() => {
+        printWindow.print();
+        // Optional: Close window after print (but better to let user close)
+        // printWindow.close(); 
+      }, 500);
     }
   };
 

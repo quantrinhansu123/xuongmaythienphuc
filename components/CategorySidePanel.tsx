@@ -1,5 +1,6 @@
 import { usePermissions } from '@/hooks/usePermissions';
-import React, { useState } from 'react';
+import { formatCurrency } from '@/utils/format';
+import React, { useEffect, useState } from 'react';
 
 interface FinancialCategory {
   id: number;
@@ -26,6 +27,35 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     type: category.type,
     description: category.description,
   });
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [category.id]);
+
+  const fetchTransactions = async () => {
+    setLoadingTransactions(true);
+    try {
+      // Fetch relevant transactions based on category type
+      const endpoint = category.type === 'THU'
+        ? `/api/finance/receipts?categoryId=${category.id}`
+        : `/api/finance/payment-vouchers?categoryId=${category.id}`;
+
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      if (data.success) {
+        setTransactions(data.data);
+      } else {
+        setTransactions([]);
+      }
+    } catch (error) {
+      console.error(error);
+      setTransactions([]);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,9 +126,8 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Loại:</span>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  category.type === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
+                <span className={`px-2 py-1 rounded text-xs ${category.type === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
                   {category.type}
                 </span>
               </div>
@@ -108,9 +137,8 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Trạng thái:</span>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                }`}>
+                <span className={`px-2 py-1 rounded text-xs ${category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
                   {category.isActive ? 'Hoạt động' : 'Ngừng'}
                 </span>
               </div>
@@ -120,6 +148,44 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
                   {new Date(category.createdAt).toLocaleString('vi-VN')}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Ngày tạo:</span>
+                <span className="font-medium">
+                  {new Date(category.createdAt).toLocaleString('vi-VN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Transaction History */}
+            <div className="mt-6">
+              <h3 className="font-semibold mb-3">Lịch sử {category.type === 'THU' ? 'thu' : 'chi'}</h3>
+              {loadingTransactions ? (
+                <div className="text-center py-4">Đang tải...</div>
+              ) : transactions.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed rounded text-gray-500">
+                  Chưa có giao dịch
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {transactions.map(t => (
+                    <div key={t.id} className="flex justify-between items-center text-sm border-b pb-2">
+                      <div>
+                        <div className="font-medium">
+                          {new Date(t.date || t.voucherDate).toLocaleDateString('vi-VN')} - {t.code || t.voucherCode}
+                        </div>
+                        <div className="text-gray-500 text-xs truncate max-w-[200px]">
+                          {t.description || t.reason}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-bold ${category.type === 'THU' ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(t.amount || t.totalAmount)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">

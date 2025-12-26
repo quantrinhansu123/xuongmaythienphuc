@@ -48,6 +48,8 @@ export default function SuppliersPage() {
     description: '',
   });
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
+  const [supplierOrders, setSupplierOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     if (!permLoading && can('purchasing.suppliers', 'view')) {
@@ -93,6 +95,27 @@ export default function SuppliersPage() {
   const handleViewDetail = (supplier: Supplier) => {
     setDetailSupplier(supplier);
     setShowDetailDrawer(true);
+    fetchSupplierOrders(supplier.id);
+  };
+
+  const fetchSupplierOrders = async (supplierId: number) => {
+    setOrdersLoading(true);
+    try {
+      // Assuming existing orders API supports filtering by supplierId or we fetch all and filter client side
+      // Ideally should be /api/purchasing/orders?supplierId=${supplierId}
+      const res = await fetch(`/api/purchasing/orders?supplierId=${supplierId}`);
+      const data = await res.json();
+      if (data.success) {
+        setSupplierOrders(data.data);
+      } else {
+        setSupplierOrders([]);
+      }
+    } catch (error) {
+      console.error(error);
+      setSupplierOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   const handleViewGroupDetail = (group: any) => {
@@ -599,6 +622,51 @@ export default function SuppliersPage() {
                 </Tag>
               </Descriptions.Item>
             </Descriptions>
+
+            <div className="mt-6">
+              <h3 className="font-semibold mb-2">Danh sách đơn đặt hàng</h3>
+              {ordersLoading ? (
+                <div className="text-center py-4">Đang tải...</div>
+              ) : supplierOrders.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 border rounded bg-gray-50">
+                  Chưa có đơn hàng
+                </div>
+              ) : (
+                <div className="border rounded overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Mã đơn</th>
+                        <th className="px-3 py-2 text-left">Ngày đặt</th>
+                        <th className="px-3 py-2 text-right">Tổng tiền</th>
+                        <th className="px-3 py-2 text-center">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {supplierOrders.map(order => (
+                        <tr key={order.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 font-mono">{order.poCode}</td>
+                          <td className="px-3 py-2">{new Date(order.orderDate).toLocaleDateString('vi-VN')}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(order.totalAmount)}</td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={`px-2 py-1 rounded text-xs ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                              order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
+                                order.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                              }`}>
+                              {order.status === 'PENDING' ? 'Chờ xác nhận' :
+                                order.status === 'CONFIRMED' ? 'Đã xác nhận' :
+                                  order.status === 'DELIVERED' ? 'Đã giao hàng' :
+                                    order.status === 'CANCELLED' ? 'Đã hủy' : order.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end gap-2">
               {can('purchasing.suppliers', 'edit') && (

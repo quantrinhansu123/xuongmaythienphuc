@@ -155,7 +155,7 @@ export default function ExportWarehousePage() {
             type="link"
             size="small"
             onClick={() =>
-              window.open(`/api/inventory/export/${record.id}/pdf`, "_blank")
+              window.open(`/api/inventory/export/${record.id}/pdf`, "_blank", "noopener,noreferrer")
             }
           >
             In
@@ -256,13 +256,13 @@ export default function ExportWarehousePage() {
           refetchDataWithKeys: ["inventory", "export", warehouseId],
           buttonEnds: can("inventory.export", "create")
             ? [
-                {
-                  type: "primary",
-                  name: "Tạo phiếu xuất",
-                  onClick: () => setCreateModalOpen(true),
-                  icon: <PlusOutlined />,
-                },
-              ]
+              {
+                type: "primary",
+                name: "Tạo phiếu xuất",
+                onClick: () => setCreateModalOpen(true),
+                icon: <PlusOutlined />,
+              },
+            ]
             : undefined,
           searchInput: {
             placeholder: "Tìm kiếm phiếu xuất",
@@ -326,15 +326,15 @@ export default function ExportWarehousePage() {
                     selectedTransaction.status === "PENDING"
                       ? "orange"
                       : selectedTransaction.status === "APPROVED"
-                      ? "blue"
-                      : "green"
+                        ? "blue"
+                        : "green"
                   }
                 >
                   {selectedTransaction.status === "PENDING"
                     ? "Chờ duyệt"
                     : selectedTransaction.status === "APPROVED"
-                    ? "Đã duyệt"
-                    : "Hoàn thành"}
+                      ? "Đã duyệt"
+                      : "Hoàn thành"}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Người tạo">
@@ -353,8 +353,8 @@ export default function ExportWarehousePage() {
                   <Descriptions.Item label="Ngày duyệt">
                     {selectedTransaction.approvedAt
                       ? new Date(selectedTransaction.approvedAt).toLocaleString(
-                          "vi-VN"
-                        )
+                        "vi-VN"
+                      )
                       : "-"}
                   </Descriptions.Item>
                 </>

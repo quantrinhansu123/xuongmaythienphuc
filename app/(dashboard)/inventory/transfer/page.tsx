@@ -396,15 +396,15 @@ export default function Page() {
                     selectedTransaction.status === "PENDING"
                       ? "orange"
                       : selectedTransaction.status === "APPROVED"
-                      ? "blue"
-                      : "green"
+                        ? "blue"
+                        : "green"
                   }
                 >
                   {selectedTransaction.status === "PENDING"
                     ? "Chờ duyệt"
                     : selectedTransaction.status === "APPROVED"
-                    ? "Đã duyệt"
-                    : "Hoàn thành"}
+                      ? "Đã duyệt"
+                      : "Hoàn thành"}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Người tạo">
@@ -423,8 +423,8 @@ export default function Page() {
                   <Descriptions.Item label="Ngày duyệt">
                     {selectedTransaction.approvedAt
                       ? new Date(selectedTransaction.approvedAt).toLocaleString(
-                          "vi-VN"
-                        )
+                        "vi-VN"
+                      )
                       : "-"}
                   </Descriptions.Item>
                 </>
@@ -438,7 +438,7 @@ export default function Page() {
               <Button
                 icon={<DownloadOutlined />}
                 onClick={() =>
-                  window.open(`/api/inventory/transfer/${selectedTransaction.id}/pdf`, "_blank")
+                  window.open(`/api/inventory/transfer/${selectedTransaction.id}/pdf`, "_blank", "noopener,noreferrer")
                 }
               >
                 In phiếu
