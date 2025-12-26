@@ -94,8 +94,8 @@ export default function DashboardLayout({
       return res.json();
     },
     retry: false,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 30 * 60 * 1000, // 30 phút - user info ít thay đổi
+    gcTime: 60 * 60 * 1000, // 1 giờ cache
   });
 
   const loading = meLoading || permLoading;

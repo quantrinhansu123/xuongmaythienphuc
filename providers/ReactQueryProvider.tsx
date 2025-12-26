@@ -13,8 +13,8 @@ export const queryClient = new QueryClient({
       refetchOnMount: true, // Refetch khi mount để dữ liệu luôn mới
       refetchOnWindowFocus: false, // Không refetch khi focus window
       retry: 2,
-      staleTime: 1 * 60 * 1000, // 1 phút - data stale nhanh hơn
-      gcTime: 10 * 60 * 1000, // 10 phút cache
+      staleTime: 3 * 60 * 1000, // 3 phút - giảm API calls khi chuyển trang
+      gcTime: 15 * 60 * 1000, // 15 phút cache - giữ data lâu hơn
       placeholderData: keepPreviousData,
     },
   },

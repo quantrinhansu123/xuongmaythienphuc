@@ -3,7 +3,20 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Tối ưu production build
   reactStrictMode: true,
-  
+
+  // Bật compression cho responses
+  compress: true,
+
+  // Ẩn header X-Powered-By để bảo mật và giảm size
+  poweredByHeader: false,
+
+  // Tối ưu logging cho production
+  logging: {
+    fetches: {
+      fullUrl: false,
+    },
+  },
+
   // Tối ưu images
   images: {
     formats: ['image/avif', 'image/webp'],
@@ -20,8 +33,8 @@ const nextConfig: NextConfig = {
 
   // Tối ưu experimental features
   experimental: {
-    // Tối ưu package imports
-    optimizePackageImports: ['antd', '@ant-design/icons', '@tanstack/react-query'],
+    // Tối ưu package imports - thêm lucide-react và recharts
+    optimizePackageImports: ['antd', '@ant-design/icons', '@tanstack/react-query', 'lucide-react', 'recharts', 'lodash'],
   },
 
   // Headers cho caching
