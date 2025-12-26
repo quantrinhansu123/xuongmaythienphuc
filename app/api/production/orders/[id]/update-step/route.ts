@@ -20,7 +20,7 @@ export async function POST(
         const body = await request.json();
         const { step } = body;
 
-        const validSteps = ['MATERIAL_IMPORT', 'CUTTING', 'SEWING', 'FINISHING', 'QC', 'WAREHOUSE_IMPORT'];
+        const validSteps = ['MATERIAL_IMPORT', 'CUTTING', 'SEWING', 'FINISHING', 'QC', 'WAREHOUSE_IMPORT', 'PRODUCTION'];
         if (!validSteps.includes(step)) {
             return NextResponse.json<ApiResponse>({
                 success: false,

@@ -192,14 +192,17 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
 
     const steps = [
         { title: "Nhập NVL", key: "MATERIAL_IMPORT" },
-        { title: "Cắt", key: "CUTTING" },
-        { title: "May", key: "SEWING" },
-        { title: "Hoàn thiện", key: "FINISHING" },
-        { title: "KCS", key: "QC" },
-        { title: "Nhập kho", key: "WAREHOUSE_IMPORT" },
+        { title: "Sản Xuất", key: "PRODUCTION" },
+        { title: "Nhập Kho", key: "WAREHOUSE_IMPORT" },
     ];
 
-    const currentStepIndex = steps.findIndex((s) => s.key === data.currentStep);
+    const isProductionStep = ['CUTTING', 'SEWING', 'FINISHING', 'QC', 'PRODUCTION'].includes(data.currentStep);
+
+    const currentStepIndex =
+        data.currentStep === "MATERIAL_IMPORT" ? 0 :
+            data.currentStep === "WAREHOUSE_IMPORT" ? 2 :
+                data.status === "COMPLETED" ? 3 :
+                    isProductionStep ? 1 : 0;
 
     const handleNextStep = async () => {
         const nextStep = steps[currentStepIndex + 1];
@@ -248,19 +251,10 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                         Tiến hành nhập NVL
                     </Button>
                 );
+            case "PRODUCTION":
             case "CUTTING":
             case "SEWING":
             case "FINISHING":
-                return (
-                    <Button
-                        type="primary"
-                        icon={<ArrowRightOutlined />}
-                        onClick={handleNextStep}
-                        loading={isUpdatingStep}
-                    >
-                        Hoàn thành & Chuyển bước tiếp
-                    </Button>
-                );
             case "QC":
                 return (
                     <Button
@@ -269,7 +263,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                         onClick={handleNextStep}
                         loading={isUpdatingStep}
                     >
-                        Hoàn thành KCS & Chuyển nhập kho
+                        Hoàn thành Sản Xuất & Chuyển nhập kho
                     </Button>
                 );
             case "WAREHOUSE_IMPORT":
@@ -612,38 +606,14 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                 {data.sourceWarehouseName ? (
                                     <Tag color="blue">📦 {data.sourceWarehouseName}</Tag>
                                 ) : (
-                                    <Button
-                                        type="link"
-                                        size="small"
-                                        onClick={() => {
-                                            warehouseForm.setFieldsValue({
-                                                sourceWarehouseId: data.sourceWarehouseId,
-                                                targetWarehouseId: data.targetWarehouseId,
-                                            });
-                                            setShowWarehouseModal(true);
-                                        }}
-                                    >
-                                        + Chọn kho
-                                    </Button>
+                                    <span className="text-gray-400 italic">Chưa chọn</span>
                                 )}
                             </Descriptions.Item>
                             <Descriptions.Item label="Kho nhận thành phẩm">
                                 {data.targetWarehouseName ? (
                                     <Tag color="green">🏭 {data.targetWarehouseName}</Tag>
                                 ) : (
-                                    <Button
-                                        type="link"
-                                        size="small"
-                                        onClick={() => {
-                                            warehouseForm.setFieldsValue({
-                                                sourceWarehouseId: data.sourceWarehouseId,
-                                                targetWarehouseId: data.targetWarehouseId,
-                                            });
-                                            setShowWarehouseModal(true);
-                                        }}
-                                    >
-                                        + Chọn kho
-                                    </Button>
+                                    <span className="text-gray-400 italic">Chưa chọn</span>
                                 )}
                             </Descriptions.Item>
                             <Descriptions.Item label="Ngày giao thợ">

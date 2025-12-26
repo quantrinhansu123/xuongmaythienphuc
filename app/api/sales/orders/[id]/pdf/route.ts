@@ -28,8 +28,10 @@ export async function GET(
       `SELECT 
         o.id,
         o.order_code as "orderCode",
+        c.customer_code as "customerCode",
         c.customer_name as "customerName",
         c.phone as "customerPhone",
+        c.email as "customerEmail",
         c.address as "customerAddress",
         o.order_date as "orderDate",
         o.total_amount as "totalAmount",
@@ -79,30 +81,8 @@ export async function GET(
 
     const details = detailsResult.rows;
 
-    // Lấy thông số (measurements) cho từng item
+    // Measurements fetch removed as requested
     const measurementsByDetail: any = {};
-    if (details.length > 0) {
-      const detailIds = details.map(d => d.id);
-      const measurementsResult = await query(
-        `SELECT 
-          oim.order_detail_id as "orderDetailId",
-          ca.attribute_name as "attributeName",
-          oim.value
-         FROM order_item_measurements oim
-         JOIN category_attributes ca ON ca.id = oim.attribute_id
-         WHERE oim.order_detail_id = ANY($1)
-         ORDER BY oim.order_detail_id, ca.id`,
-        [detailIds]
-      );
-
-      // Group measurements by order_detail_id
-      measurementsResult.rows.forEach((m: any) => {
-        if (!measurementsByDetail[m.orderDetailId]) {
-          measurementsByDetail[m.orderDetailId] = [];
-        }
-        measurementsByDetail[m.orderDetailId].push(m);
-      });
-    }
 
     // Lấy thông tin công ty
     const companyResult = await query(
@@ -191,13 +171,18 @@ export async function GET(
   <div class="info-section">
     <div style="font-weight: bold; margin-bottom: 10px; font-size: 15px;">THÔNG TIN KHÁCH HÀNG</div>
     <div class="info-row">
-      <div class="info-label">Tên khách hàng:</div>
-      <div class="info-value">${order.customerName}</div>
+      <div class="info-label">Khách hàng:</div>
+      <div class="info-value"><strong>${order.customerName}</strong> ${order.customerCode ? `(${order.customerCode})` : ''}</div>
     </div>
     ${order.customerPhone ? `
     <div class="info-row">
       <div class="info-label">Điện thoại:</div>
       <div class="info-value">${order.customerPhone}</div>
+    </div>` : ''}
+    ${order.customerEmail ? `
+    <div class="info-row">
+      <div class="info-label">Email:</div>
+      <div class="info-value">${order.customerEmail}</div>
     </div>` : ''}
     ${order.customerAddress ? `
     <div class="info-row">
@@ -220,10 +205,7 @@ export async function GET(
     </thead>
     <tbody>
       ${details.map((item, idx) => {
-      const measurements = measurementsByDetail[item.id] || [];
-      const measurementsHtml = measurements.length > 0
-        ? `<br><small style="color: #0066cc; font-weight: bold;">📏 Thông số: ${measurements.map((m: any) => `${m.attributeName}: ${m.value}`).join(', ')}</small>`
-        : '';
+      const measurementsHtml = '';
       return `
       <tr>
         <td class="text-center">${idx + 1}</td>
@@ -240,10 +222,11 @@ export async function GET(
   </table>
 
   <div class="total-section">
+    ${order.discountAmount > 0 ? `
     <div class="total-row">
       <span>Tổng tiền:</span>
       <span>${formatNumber(order.totalAmount)} đ</span>
-    </div>
+    </div>` : ''}
     ${order.discountAmount > 0 ? `
     <div class="total-row" style="color: #dc2626;">
       <span>Giảm giá:</span>
@@ -253,23 +236,24 @@ export async function GET(
       <span>THÀNH TIỀN:</span>
       <span>${formatNumber(order.finalAmount)} đ</span>
     </div>
-    ${parseFloat(order.depositAmount) > 0 ? `
-    <div class="total-row" style="color: #16a34a;">
-      <span>Tiền cọc:</span>
-      <span>${formatNumber(order.depositAmount)} đ</span>
-    </div>` : ''}
-    ${parseFloat(order.paidAmount) > 0 ? `
-    <div class="total-row" style="color: #16a34a;">
-      <span>Đã thanh toán:</span>
-      <span>${formatNumber(order.paidAmount)} đ</span>
-    </div>` : ''}
+    
     ${(() => {
-        const remaining = parseFloat(order.finalAmount) - parseFloat(order.depositAmount) - parseFloat(order.paidAmount);
-        return remaining > 0 ? `
-    <div class="total-row" style="color: #dc2626; font-weight: bold;">
-      <span>CÒN LẠI:</span>
-      <span>${formatNumber(remaining)} đ</span>
-    </div>` : '';
+        const deposit = parseFloat(order.depositAmount) || 0;
+        const paid = parseFloat(order.paidAmount) || 0;
+        const totalPaid = deposit + paid;
+        const remaining = parseFloat(order.finalAmount) - totalPaid;
+
+        return `
+        <div class="total-row" style="color: #16a34a;">
+          <span>Đã thanh toán:</span>
+          <span>${formatNumber(totalPaid)} đ</span>
+        </div>
+        ${remaining > 0 ? `
+        <div class="total-row" style="color: #dc2626; font-weight: bold;">
+          <span>CÒN LẠI:</span>
+          <span>${formatNumber(remaining)} đ</span>
+        </div>` : ''}
+        `;
       })()}
   </div>
 
@@ -280,6 +264,10 @@ export async function GET(
     <div class="notes-label">Ghi chú:</div>
     <div>${order.notes}</div>
   </div>` : ''}
+
+  <div style="text-align: right; margin-top: 20px; margin-bottom: 20px; font-style: italic; margin-right: 40px;">
+    ..., ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}
+  </div>
 
   <div class="signature-section">
     <div class="signature-box">
