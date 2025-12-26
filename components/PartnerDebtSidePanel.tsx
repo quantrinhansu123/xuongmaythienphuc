@@ -138,7 +138,7 @@ export default function PartnerDebtSidePanel({
     setSelectedOrderId(orderId);
     const order = unpaidOrdersList.find(o => o.id === orderId);
     if (order) {
-      form.setFieldsValue({ paymentAmount: order.remainingAmount.toString() });
+      form.setFieldsValue({ paymentAmount: (order.remainingAmount || 0).toString() });
     }
   };
 
@@ -309,7 +309,7 @@ export default function PartnerDebtSidePanel({
                         label: (
                           <div className="flex justify-between">
                             <span>{order.orderCode} - {dayjs(order.orderDate).format("DD/MM/YYYY")}</span>
-                            <span className="text-orange-600">{order.remainingAmount.toLocaleString("vi-VN")} đ</span>
+                            <span className="text-orange-600">{(order.remainingAmount || 0).toLocaleString("vi-VN")} đ</span>
                           </div>
                         ),
                         value: order.id,

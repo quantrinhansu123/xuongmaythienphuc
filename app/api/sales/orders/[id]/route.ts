@@ -27,6 +27,7 @@ export async function GET(
         o.customer_id as "customerId",
         c.customer_name as "customerName",
         o.branch_id as "branchId",
+        b.branch_name as "branchName",
         o.order_date as "orderDate",
         o.total_amount as "totalAmount",
         o.discount_amount as "discountAmount",
@@ -41,6 +42,7 @@ export async function GET(
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.created_by
+       LEFT JOIN branches b ON b.id = o.branch_id
        WHERE o.id = $1`,
       [orderId]
     );
@@ -120,6 +122,90 @@ export async function GET(
 
   } catch (error) {
     console.error('Get order detail error:', error);
+    return NextResponse.json<ApiResponse>({
+      success: false,
+      error: 'Lỗi server'
+    }, { status: 500 });
+  }
+}
+
+// PUT: Update order (only for PENDING orders)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { hasPermission, error } = await requirePermission('sales.orders', 'edit');
+    if (!hasPermission) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: error || 'Không có quyền sửa đơn hàng'
+      }, { status: 403 });
+    }
+
+    const resolvedParams = await params;
+    const orderId = parseInt(resolvedParams.id);
+    const body = await request.json();
+    const { customerId, notes, discountAmount, items } = body;
+
+    // Check order exists and is PENDING
+    const orderCheck = await query(
+      `SELECT status FROM orders WHERE id = $1`,
+      [orderId]
+    );
+
+    if (orderCheck.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy đơn hàng'
+      }, { status: 404 });
+    }
+
+    if (orderCheck.rows[0].status !== 'PENDING') {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Chỉ có thể sửa đơn hàng chưa xác nhận'
+      }, { status: 400 });
+    }
+
+    // Calculate totals
+    let totalAmount = 0;
+    if (items && items.length > 0) {
+      totalAmount = items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
+    }
+    const discount = discountAmount || 0;
+    const finalAmount = totalAmount - discount;
+
+    // Update order
+    await query(
+      `UPDATE orders 
+       SET customer_id = $1, notes = $2, discount_amount = $3, 
+           total_amount = $4, final_amount = $5, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $6`,
+      [customerId, notes || null, discount, totalAmount, finalAmount, orderId]
+    );
+
+    // Delete existing order details
+    await query(`DELETE FROM order_details WHERE order_id = $1`, [orderId]);
+
+    // Insert new order details
+    if (items && items.length > 0) {
+      for (const item of items) {
+        await query(
+          `INSERT INTO order_details (order_id, item_id, product_id, quantity, unit_price, total_amount, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [orderId, item.itemId || null, item.productId || null, item.quantity, item.unitPrice, item.quantity * item.unitPrice, item.notes || null]
+        );
+      }
+    }
+
+    return NextResponse.json<ApiResponse>({
+      success: true,
+      data: { id: orderId }
+    });
+
+  } catch (error) {
+    console.error('Update order error:', error);
     return NextResponse.json<ApiResponse>({
       success: false,
       error: 'Lỗi server'

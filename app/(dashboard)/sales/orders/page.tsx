@@ -26,6 +26,7 @@ import {
   App,
   Button,
   Card,
+  Collapse,
   DatePicker,
   Descriptions,
   Form,
@@ -128,8 +129,9 @@ interface MaterialSuggestion {
 interface OrderDetailDrawerProps {
   orderId: number | null;
   canEdit: boolean;
-  onUpdateStatus: (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string; bankAccountId?: number }) => void;
+  onUpdateStatus: (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string; bankAccountId?: number; isDeposit?: boolean }) => void;
   onExportOrder: (order: Order) => void;
+  onEditOrder?: (order: Order) => void;
 }
 
 function OrderDetailDrawer({
@@ -137,6 +139,7 @@ function OrderDetailDrawer({
   canEdit,
   onUpdateStatus,
   onExportOrder,
+  onEditOrder,
 }: OrderDetailDrawerProps) {
   const [paymentForm] = Form.useForm();
   const [remainingPaymentForm] = Form.useForm();
@@ -304,6 +307,9 @@ function OrderDetailDrawer({
           <Descriptions.Item label="Khách hàng">
             {data.customerName}
           </Descriptions.Item>
+          <Descriptions.Item label="Chi nhánh">
+            {data.branchName || 'Chưa xác định'}
+          </Descriptions.Item>
           <Descriptions.Item label="Ngày đặt">
             {new Date(data.orderDate).toLocaleDateString("vi-VN")}
           </Descriptions.Item>
@@ -337,8 +343,15 @@ function OrderDetailDrawer({
               data.paymentStatus === 'PAID' ? 'green' :
                 data.paymentStatus === 'PARTIAL' ? 'orange' : 'red'
             }>
-              {data.paymentStatus === 'PAID' ? 'Đã thanh toán' :
-                data.paymentStatus === 'PARTIAL' ? 'Thanh toán một phần' : 'Chưa thanh toán'}
+              {(() => {
+                const deposit = data.depositAmount || 0;
+                const paid = data.paidAmount || 0;
+                if (data.paymentStatus === 'PAID') return 'Đã hoàn thành TT';
+                if (deposit > 0 && paid > 0) return 'Đã TT một phần';
+                if (deposit > 0) return 'Đã cọc';
+                if (paid > 0) return 'Đã TT một phần';
+                return 'Chưa TT';
+              })()}
             </Tag>
           </Descriptions.Item>
         </Descriptions>
@@ -402,13 +415,15 @@ function OrderDetailDrawer({
                   2
                 </div>
                 <div className="flex-1">
-                  <Typography.Text strong>Thanh toán</Typography.Text>
+                  <Typography.Text strong>Cọc</Typography.Text>
                   <div className="text-xs text-gray-500">
-                    {data.paymentStatus === "PAID"
-                      ? "Đã thanh toán đủ"
-                      : data.paymentStatus === "PARTIAL"
-                        ? "Đã thanh toán một phần"
-                        : "Chưa thanh toán"}
+                    {(data.depositAmount || 0) > 0
+                      ? `Đã cọc: ${formatCurrency(data.depositAmount)}`
+                      : data.paymentStatus === "PAID"
+                        ? "Đã thanh toán đủ"
+                        : data.paymentStatus === "PARTIAL"
+                          ? "Đã thanh toán một phần"
+                          : "Chưa cọc"}
                   </div>
                   {data.status === "CONFIRMED" && canEdit && (() => {
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
@@ -416,7 +431,7 @@ function OrderDetailDrawer({
                   })() && (
                       <div style={{ marginTop: 8, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
                         <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                          💰 Thanh toán
+                          💰 Nhập tiền cọc
                         </Typography.Text>
                         <Form
                           form={paymentForm}
@@ -426,14 +441,15 @@ function OrderDetailDrawer({
                             onUpdateStatus(data.id, 'PAID', {
                               paymentAmount: values.paymentAmount,
                               paymentMethod: acc?.accountType === 'CASH' ? 'CASH' : 'BANK',
-                              bankAccountId: values.bankAccountId
+                              bankAccountId: values.bankAccountId,
+                              isDeposit: true // Flag to indicate this is deposit, not regular payment
                             });
                             paymentForm.resetFields();
                           }}
                         >
-                          <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 8 }}>
+                          <Form.Item name="paymentAmount" rules={[{ required: true, message: 'Nhập số tiền cọc' }]} style={{ marginBottom: 8 }}>
                             <InputNumber
-                              placeholder="Nhập số tiền"
+                              placeholder="Nhập số tiền cọc"
                               min={0}
                               max={data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)}
                               style={{ width: '100%' }}
@@ -450,7 +466,7 @@ function OrderDetailDrawer({
                             }}
                             style={{ marginTop: -8, marginBottom: 8, padding: 0 }}
                           >
-                            Thanh toán toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
+                            Cọc toàn bộ: {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
                           </Button>
                           <Form.Item name="bankAccountId" rules={[{ required: true, message: 'Chọn tài khoản nhận tiền' }]} style={{ marginBottom: 8 }}>
                             <Select placeholder="Chọn tài khoản nhận tiền">
@@ -462,7 +478,7 @@ function OrderDetailDrawer({
                             </Select>
                           </Form.Item>
                           <Button type="primary" htmlType="submit" size="small" block>
-                            Xác nhận thanh toán
+                            Xác nhận tiền cọc
                           </Button>
                         </Form>
                       </div>
@@ -532,21 +548,18 @@ function OrderDetailDrawer({
                       </Button>
                     </Space>
                   )}
-                  {data.status === "PAID" && canEdit && needsProduction === false && (() => {
-                    const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-                    return remainingAmount === 0 || data.paymentStatus === 'PAID';
-                  })() && (
-                      <Button
-                        size="small"
-                        type="primary"
-                        style={{ marginTop: 8 }}
-                        onClick={() => {
-                          onUpdateStatus(data.id, "READY_TO_EXPORT");
-                        }}
-                      >
-                        Bỏ qua
-                      </Button>
-                    )}
+                  {data.status === "PAID" && canEdit && needsProduction === false && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        onUpdateStatus(data.id, "READY_TO_EXPORT");
+                      }}
+                    >
+                      → Chuyển sẵn sàng xuất kho
+                    </Button>
+                  )}
                   {data.status === "IN_PRODUCTION" && canEdit && (
                     <Button
                       size="small"
@@ -586,13 +599,49 @@ function OrderDetailDrawer({
                         ? "Đã xuất kho"
                         : "Chờ xuất kho"}
                   </div>
-                  {data.status === "READY_TO_EXPORT" && canEdit && (() => {
+                  {data.status === "READY_TO_EXPORT" && canEdit && (
+                    <Button
+                      onClick={() => onExportOrder(data)}
+                      size="small"
+                      type="primary"
+                      style={{ marginTop: 8 }}
+                      block
+                    >
+                      → Xuất kho
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bước 5: Hoàn thành */}
+              <div
+                className={`flex items-start gap-3 ${["EXPORTED", "COMPLETED"].includes(data.status)
+                  ? "opacity-100"
+                  : "opacity-50"
+                  }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${["EXPORTED", "COMPLETED"].includes(data.status)
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-300 text-gray-600"
+                    }`}
+                >
+                  5
+                </div>
+                <div className="flex-1">
+                  <Typography.Text strong>Hoàn thành</Typography.Text>
+                  <div className="text-xs text-gray-500">
+                    {data.status === "COMPLETED"
+                      ? "Đơn hàng đã hoàn thành"
+                      : "Đã xuất kho - Chờ hoàn thành"}
+                  </div>
+                  {data.status === "EXPORTED" && canEdit && (() => {
                     const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-                    return remainingAmount;
-                  })() > 0 && (
-                      <div style={{ marginTop: 8, padding: 12, background: '#fff7e6', borderRadius: 6, border: '1px solid #ffd591' }}>
-                        <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8, color: '#d46b08' }}>
-                          ⚠️ Cần thanh toán phần còn lại trước khi xuất kho
+                    return remainingAmount > 0;
+                  })() && (
+                      <div style={{ marginTop: 8, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
+                        <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                          💰 Thanh toán phần còn lại (không bắt buộc)
                         </Typography.Text>
                         <Typography.Text style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
                           Còn lại: <strong>{formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}</strong>
@@ -641,50 +690,11 @@ function OrderDetailDrawer({
                             </Select>
                           </Form.Item>
                           <Button type="primary" htmlType="submit" size="small" block>
-                            Thanh toán phần còn lại
+                            Thanh toán
                           </Button>
                         </Form>
                       </div>
                     )}
-                  {data.status === "READY_TO_EXPORT" && canEdit && (() => {
-                    const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-                    return remainingAmount === 0 || data.paymentStatus === 'PAID';
-                  })() && (
-                      <Button
-                        onClick={() => onExportOrder(data)}
-                        size="small"
-                        type="primary"
-                        style={{ marginTop: 8 }}
-                        block
-                      >
-                        → Xuất kho
-                      </Button>
-                    )}
-                </div>
-              </div>
-
-              {/* Bước 5: Hoàn thành */}
-              <div
-                className={`flex items-start gap-3 ${["EXPORTED", "COMPLETED"].includes(data.status)
-                  ? "opacity-100"
-                  : "opacity-50"
-                  }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${["EXPORTED", "COMPLETED"].includes(data.status)
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-300 text-gray-600"
-                    }`}
-                >
-                  5
-                </div>
-                <div className="flex-1">
-                  <Typography.Text strong>Hoàn thành</Typography.Text>
-                  <div className="text-xs text-gray-500">
-                    {data.status === "COMPLETED"
-                      ? "Đơn hàng đã hoàn thành"
-                      : "Đã xuất kho - Chờ hoàn thành"}
-                  </div>
                   {data.status === "EXPORTED" && canEdit && (
                     <Button
                       onClick={() => {
@@ -695,7 +705,7 @@ function OrderDetailDrawer({
                       style={{ marginTop: 8 }}
                       block
                     >
-                      → Hoàn thành
+                      → Hoàn thành đơn hàng
                     </Button>
                   )}
                 </div>
@@ -798,54 +808,62 @@ function OrderDetailDrawer({
         </div>
       </Card>
 
-      {/* Kiểm tra tồn kho */}
+      {/* Kiểm tra tồn kho - Thu gọn mặc định */}
       {stockByWarehouse.length > 0 && (
-        <Card title="Kiểm tra tồn kho" size="small">
-          <Table
-            dataSource={stockByWarehouse}
-            rowKey="warehouseId"
-            pagination={false}
-            size="small"
-            columns={[
-              {
-                title: 'Kho',
-                key: 'warehouse',
-                render: (_: any, record: any) => (
-                  <div>
-                    <div className="font-medium">{record.warehouseName}</div>
-                    <div className="text-xs text-gray-500">{record.branchName}</div>
-                  </div>
-                ),
-              },
-              {
-                title: 'Trạng thái',
-                key: 'status',
-                align: 'center' as const,
-                render: (_: any, record: any) => {
-                  const isEnough = record.canFulfill;
-                  return isEnough ? (
-                    <Tag color="green">✓ Đủ hàng</Tag>
-                  ) : (
-                    <Tag color="red">✗ Thiếu hàng</Tag>
-                  );
-                },
-              },
-              {
-                title: 'Chi tiết',
-                key: 'details',
-                render: (_: any, record: any) => (
-                  <div className="text-xs space-y-1">
-                    {record.items?.map((item: any, idx: number) => (
-                      <div key={idx} className={item.available >= item.required ? 'text-green-600' : 'text-red-600'}>
-                        {item.itemName}: {formatQuantity(item.available)}/{formatQuantity(item.required)}
+        <Collapse
+          size="small"
+          defaultActiveKey={[]}
+          items={[{
+            key: 'stock-check',
+            label: <span className="font-semibold">Kiểm tra tồn kho</span>,
+            children: (
+              <Table
+                dataSource={stockByWarehouse}
+                rowKey="warehouseId"
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: 'Kho',
+                    key: 'warehouse',
+                    render: (_: any, record: any) => (
+                      <div>
+                        <div className="font-medium">{record.warehouseName}</div>
+                        <div className="text-xs text-gray-500">{record.branchName}</div>
                       </div>
-                    ))}
-                  </div>
-                ),
-              },
-            ]}
-          />
-        </Card>
+                    ),
+                  },
+                  {
+                    title: 'Trạng thái',
+                    key: 'status',
+                    align: 'center' as const,
+                    render: (_: any, record: any) => {
+                      const isEnough = record.canFulfill;
+                      return isEnough ? (
+                        <Tag color="green">✓ Đủ hàng</Tag>
+                      ) : (
+                        <Tag color="red">✗ Thiếu hàng</Tag>
+                      );
+                    },
+                  },
+                  {
+                    title: 'Chi tiết',
+                    key: 'details',
+                    render: (_: any, record: any) => (
+                      <div className="text-xs space-y-1">
+                        {record.items?.map((item: any, idx: number) => (
+                          <div key={idx} className={item.available >= item.required ? 'text-green-600' : 'text-red-600'}>
+                            {item.itemName}: {formatQuantity(item.available)}/{formatQuantity(item.required)}
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            )
+          }]}
+        />
       )}
 
       <Space
@@ -866,6 +884,12 @@ function OrderDetailDrawer({
         </Button>
         {data.status === "PENDING" && canEdit && (
           <>
+            <Button
+              onClick={() => onEditOrder?.(data)}
+              icon={<span>✏️</span>}
+            >
+              Sửa đơn
+            </Button>
             <Button danger onClick={() => onUpdateStatus(data.id, "CANCELLED")}>
               ✗ Hủy đơn
             </Button>
@@ -885,18 +909,15 @@ function OrderDetailDrawer({
             → Nhập thông số
           </Button>
         )}
-        {data.status === "READY_TO_EXPORT" && canEdit && (() => {
-          const remainingAmount = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
-          return remainingAmount === 0 || data.paymentStatus === 'PAID';
-        })() && (
-            <Button
-              type="primary"
-              onClick={() => onExportOrder(data)}
-              icon={<span>📦</span>}
-            >
-              Xuất kho
-            </Button>
-          )}
+        {data.status === "READY_TO_EXPORT" && canEdit && (
+          <Button
+            type="primary"
+            onClick={() => onExportOrder(data)}
+            icon={<span>📦</span>}
+          >
+            Xuất kho
+          </Button>
+        )}
         {data.status === "EXPORTED" && canEdit && (
           <Button
             type="primary"
@@ -997,12 +1018,7 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
   const handleExport = async (values: any) => {
     if (!order) return;
 
-    // Check if payment is complete
-    const remainingAmount = order.finalAmount - (order.depositAmount || 0) - (order.paidAmount || 0);
-    if (remainingAmount > 0) {
-      message.error(`Đơn hàng còn thiếu ${formatCurrency(remainingAmount)}. Vui lòng thanh toán trước khi xuất kho.`);
-      return;
-    }
+    // Cho phép xuất kho không cần thanh toán hết
 
     setLoading(true);
     try {
@@ -1069,15 +1085,7 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
       footer={null}
       destroyOnClose
     >
-      {remainingAmount > 0 && (
-        <Alert
-          message="Cảnh báo"
-          description={`Đơn hàng còn thiếu ${formatCurrency(remainingAmount)}. Vui lòng thanh toán trước khi xuất kho.`}
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-      )}
+
       <Form form={form} layout="vertical" onFinish={handleExport}>
         <Form.Item
           name="warehouseId"
@@ -1098,36 +1106,46 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
           </Select>
         </Form.Item>
 
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <Typography.Text strong>Danh sách hàng hóa:</Typography.Text>
-            {checkingStock && <Spin size="small" />}
-          </div>
-          <ul className="list-disc pl-4 mt-2 space-y-1">
-            {order?.details?.map((item, idx) => {
-              const key = item.productId ? `p-${item.productId}` : `m-${item.materialId}`;
-              const stock = stockData[key] || 0;
-              const isEnough = stock >= item.quantity;
+        <Collapse
+          size="small"
+          defaultActiveKey={[]}
+          activeKey={selectedWarehouseId ? ['stock'] : undefined}
+          items={[{
+            key: 'stock',
+            label: (
+              <div className="flex items-center gap-2">
+                <Typography.Text strong>Kiểm tra tồn kho</Typography.Text>
+                {checkingStock && <Spin size="small" />}
+              </div>
+            ),
+            children: (
+              <ul className="list-disc pl-4 space-y-1">
+                {order?.details?.map((item, idx) => {
+                  const key = item.productId ? `p-${item.productId}` : `m-${item.materialId}`;
+                  const stock = stockData[key] || 0;
+                  const isEnough = stock >= item.quantity;
 
-              return (
-                <li key={idx} className="text-sm">
-                  <div className="flex justify-between items-center">
-                    <span>{item.itemName}</span>
-                    <div className="flex gap-3">
-                      <span>SL: <strong>{formatQuantity(item.quantity)}</strong></span>
-                      {selectedWarehouseId && (
-                        <span className={isEnough ? "text-green-600" : "text-red-600 font-bold"}>
-                          (Tồn: {formatQuantity(stock)})
-                          {!isEnough && " ⚠️ Thiếu"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+                  return (
+                    <li key={idx} className="text-sm">
+                      <div className="flex justify-between items-center">
+                        <span>{item.itemName}</span>
+                        <div className="flex gap-3">
+                          <span>SL: <strong>{formatQuantity(item.quantity)}</strong></span>
+                          {selectedWarehouseId && (
+                            <span className={isEnough ? "text-green-600" : "text-red-600 font-bold"}>
+                              (Tồn: {formatQuantity(stock)})
+                              {!isEnough && " ⚠️ Thiếu"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
+          }]}
+        />
 
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Hủy</Button>
@@ -1135,7 +1153,6 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
             type="primary"
             htmlType="submit"
             loading={loading}
-            disabled={remainingAmount > 0}
           >
             Xuất kho
           </Button>
@@ -1256,6 +1273,7 @@ export default function OrdersPage() {
 
   // Modal and form state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [previewBOM, setPreviewBOM] = useState<MaterialSuggestion[]>([]);
   const [showPreviewBOM, setShowPreviewBOM] = useState(false);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -1265,6 +1283,7 @@ export default function OrdersPage() {
   const [branches, setBranches] = useState<{ id: number; branchName: string }[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | "all">("all");
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string | "all">("all");
   const [currentUser, setCurrentUser] = useState<{ roleCode: string } | null>(null);
   const { modal } = App.useApp();
 
@@ -1272,8 +1291,11 @@ export default function OrdersPage() {
   const [form] = Form.useForm();
   const saveMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
-      const res = await fetch("/api/sales/orders", {
-        method: "POST",
+      const url = editingOrderId
+        ? `/api/sales/orders/${editingOrderId}`
+        : "/api/sales/orders";
+      const res = await fetch(url, {
+        method: editingOrderId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
@@ -1283,9 +1305,12 @@ export default function OrdersPage() {
     },
     onSuccess: (data) => {
       message.success(
-        `Tạo đơn hàng thành công! Mã đơn: ${data.data.orderCode}`
+        editingOrderId
+          ? `Cập nhật đơn hàng thành công!`
+          : `Tạo đơn hàng thành công! Mã đơn: ${data.data.orderCode}`
       );
       setShowCreateModal(false);
+      setEditingOrderId(null);
       form.resetFields();
       setOrderItems([]);
       setSelectedCustomer(null);
@@ -1307,11 +1332,11 @@ export default function OrdersPage() {
 
   // Status update mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, paymentAmount, paymentMethod, bankAccountId }: { id: number; status: string; paymentAmount?: number; paymentMethod?: string; bankAccountId?: number }) => {
+    mutationFn: async ({ id, status, paymentAmount, paymentMethod, bankAccountId, isDeposit }: { id: number; status: string; paymentAmount?: number; paymentMethod?: string; bankAccountId?: number; isDeposit?: boolean }) => {
       const res = await fetch(`/api/sales/orders/${id}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, paymentAmount, paymentMethod, bankAccountId }),
+        body: JSON.stringify({ status, paymentAmount, paymentMethod, bankAccountId, isDeposit }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
@@ -1338,6 +1363,7 @@ export default function OrdersPage() {
     customerId: "",
     orderDate: new Date().toISOString().split("T")[0],
     notes: "",
+    branchId: "", // Add branchId to form state
   });
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -1400,7 +1426,7 @@ export default function OrdersPage() {
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ["orders", SuperJSON.stringify(query), dateRange?.[0]?.format("YYYY-MM-DD"), dateRange?.[1]?.format("YYYY-MM-DD"), selectedBranchId, selectedCustomerId],
+    queryKey: ["orders", SuperJSON.stringify(query), dateRange?.[0]?.format("YYYY-MM-DD"), dateRange?.[1]?.format("YYYY-MM-DD"), selectedBranchId, selectedCustomerId, selectedPaymentStatus],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (query.search) params.append("search", query.search);
@@ -1409,6 +1435,7 @@ export default function OrdersPage() {
       if (dateRange?.[0]) params.append("startDate", dateRange[0].format("YYYY-MM-DD"));
       if (dateRange?.[1]) params.append("endDate", dateRange[1].format("YYYY-MM-DD"));
       if (selectedBranchId !== "all") params.append("branchId", selectedBranchId.toString());
+      if (selectedPaymentStatus !== "all") params.append("paymentStatus", selectedPaymentStatus);
 
       const res = await fetch("/api/sales/orders?" + params.toString());
       const data = await res.json();
@@ -1523,6 +1550,7 @@ export default function OrdersPage() {
       customerId: "",
       orderDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD in local time
       notes: "",
+      branchId: "",
     });
     setOrderItems([]);
     setSelectedCustomer(null);
@@ -1540,6 +1568,35 @@ export default function OrdersPage() {
       discountPercent: 0,
       depositAmount: 0,
       orderDate: new Date().toLocaleDateString('en-CA'),
+    });
+    setShowCreateModal(true);
+  };
+
+  // Handle edit order - load order data into form
+  const handleEditOrder = (order: Order) => {
+    setEditingOrderId(order.id);
+    // Set customer
+    setSelectedCustomer({ id: order.customerId, customerName: order.customerName, phone: '', address: '' } as any);
+    // Set order items
+    if (order.details) {
+      setOrderItems(order.details.map(item => ({
+        itemId: item.itemId,
+        itemName: item.itemName,
+        productId: item.productId,
+        productName: item.itemName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        costPrice: item.costPrice || 0,
+        totalAmount: item.totalAmount,
+        notes: item.notes || '',
+      })));
+    }
+    // Set discount
+    setDiscountAmount(order.discountAmount || 0);
+    // Set form values
+    form.setFieldsValue({
+      customerId: order.customerId,
+      notes: order.notes,
     });
     setShowCreateModal(true);
   };
@@ -1712,8 +1769,19 @@ export default function OrdersPage() {
     }
 
     try {
-      const res = await fetch("/api/sales/orders", {
-        method: "POST",
+      if (isAdmin && !orderForm.branchId) {
+        alert("Vui lòng chọn chi nhánh");
+        return;
+      }
+
+      // Xác định URL và method dựa trên có editingOrderId hay không
+      const url = editingOrderId
+        ? `/api/sales/orders/${editingOrderId}`
+        : "/api/sales/orders";
+      const method = editingOrderId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: orderForm.customerId
@@ -1735,15 +1803,19 @@ export default function OrdersPage() {
             notes: item.notes,
             measurements: item.measurements,
           })),
+          branchId: orderForm.branchId || null,
         }),
       });
 
       const data = await res.json();
       if (data.success) {
         message.success(
-          `Tạo đơn hàng thành công! Mã đơn: ${data.data.orderCode}`
+          editingOrderId
+            ? `Cập nhật đơn hàng thành công!`
+            : `Tạo đơn hàng thành công! Mã đơn: ${data.data.orderCode}`
         );
         setShowCreateModal(false);
+        setEditingOrderId(null);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
         queryClient.invalidateQueries({ queryKey: ["items"] });
         queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -1758,8 +1830,8 @@ export default function OrdersPage() {
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
       PENDING: "Chờ xác nhận",
-      CONFIRMED: "Chờ thanh toán",
-      PAID: "Đã thanh toán",
+      CONFIRMED: "Chờ cọc",
+      PAID: "Đã cọc",
       MEASUREMENTS_COMPLETED: "Đã nhập thông số",
       WAITING_MATERIAL: "Chờ nguyên liệu",
       IN_PRODUCTION: "Đang sản xuất",
@@ -1771,7 +1843,7 @@ export default function OrdersPage() {
     return statusMap[status] || status;
   };
 
-  const updateStatus = (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string; bankAccountId?: number }) => {
+  const updateStatus = (id: number, status: string, paymentData?: { paymentAmount: number; paymentMethod: string; bankAccountId?: number; isDeposit?: boolean }) => {
     if (paymentData) {
       updateStatusMutation.mutate({ id, status, ...paymentData });
       return;
@@ -1973,6 +2045,7 @@ export default function OrdersPage() {
     setDateRange([dayjs().startOf("month"), dayjs()]);
     setSelectedBranchId("all");
     setSelectedCustomerId("all");
+    setSelectedPaymentStatus("all");
   };
 
   return (
@@ -2067,6 +2140,19 @@ export default function OrdersPage() {
                   value: c.id,
                 })) : []}
               />
+              <Select
+                style={{ width: 160 }}
+                placeholder="Trạng thái TT"
+                allowClear
+                value={selectedPaymentStatus === "all" ? undefined : selectedPaymentStatus}
+                onChange={(value: string | undefined) => setSelectedPaymentStatus(value || "all")}
+                options={[
+                  { label: "Chưa TT", value: "UNPAID" },
+                  { label: "Đã cọc", value: "DEPOSITED" },
+                  { label: "TT một phần", value: "PARTIAL" },
+                  { label: "Hoàn thành TT", value: "PAID" },
+                ]}
+              />
             </>
           ),
           buttonEnds: can("sales.orders", "create")
@@ -2125,6 +2211,7 @@ export default function OrdersPage() {
                   canEdit={can("sales.orders", "edit")}
                   onUpdateStatus={updateStatus}
                   onExportOrder={handleExportOrder}
+                  onEditOrder={handleEditOrder}
                 />
               )}
               columns={getVisibleColumns()}
@@ -2134,11 +2221,14 @@ export default function OrdersPage() {
             />
           </div>
 
-          {/* Create Order Modal */}
+          {/* Create/Edit Order Modal */}
           <Modal
-            title={<div className="text-lg font-semibold">Tạo đơn hàng mới</div>}
+            title={<div className="text-lg font-semibold">{editingOrderId ? 'Sửa đơn hàng' : 'Tạo đơn hàng mới'}</div>}
             open={showCreateModal}
-            onCancel={() => setShowCreateModal(false)}
+            onCancel={() => {
+              setShowCreateModal(false);
+              setEditingOrderId(null);
+            }}
             footer={null}
             width={1200}
             destroyOnHidden
@@ -2199,6 +2289,26 @@ export default function OrdersPage() {
                       >
                         <Input type="date" size="large" />
                       </Form.Item>
+
+                      {/* Admin chọn chi nhánh */}
+                      {isAdmin && (
+                        <Form.Item
+                          label="Chi nhánh"
+                          required
+                          help={!orderForm.branchId && "Vui lòng chọn chi nhánh"}
+                          validateStatus={!orderForm.branchId ? "error" : "success"}
+                        >
+                          <Select
+                            placeholder="Chọn chi nhánh"
+                            value={orderForm.branchId}
+                            onChange={(val) => setOrderForm({ ...orderForm, branchId: val })}
+                            options={Array.isArray(branchesData) ? branchesData.map((b: any) => ({
+                              label: b.branchName,
+                              value: String(b.id),
+                            })) : []}
+                          />
+                        </Form.Item>
+                      )}
 
                       <div>
                         <label className="text-sm text-gray-600 block mb-2">Chiết khấu KH</label>
@@ -2524,62 +2634,6 @@ export default function OrdersPage() {
                       </span>
                     </div>
 
-                    {/* Tiền đặt cọc */}
-                    <div className="mt-4 space-y-3 border-t border-gray-300 pt-3">
-                      <div className="space-y-2">
-                        <span className="text-gray-600 text-sm">Tiền đặt cọc:</span>
-                        <Form.Item name="depositAmount" noStyle initialValue={0}>
-                          <InputNumber
-                            min={0}
-                            max={calculateTotal() - discountAmount}
-                            style={{ width: '100%' }}
-                            placeholder="Nhập tiền đặt cọc (nếu có)"
-                            value={depositAmount}
-                            formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
-                            onChange={(value: string | number | null) => {
-                              const amount = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
-                              setDepositAmount(amount);
-                              form.setFieldsValue({ depositAmount: amount });
-                            }}
-                          />
-                        </Form.Item>
-                      </div>
-                      {depositAmount > 0 && (
-                        <div className="space-y-2">
-                          <span className="text-gray-600 text-sm">Nhận vào tài khoản:</span>
-                          <Select
-                            style={{ width: '100%' }}
-                            placeholder="Chọn tài khoản"
-                            value={depositAccountId}
-                            onChange={(value) => {
-                              setDepositAccountId(value);
-                              const acc = bankAccounts.find((a: any) => a.id === value);
-                              setDepositMethod(acc?.accountType === 'CASH' ? 'CASH' : 'BANK');
-                            }}
-                            allowClear
-                            options={bankAccounts.map((acc: any) => ({
-                              label: `${acc.accountType === 'CASH' ? '💵' : '🏦'} ${acc.accountNumber} - ${acc.bankName}`,
-                              value: acc.id,
-                            }))}
-                          />
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center pt-2">
-                        <span className="text-gray-600">Còn lại phải trả:</span>
-                        <span className={`font-bold text-lg ${(calculateTotal() - discountAmount - depositAmount) > 0
-                          ? 'text-red-600'
-                          : 'text-green-600'
-                          }`}>
-                          {formatCurrency(Math.max(0, calculateTotal() - discountAmount - depositAmount))}
-                        </span>
-                      </div>
-                      {depositAmount > 0 && (calculateTotal() - discountAmount - depositAmount) > 0 && (
-                        <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                          ⚠️ Khách hàng sẽ còn phải trả: {formatCurrency(calculateTotal() - discountAmount - depositAmount)}
-                        </div>
-                      )}
-                    </div>
 
                     {/* Footer buttons */}
                     <div className="flex flex-col gap-2 border-t border-gray-300 pt-4 mt-4">

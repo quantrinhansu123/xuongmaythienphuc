@@ -7,23 +7,22 @@ import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-    DownloadOutlined,
-    PlusOutlined,
-    SettingOutlined,
-    UploadOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  SettingOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-    App,
-    Button,
-    Descriptions,
-    Drawer,
-    Form,
-    Input,
-    Modal,
-    Tag,
-    Tooltip,
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Form,
+  Input,
+  Modal,
+  Tooltip
 } from "antd";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -33,7 +32,7 @@ interface Role {
   roleCode: string;
   roleName: string;
   description?: string;
-  level: number;
+
   userCount: number;
 }
 
@@ -41,7 +40,7 @@ type RoleFormValues = {
   roleCode: string;
   roleName: string;
   description?: string;
-  level: number;
+
 };
 
 export default function RolesPage() {
@@ -133,13 +132,13 @@ export default function RolesPage() {
 
   const handleEdit = (row: Role) => {
     // Nếu không phải ADMIN, không cho edit role level 4-5
-    if (!isAdmin && row.level > 3) {
+    /*if (!isAdmin && row.level > 3) {
       modal.warning({
         title: "Không có quyền",
         content: "Chỉ Admin mới có thể chỉnh sửa vai trò cấp cao (Level 4-5)",
       });
       return;
-    }
+    }*/
     setModalMode("edit");
     setSelected(row);
     setModalOpen(true);
@@ -180,26 +179,7 @@ export default function RolesPage() {
       key: "roleName",
       width: 220,
     },
-    {
-      title: "Cấp độ",
-      dataIndex: "level",
-      key: "level",
-      width: 100,
-      render: (level: number) => {
-        const levelMap: Record<number, { text: string; color: string }> = {
-          1: { text: "Level 1", color: "default" },
-          2: { text: "Level 2", color: "blue" },
-          3: { text: "Level 3", color: "cyan" },
-          4: { text: "Level 4", color: "orange" },
-          5: { text: "Level 5", color: "red" },
-        };
-        const info = levelMap[level] || {
-          text: `Level ${level}`,
-          color: "default",
-        };
-        return <Tag color={info.color}>{info.text}</Tag>;
-      },
-    },
+
     {
       title: "Mô tả",
       dataIndex: "description",
@@ -267,14 +247,14 @@ export default function RolesPage() {
 
               type: "default",
               name: "Xuất Excel",
-              onClick: () => {},
+              onClick: () => { },
               icon: <DownloadOutlined />,
             },
             {
               can: can("admin.roles", "create"),
               type: "default",
               name: "Nhập Excel",
-              onClick: () => {},
+              onClick: () => { },
               icon: <UploadOutlined />,
             },
           ],
@@ -397,12 +377,11 @@ export default function RolesPage() {
           initialValues={
             selected
               ? {
-                  roleCode: selected.roleCode,
-                  roleName: selected.roleName,
-                  description: selected.description,
-                  level: selected.level || 3,
-                }
-              : { level: 3 }
+                roleCode: selected.roleCode,
+                roleName: selected.roleName,
+                description: selected.description,
+              }
+              : {}
           }
           onCancel={() => setModalOpen(false)}
           onSubmit={handleSubmit}
@@ -452,38 +431,11 @@ function RoleForm({
       <Form.Item name="description" label="Mô tả">
         <Input.TextArea rows={3} />
       </Form.Item>
-      <Form.Item
-        name="level"
-        label="Cấp độ quyền"
-        rules={[{ required: true, message: "Vui lòng chọn cấp độ" }]}
-        initialValue={3}
-      >
-        <select className="w-full px-3 py-2 border rounded">
-          <option value={1}>Level 1 - Nhân viên cơ bản (Chỉ xem)</option>
-          <option value={2}>Level 2 - Nhân viên (Xem + Tạo)</option>
-          <option value={3}>Level 3 - Trưởng nhóm (Xem + Tạo + Sửa)</option>
-          {isAdmin && (
-            <>
-              <option value={4}>
-                Level 4 - Quản lý (Xem + Tạo + Sửa + Xóa)
-              </option>
-              <option value={5}>Level 5 - Giám đốc (Full quyền)</option>
-            </>
-          )}
-        </select>
-      </Form.Item>
       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
         <p className="font-medium text-blue-900 mb-1">💡 Quyền tự động</p>
         <p className="text-blue-700">
-          Khi tạo/sửa role, hệ thống sẽ tự động cấp quyền theo cấp độ đã chọn.
-          Bạn có thể tinh chỉnh thêm ở trang &quot;Phân quyền&quot;.
+          Vui lòng kiểm tra lại quyền hạn ở trang &quot;Phân quyền&quot; sau khi tạo/sửa vai trò.
         </p>
-        {!isAdmin && (
-          <p className="text-orange-600 mt-2">
-            ⚠️ Bạn chỉ có thể tạo/sửa vai trò Level 1-3. Liên hệ Admin để tạo
-            vai trò cấp cao hơn.
-          </p>
-        )}
       </div>
       <div className="flex gap-2 justify-end">
         <Button onClick={onCancel}>Hủy</Button>

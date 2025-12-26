@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get('search');
     const status = searchParams.get('status');
+    const paymentStatus = searchParams.get('paymentStatus');
+    const unpaidOnly = searchParams.get('unpaidOnly') === 'true';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const branchIdParam = searchParams.get('branchId');
@@ -50,6 +52,18 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
+    // Payment status filter
+    if (paymentStatus) {
+      if (paymentStatus === 'DEPOSITED') {
+        // Đã cọc = có deposit_amount > 0 và chưa PAID
+        whereConditions.push(`(COALESCE(o.deposit_amount, 0) > 0 AND COALESCE(o.payment_status, 'UNPAID') != 'PAID')`);
+      } else {
+        whereConditions.push(`COALESCE(o.payment_status, 'UNPAID') = $${paramIndex}`);
+        params.push(paymentStatus);
+        paramIndex++;
+      }
+    }
+
     // Customer filter
     if (customerId) {
       whereConditions.push(`o.customer_id = $${paramIndex}`);
@@ -67,6 +81,12 @@ export async function GET(request: NextRequest) {
       whereConditions.push(`o.order_date::date <= $${paramIndex}::date`);
       params.push(endDate);
       paramIndex++;
+    }
+
+    // Unpaid only filter - lọc đơn hàng chưa thanh toán đủ
+    if (unpaidOnly) {
+      whereConditions.push(`(o.final_amount - COALESCE(o.deposit_amount, 0) - COALESCE(o.paid_amount, 0)) > 0`);
+      whereConditions.push(`o.status NOT IN ('CANCELLED')`);
     }
 
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
@@ -100,6 +120,7 @@ export async function GET(request: NextRequest) {
         o.final_amount as "finalAmount",
         COALESCE(o.deposit_amount, 0) as "depositAmount",
         COALESCE(o.paid_amount, 0) as "paidAmount",
+        (o.final_amount - COALESCE(o.deposit_amount, 0) - COALESCE(o.paid_amount, 0)) as "remainingAmount",
         COALESCE(o.payment_status, 'UNPAID') as "paymentStatus",
         o.status,
         u.full_name as "createdBy",
@@ -192,7 +213,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, depositAccountId, depositMethod, notes } = body;
+    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, depositAccountId, depositMethod, notes, branchId } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -271,7 +292,7 @@ export async function POST(request: NextRequest) {
       [
         orderCode,
         finalCustomerId,
-        currentUser.branchId,
+        (currentUser.roleCode === 'ADMIN' && branchId) ? parseInt(branchId) : currentUser.branchId,
         orderDate,
         totalAmount,
         discountAmount || 0,

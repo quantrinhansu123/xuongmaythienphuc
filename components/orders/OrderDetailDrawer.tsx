@@ -105,19 +105,18 @@ export default function OrderDetailDrawer({
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái" span={2}>
             <span
-              className={`px-2 py-1 rounded text-xs ${
-                order.status === "PENDING"
+              className={`px-2 py-1 rounded text-xs ${order.status === "PENDING"
                   ? "bg-yellow-100 text-yellow-800"
                   : order.status === "CONFIRMED"
-                  ? "bg-blue-100 text-blue-800"
-                  : order.status === "WAITING_MATERIAL"
-                  ? "bg-orange-100 text-orange-800"
-                  : order.status === "IN_PRODUCTION"
-                  ? "bg-purple-100 text-purple-800"
-                  : order.status === "COMPLETED"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }`}
+                    ? "bg-blue-100 text-blue-800"
+                    : order.status === "WAITING_MATERIAL"
+                      ? "bg-orange-100 text-orange-800"
+                      : order.status === "IN_PRODUCTION"
+                        ? "bg-purple-100 text-purple-800"
+                        : order.status === "COMPLETED"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                }`}
             >
               {getStatusText(order.status)}
             </span>
@@ -140,12 +139,12 @@ export default function OrderDetailDrawer({
                 order.status === "PENDING"
                   ? 0
                   : order.status === "CONFIRMED"
-                  ? 1
-                  : order.status === "WAITING_MATERIAL"
-                  ? 2
-                  : order.status === "IN_PRODUCTION"
-                  ? 3
-                  : 4
+                    ? 1
+                    : order.status === "WAITING_MATERIAL"
+                      ? 2
+                      : order.status === "IN_PRODUCTION"
+                        ? 3
+                        : 4
               }
               items={[
                 {
@@ -188,8 +187,8 @@ export default function OrderDetailDrawer({
                   title: "Sản xuất",
                   description:
                     order.status === "IN_PRODUCTION" &&
-                    order.production &&
-                    canEdit ? (
+                      order.production &&
+                      canEdit ? (
                       <Space orientation="vertical" size="small" className="mt-2">
                         <Checkbox
                           checked={order.production.cutting}

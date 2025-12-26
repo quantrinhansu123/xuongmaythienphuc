@@ -19,6 +19,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Customer } from "@/services/customerService";
+import { formatCurrency } from "@/utils/format";
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -28,8 +29,9 @@ import {
   UnlockOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { App, Button, Descriptions, Tag } from "antd";
+import { App, Button, Descriptions, Spin, Table, Tag, Typography } from "antd";
 import { useState } from "react";
 
 export default function CustomersPage() {
@@ -163,12 +165,6 @@ export default function CustomersPage() {
       width: 130,
     },
     {
-      title: "Email",
-      dataIndex: "email",
-      key: "email",
-      width: 180,
-    },
-    {
       title: "Địa chỉ",
       dataIndex: "address",
       key: "address",
@@ -180,18 +176,18 @@ export default function CustomersPage() {
       key: "groupName",
       width: 150,
     },
-    // {
-    //   title: "Công nợ",
-    //   dataIndex: "debtAmount",
-    //   key: "debtAmount",
-    //   width: 130,
-    //   align: "right",
-    //   render: (amount: number) => (
-    //     <span className={(amount || 0) > 0 ? "text-red-600 font-semibold" : ""}>
-    //       {(amount || 0).toLocaleString()} đ
-    //     </span>
-    //   ),
-    // },
+    {
+      title: "Công nợ",
+      dataIndex: "debtAmount",
+      key: "debtAmount",
+      width: 130,
+      align: "right" as const,
+      render: (amount: number) => (
+        <span className={(amount || 0) > 0 ? "text-red-600 font-semibold" : "text-gray-400"}>
+          {formatCurrency(amount || 0)}
+        </span>
+      ),
+    },
     {
       title: "Trạng thái",
       dataIndex: "isActive",
@@ -302,76 +298,170 @@ export default function CustomersPage() {
         }}
       >
         <CommonTable
-          DrawerDetails={({ data, onClose }) => (
-            <>
-              <Descriptions column={1} bordered>
-                <Descriptions.Item label="Mã khách hàng">
-                  <span className="font-mono">{data.customerCode}</span>
-                </Descriptions.Item>
-                <Descriptions.Item label="Tên khách hàng">
-                  <span className="font-medium">{data.customerName}</span>
-                </Descriptions.Item>
-                <Descriptions.Item label="Điện thoại">
-                  {data.phone || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="Email">
-                  {data.email || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="Địa chỉ">
-                  {data.address || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="Nhóm khách hàng">
-                  {data.groupName || "-"}
-                </Descriptions.Item>
-                {/* <Descriptions.Item label="Công nợ">
-                  <span
-                    className={
-                      (data.debtAmount || 0) > 0 ? "text-red-600 font-semibold" : ""
-                    }
-                  >
-                    {(data.debtAmount || 0).toLocaleString()} đ
-                  </span>
-                </Descriptions.Item> */}
-                <Descriptions.Item label="Trạng thái">
-                  <Tag
-                    color={data.isActive ? "success" : "error"}
-                    icon={data.isActive ? <UnlockOutlined /> : <LockOutlined />}
-                  >
-                    {data.isActive ? "Hoạt động" : "Ngừng"}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Ngày tạo">
-                  {new Date(data.createdAt).toLocaleString("vi-VN")}
-                </Descriptions.Item>
-              </Descriptions>
-              <div className="flex gap-2 justify-end mt-4">
-                {can("sales.customers", "edit") && (
-                  <Button
-                    type="primary"
-                    icon={<EditOutlined />}
-                    onClick={() => {
-                      onClose();
-                      handleEdit(data);
-                    }}
-                  >
-                    Sửa
-                  </Button>
-                )}
-                {can("sales.customers", "delete") && (
-                  <Button
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => {
-                      onClose();
-                      handleDelete(data.id);
-                    }}
-                  >
-                    Xóa
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
+          DrawerDetails={({ data, onClose }) => {
+            // eslint-disable-next-line react-hooks/rules-of-hooks
+            const { data: customerOrders = [], isLoading: ordersLoading } = useQuery({
+              queryKey: ["customer-orders", data.id],
+              queryFn: async () => {
+                const res = await fetch(`/api/sales/orders?customerId=${data.id}`);
+                const result = await res.json();
+                return result.success ? result.data || [] : [];
+              },
+              staleTime: 2 * 60 * 1000,
+              enabled: !!data.id,
+            });
+
+            const getStatusText = (status: string) => {
+              const statusMap: Record<string, string> = {
+                PENDING: "Chờ xác nhận",
+                CONFIRMED: "Đã xác nhận",
+                PAID: "Đã thanh toán",
+                IN_PRODUCTION: "Đang sản xuất",
+                READY_TO_EXPORT: "Chờ xuất kho",
+                EXPORTED: "Đã xuất kho",
+                COMPLETED: "Hoàn thành",
+                CANCELLED: "Đã hủy",
+              };
+              return statusMap[status] || status;
+            };
+
+            const getStatusColor = (status: string) => {
+              const colorMap: Record<string, string> = {
+                PENDING: "orange",
+                CONFIRMED: "blue",
+                PAID: "purple",
+                IN_PRODUCTION: "cyan",
+                READY_TO_EXPORT: "geekblue",
+                EXPORTED: "lime",
+                COMPLETED: "green",
+                CANCELLED: "red",
+              };
+              return colorMap[status] || "default";
+            };
+
+            return (
+              <>
+                <Descriptions column={1} bordered size="small">
+                  <Descriptions.Item label="Mã khách hàng">
+                    <span className="font-mono">{data.customerCode}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Tên khách hàng">
+                    <span className="font-medium">{data.customerName}</span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Điện thoại">
+                    {data.phone || "-"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Địa chỉ">
+                    {data.address || "-"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Nhóm khách hàng">
+                    {data.groupName || "-"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Công nợ">
+                    <span
+                      className={
+                        (data.debtAmount || 0) > 0 ? "text-red-600 font-semibold" : "text-gray-400"
+                      }
+                    >
+                      {formatCurrency(data.debtAmount || 0)}
+                    </span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Trạng thái">
+                    <Tag
+                      color={data.isActive ? "success" : "error"}
+                      icon={data.isActive ? <UnlockOutlined /> : <LockOutlined />}
+                    >
+                      {data.isActive ? "Hoạt động" : "Ngừng"}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngày tạo">
+                    {new Date(data.createdAt).toLocaleString("vi-VN")}
+                  </Descriptions.Item>
+                </Descriptions>
+
+                {/* Lịch sử đơn hàng */}
+                <div className="mt-4">
+                  <Typography.Title level={5}>Lịch sử đơn hàng</Typography.Title>
+                  {ordersLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Spin />
+                    </div>
+                  ) : customerOrders.length === 0 ? (
+                    <div className="text-gray-400 text-center py-4">Chưa có đơn hàng</div>
+                  ) : (
+                    <Table
+                      dataSource={customerOrders}
+                      rowKey="id"
+                      size="small"
+                      pagination={{ pageSize: 5, size: "small" }}
+                      columns={[
+                        {
+                          title: "Mã đơn",
+                          dataIndex: "orderCode",
+                          key: "orderCode",
+                          width: 110,
+                          render: (val: string) => <span className="font-mono text-xs">{val}</span>,
+                        },
+                        {
+                          title: "Ngày",
+                          dataIndex: "orderDate",
+                          key: "orderDate",
+                          width: 90,
+                          render: (val: string) => new Date(val).toLocaleDateString("vi-VN"),
+                        },
+                        {
+                          title: "Tổng tiền",
+                          dataIndex: "finalAmount",
+                          key: "finalAmount",
+                          width: 100,
+                          align: "right" as const,
+                          render: (val: number) => formatCurrency(val),
+                        },
+                        {
+                          title: "Trạng thái",
+                          dataIndex: "status",
+                          key: "status",
+                          width: 100,
+                          render: (val: string) => (
+                            <Tag color={getStatusColor(val)} className="text-xs">
+                              {getStatusText(val)}
+                            </Tag>
+                          ),
+                        },
+                      ]}
+                    />
+                  )}
+                </div>
+
+                <div className="flex gap-2 justify-end mt-4">
+                  {can("sales.customers", "edit") && (
+                    <Button
+                      type="primary"
+                      icon={<EditOutlined />}
+                      onClick={() => {
+                        onClose();
+                        handleEdit(data);
+                      }}
+                    >
+                      Sửa
+                    </Button>
+                  )}
+                  {can("sales.customers", "delete") && (
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => {
+                        onClose();
+                        handleDelete(data.id);
+                      }}
+                    >
+                      Xóa
+                    </Button>
+                  )}
+                </div>
+              </>
+            );
+          }}
           columns={getVisibleColumns()}
           dataSource={filteredCustomers}
           loading={customersLoading || customersFetching}

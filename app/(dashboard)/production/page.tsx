@@ -13,10 +13,9 @@ import {
     SkinOutlined
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { DatePicker, Tag } from "antd";
-import { Dayjs } from "dayjs";
+import { DatePicker, Select, Tag } from "antd";
+import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 const { RangePicker } = DatePicker;
 
@@ -32,7 +31,7 @@ export default function ProductionPage() {
         handlePageChange,
     } = useFilter();
 
-    const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+
 
     // Fetch branches for filter
     const { data: branches = [] } = useBranches();
@@ -44,8 +43,6 @@ export default function ProductionPage() {
         queryKey: [
             "production-orders",
             query,
-            dateRange?.[0]?.format("YYYY-MM-DD"),
-            dateRange?.[1]?.format("YYYY-MM-DD"),
         ],
         queryFn: async () => {
             const params = new URLSearchParams();
@@ -55,10 +52,8 @@ export default function ProductionPage() {
             });
 
             // Add date range params
-            if (dateRange?.[0])
-                params.append("startDate", dateRange[0].format("YYYY-MM-DD"));
-            if (dateRange?.[1])
-                params.append("endDate", dateRange[1].format("YYYY-MM-DD"));
+            if (query.startDate) params.append("startDate", String(query.startDate));
+            if (query.endDate) params.append("endDate", String(query.endDate));
 
             const res = await fetch(`/api/production/orders?${params.toString()}`);
             const data = await res.json();
@@ -179,7 +174,6 @@ export default function ProductionPage() {
 
     const handleReset = () => {
         reset();
-        setDateRange(null);
     };
 
     return (
@@ -206,46 +200,57 @@ export default function ProductionPage() {
                     placeholder: "Tìm kiếm đơn sản xuất",
                     filterKeys: ["orderCode", "customerName"],
                 },
-                filters: {
-                    fields: [
-                        {
-                            type: "custom",
-                            name: "dateRange",
-                            label: "Thời gian",
-                            render: () => (
-                                <RangePicker
-                                    value={dateRange}
-                                    onChange={(dates) => {
-                                        setDateRange(dates as [Dayjs, Dayjs]);
-                                        // Trigger refetch via query key dependency
-                                    }}
-                                    format="DD/MM/YYYY"
-                                    placeholder={["Từ ngày", "Đến ngày"]}
-                                    style={{ width: "100%" }}
-                                />
-                            ),
-                        },
-                        {
-                            type: "select",
-                            name: "branchId",
-                            label: "Chi nhánh",
-                            options: branches.map((b) => ({
+                customToolbar: (
+                    <div className="flex gap-2 items-center flex-wrap">
+                        <RangePicker
+                            value={
+                                query.startDate && query.endDate
+                                    ? [dayjs(query.startDate as string), dayjs(query.endDate as string)]
+                                    : null
+                            }
+                            onChange={(dates) => {
+                                updateQueries([
+                                    {
+                                        key: "startDate",
+                                        value: dates?.[0]?.format("YYYY-MM-DD") || "",
+                                    },
+                                    {
+                                        key: "endDate",
+                                        value: dates?.[1]?.format("YYYY-MM-DD") || "",
+                                    },
+                                ]);
+                            }}
+                            format="DD/MM/YYYY"
+                            placeholder={["Từ ngày", "Đến ngày"]}
+                            style={{ width: 250 }}
+                        />
+                        <Select
+                            placeholder="Chi nhánh"
+                            allowClear
+                            style={{ width: 200 }}
+                            value={query.branchId?.toString()}
+                            onChange={(value) => updateQueries([{ key: "branchId", value: value || "" }])}
+                            options={branches.map((b) => ({
                                 label: b.branchName,
                                 value: String(b.id),
-                            })),
-                        },
-                        {
-                            type: "select",
-                            name: "status",
-                            label: "Trạng thái",
-                            options: [
+                            }))}
+                        />
+                        <Select
+                            placeholder="Trạng thái"
+                            allowClear
+                            style={{ width: 150 }}
+                            value={query.status}
+                            onChange={(value) => updateQueries([{ key: "status", value: value || "" }])}
+                            options={[
                                 { label: "Chờ xử lý", value: "PENDING" },
                                 { label: "Đang sản xuất", value: "IN_PROGRESS" },
                                 { label: "Hoàn thành", value: "COMPLETED" },
                                 { label: "Đã hủy", value: "CANCELLED" },
-                            ],
-                        },
-                    ],
+                            ]}
+                        />
+                    </div>
+                ),
+                filters: {
                     query,
                     onApplyFilter: updateQueries,
                     onReset: handleReset,

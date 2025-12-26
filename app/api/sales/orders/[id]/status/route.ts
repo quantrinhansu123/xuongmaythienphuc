@@ -19,7 +19,7 @@ export async function POST(
     const resolvedParams = await params;
     const orderId = parseInt(resolvedParams.id);
     const body = await request.json();
-    const { status, paymentAmount, paymentMethod, bankAccountId, paymentNotes } = body;
+    const { status, paymentAmount, paymentMethod, bankAccountId, paymentNotes, isDeposit } = body;
 
     const validStatuses = ['PENDING', 'CONFIRMED', 'PAID', 'MEASUREMENTS_COMPLETED', 'IN_PRODUCTION', 'READY_TO_EXPORT', 'EXPORTED', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
@@ -62,10 +62,21 @@ export async function POST(
 
       // Update payment for THIS order
       const currentPaid = parseFloat(order.paidAmount || 0);
-      const depositAmount = parseFloat(order.depositAmount || 0);
-      const newPaid = currentPaid + amount;
+      const currentDeposit = parseFloat(order.depositAmount || 0);
       const finalAmount = parseFloat(order.finalAmount);
-      const totalPaid = depositAmount + newPaid;
+
+      let newPaid = currentPaid;
+      let newDeposit = currentDeposit;
+
+      if (isDeposit) {
+        // Save to deposit_amount
+        newDeposit = currentDeposit + amount;
+      } else {
+        // Save to paid_amount
+        newPaid = currentPaid + amount;
+      }
+
+      const totalPaid = newDeposit + newPaid;
 
       // Calculate payment status based on deposit_amount + paid_amount
       let newPaymentStatus = 'PARTIAL';
@@ -81,16 +92,25 @@ export async function POST(
       // Ghi vào order_payments
       await query(
         `INSERT INTO order_payments (order_id, payment_type, amount, payment_method, bank_account_id, notes, created_by)
-         VALUES ($1, 'PAYMENT', $2, $3, $4, $5, $6)`,
-        [orderId, amount, paymentMethod || 'CASH', bankAccountId || null, paymentNotes || 'Thanh toán đơn hàng', user?.id || null]
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [orderId, isDeposit ? 'DEPOSIT' : 'PAYMENT', amount, paymentMethod || 'CASH', bankAccountId || null, isDeposit ? 'Tiền cọc đơn hàng' : (paymentNotes || 'Thanh toán đơn hàng'), user?.id || null]
       );
 
-      await query(
-        `UPDATE orders 
-         SET paid_amount = $1, payment_status = $2, payment_method = $3
-         WHERE id = $4`,
-        [newPaid, newPaymentStatus, paymentMethod || null, orderId]
-      );
+      if (isDeposit) {
+        await query(
+          `UPDATE orders 
+           SET deposit_amount = $1, payment_status = $2, payment_method = $3
+           WHERE id = $4`,
+          [newDeposit, newPaymentStatus, paymentMethod || null, orderId]
+        );
+      } else {
+        await query(
+          `UPDATE orders 
+           SET paid_amount = $1, payment_status = $2, payment_method = $3
+           WHERE id = $4`,
+          [newPaid, newPaymentStatus, paymentMethod || null, orderId]
+        );
+      }
 
       // Update account balance if provided (bank or cash)
       if (bankAccountId) {
