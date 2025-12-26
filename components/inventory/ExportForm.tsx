@@ -47,7 +47,6 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
     enabled: !!warehouse,
     queryFn: async () => {
       console.log(`🔍 [ExportForm] Fetching balance for warehouse ${warehouseId}, type: ${warehouse.warehouseType}`);
-    staleTime: 5 * 60 * 1000, // Cache
       
       // Dùng API balance với showAll=false để chỉ lấy items có tồn kho > 0
       const res = await fetch(`/api/inventory/balance?warehouseId=${warehouseId}&showAll=false`);
@@ -61,6 +60,7 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
       }
       return [];
     },
+    staleTime: 5 * 60 * 1000, // Cache
   });
 
   const handleAddItem = () => {

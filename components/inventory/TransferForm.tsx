@@ -103,8 +103,8 @@ export default function TransferForm({ fromWarehouseId, onSuccess, onCancel }: T
         
         return false;
       });
-    staleTime: 10 * 60 * 1000, // Cache
     },
+    staleTime: 10 * 60 * 1000, // Cache
   });
 
   // Lấy thông tin kho nhập đã chọn
