@@ -7,6 +7,7 @@ import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
+    Checkbox,
     Descriptions,
     Form,
     Input,
@@ -37,6 +38,7 @@ interface CategoryMeasurement {
     id: number;
     measurementName: string;
     unit: string;
+    options: string[];
     isRequired: boolean;
 }
 
@@ -268,6 +270,7 @@ export default function CategoryDetailPage() {
         measurementForm.setFieldsValue({
             measurementName: m.measurementName,
             unit: m.unit,
+            options: m.options?.join(", "),
             isRequired: m.isRequired,
         });
         setShowMeasurementModal(true);
@@ -281,11 +284,25 @@ export default function CategoryDetailPage() {
 
     const handleEditTemplate = (t: CategoryTemplate) => {
         setEditingTemplate(t);
+
+        // Extract selected attribute names from attributeValues
+        const selectedAttributes = Object.keys(t.attributeValues || {});
+
+        // Build measurement values with meas_ prefix
+        const measValues: Record<string, unknown> = {};
+        measurements.forEach(m => {
+            const val = t.measurementValues?.[m.measurementName];
+            if (val !== undefined) {
+                // If measurement has options, wrap value in array for tags mode
+                measValues[`meas_${m.id}`] = m.options && m.options.length > 0 ? [val] : val;
+            }
+        });
+
         templateForm.setFieldsValue({
             templateName: t.templateName,
             isActive: t.isActive,
-            ...t.attributeValues,
-            ...t.measurementValues,
+            selectedAttributes,
+            ...measValues,
         });
         setShowTemplateModal(true);
     };
@@ -293,18 +310,24 @@ export default function CategoryDetailPage() {
     const handleSaveTemplate = async () => {
         try {
             const values = await templateForm.validateFields();
-            const attributeValues: Record<string, string> = {};
-            const measurementValues: Record<string, number> = {};
 
-            // Extract attribute and measurement values
-            attributes.forEach(attr => {
-                if (values[`attr_${attr.id}`]) {
-                    attributeValues[attr.attributeName] = values[`attr_${attr.id}`];
-                }
+            // Extract selected attributes (from checkboxes)
+            const selectedAttributes = values.selectedAttributes || [];
+            const attributeValues: Record<string, string> = {};
+            selectedAttributes.forEach((attrName: string) => {
+                attributeValues[attrName] = 'true'; // Just mark as selected
             });
+
+            // Extract measurement values
+            const measurementValues: Record<string, string | number> = {};
             measurements.forEach(m => {
-                if (values[`meas_${m.id}`] !== undefined) {
-                    measurementValues[m.measurementName] = values[`meas_${m.id}`];
+                const val = values[`meas_${m.id}`];
+                if (val !== undefined && val !== null) {
+                    // Handle array value from tags mode (take first value)
+                    const finalVal = Array.isArray(val) ? val[0] : val;
+                    if (finalVal !== undefined) {
+                        measurementValues[m.measurementName] = finalVal;
+                    }
                 }
             });
 
@@ -322,14 +345,6 @@ export default function CategoryDetailPage() {
     // Columns
     const attributeColumns = [
         { title: "Tên thuộc tính", dataIndex: "attributeName", key: "attributeName" },
-        { title: "Loại", dataIndex: "attributeType", key: "attributeType", width: 100 },
-        {
-            title: "Bắt buộc",
-            dataIndex: "isRequired",
-            key: "isRequired",
-            width: 80,
-            render: (val: boolean) => <Tag color={val ? "red" : "default"}>{val ? "Có" : "Không"}</Tag>,
-        },
         {
             title: "",
             key: "actions",
@@ -348,6 +363,15 @@ export default function CategoryDetailPage() {
     const measurementColumns = [
         { title: "Tên thông số", dataIndex: "measurementName", key: "measurementName" },
         { title: "Đơn vị", dataIndex: "unit", key: "unit", width: 80 },
+        {
+            title: "Lựa chọn có sẵn",
+            dataIndex: "options",
+            key: "options",
+            width: 200,
+            render: (val: string[]) => val && val.length > 0 ? (
+                <span>{val.join(", ")}</span>
+            ) : <span style={{ color: '#999' }}>Nhập tự do</span>,
+        },
         {
             title: "Bắt buộc",
             dataIndex: "isRequired",
@@ -516,20 +540,7 @@ export default function CategoryDetailPage() {
             >
                 <Form form={attributeForm} layout="vertical">
                     <Form.Item name="attributeName" label="Tên thuộc tính" rules={[{ required: true }]}>
-                        <Input placeholder="VD: Màu sắc, Size..." />
-                    </Form.Item>
-                    <Form.Item name="attributeType" label="Loại" initialValue="text">
-                        <Select options={[
-                            { label: "Text", value: "text" },
-                            { label: "Select", value: "select" },
-                            { label: "Number", value: "number" },
-                        ]} />
-                    </Form.Item>
-                    <Form.Item name="options" label="Các lựa chọn (phân cách bằng dấu phẩy)">
-                        <Input placeholder="VD: Đỏ, Xanh, Vàng" />
-                    </Form.Item>
-                    <Form.Item name="isRequired" label="Bắt buộc" valuePropName="checked">
-                        <Switch />
+                        <Input placeholder="VD: Màu sắc, Loại vải, Kiểu dáng..." />
                     </Form.Item>
                 </Form>
             </Modal>
@@ -541,7 +552,8 @@ export default function CategoryDetailPage() {
                 onCancel={() => setShowMeasurementModal(false)}
                 onOk={() => {
                     measurementForm.validateFields().then(values => {
-                        saveMeasurementMutation.mutate(values);
+                        const options = values.options ? values.options.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+                        saveMeasurementMutation.mutate({ ...values, options });
                     });
                 }}
                 okText="Lưu"
@@ -550,10 +562,13 @@ export default function CategoryDetailPage() {
             >
                 <Form form={measurementForm} layout="vertical">
                     <Form.Item name="measurementName" label="Tên thông số" rules={[{ required: true }]}>
-                        <Input placeholder="VD: Vòng ngực, Vòng eo..." />
+                        <Input placeholder="VD: Vòng ngực, Vòng eo, Size..." />
                     </Form.Item>
                     <Form.Item name="unit" label="Đơn vị" initialValue="cm">
                         <Input placeholder="VD: cm, inch..." />
+                    </Form.Item>
+                    <Form.Item name="options" label="Các lựa chọn sẵn (phân cách bằng dấu phẩy)" tooltip="Để trống nếu muốn người dùng nhập tự do">
+                        <Input placeholder="VD: S, M, L, XL hoặc 38, 39, 40, 41" />
                     </Form.Item>
                     <Form.Item name="isRequired" label="Bắt buộc" valuePropName="checked">
                         <Switch />
@@ -579,20 +594,18 @@ export default function CategoryDetailPage() {
 
                     {attributes.length > 0 && (
                         <div className="mb-4">
-                            <h4 className="font-medium mb-2">Thuộc tính</h4>
-                            {attributes.map(attr => (
-                                <Form.Item key={attr.id} name={`attr_${attr.id}`} label={attr.attributeName}>
-                                    {attr.attributeType === "select" && attr.options?.length > 0 ? (
-                                        <Select placeholder={`Chọn ${attr.attributeName}`} allowClear>
-                                            {attr.options.map(opt => (
-                                                <Select.Option key={opt} value={opt}>{opt}</Select.Option>
-                                            ))}
-                                        </Select>
-                                    ) : (
-                                        <Input placeholder={`Nhập ${attr.attributeName}`} />
-                                    )}
-                                </Form.Item>
-                            ))}
+                            <h4 className="font-medium mb-2">Thuộc tính (chọn thuộc tính áp dụng cho mẫu)</h4>
+                            <Form.Item name="selectedAttributes">
+                                <Checkbox.Group>
+                                    <div className="flex flex-wrap gap-2">
+                                        {attributes.map(attr => (
+                                            <Checkbox key={attr.id} value={attr.attributeName}>
+                                                {attr.attributeName}
+                                            </Checkbox>
+                                        ))}
+                                    </div>
+                                </Checkbox.Group>
+                            </Form.Item>
                         </div>
                     )}
 
@@ -601,7 +614,22 @@ export default function CategoryDetailPage() {
                             <h4 className="font-medium mb-2">Thông số đo</h4>
                             {measurements.map(m => (
                                 <Form.Item key={m.id} name={`meas_${m.id}`} label={`${m.measurementName} (${m.unit})`}>
-                                    <InputNumber placeholder={`Nhập ${m.measurementName}`} style={{ width: "100%" }} />
+                                    {m.options && m.options.length > 0 ? (
+                                        <Select
+                                            placeholder={`Chọn hoặc nhập ${m.measurementName}`}
+                                            allowClear
+                                            showSearch
+                                            mode="tags"
+                                            tokenSeparators={[',']}
+                                            maxCount={1}
+                                        >
+                                            {m.options.map(opt => (
+                                                <Select.Option key={opt} value={opt}>{opt}</Select.Option>
+                                            ))}
+                                        </Select>
+                                    ) : (
+                                        <InputNumber placeholder={`Nhập ${m.measurementName}`} style={{ width: "100%" }} />
+                                    )}
                                 </Form.Item>
                             ))}
                         </div>

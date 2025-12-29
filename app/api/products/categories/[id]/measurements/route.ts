@@ -21,7 +21,7 @@ export async function GET(
 
         const result = await query(
             `SELECT id, category_id as "categoryId", measurement_name as "measurementName", 
-                    unit, is_required as "isRequired"
+                    unit, is_required as "isRequired", COALESCE(options, '[]'::jsonb) as "options"
        FROM category_measurements 
        WHERE category_id = $1 
        ORDER BY id`,
@@ -58,7 +58,7 @@ export async function POST(
         const resolvedParams = await params;
         const categoryId = parseInt(resolvedParams.id);
         const body = await request.json();
-        const { measurementName, unit, isRequired = false } = body;
+        const { measurementName, unit, isRequired = false, options = [] } = body;
 
         if (!measurementName) {
             return NextResponse.json<ApiResponse>({
@@ -67,11 +67,14 @@ export async function POST(
             }, { status: 400 });
         }
 
+        // Ensure options is an array
+        const optionsArray = Array.isArray(options) ? options : [];
+
         const result = await query(
-            `INSERT INTO category_measurements (category_id, measurement_name, unit, is_required)
-       VALUES ($1, $2, $3, $4)
+            `INSERT INTO category_measurements (category_id, measurement_name, unit, is_required, options)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-            [categoryId, measurementName, unit, isRequired]
+            [categoryId, measurementName, unit, isRequired, JSON.stringify(optionsArray)]
         );
 
         return NextResponse.json<ApiResponse>({
@@ -104,7 +107,7 @@ export async function PUT(
         const { searchParams } = new URL(request.url);
         const measurementId = searchParams.get('id');
         const body = await request.json();
-        const { measurementName, unit, isRequired } = body;
+        const { measurementName, unit, isRequired, options } = body;
 
         if (!measurementId) {
             return NextResponse.json<ApiResponse>({
@@ -113,13 +116,17 @@ export async function PUT(
             }, { status: 400 });
         }
 
+        // Build update query dynamically to handle options
+        const optionsValue = options !== undefined ? JSON.stringify(Array.isArray(options) ? options : []) : null;
+
         await query(
             `UPDATE category_measurements 
              SET measurement_name = COALESCE($1, measurement_name),
                  unit = COALESCE($2, unit),
-                 is_required = COALESCE($3, is_required)
+                 is_required = COALESCE($3, is_required),
+                 options = COALESCE($5, options)
              WHERE id = $4`,
-            [measurementName, unit, isRequired, measurementId]
+            [measurementName, unit, isRequired, measurementId, optionsValue]
         );
 
         return NextResponse.json<ApiResponse>({
