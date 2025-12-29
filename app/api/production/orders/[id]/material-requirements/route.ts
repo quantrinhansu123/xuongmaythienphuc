@@ -18,9 +18,9 @@ export async function GET(
 
         const { id } = await params;
 
-        // 1. Get Production Order Items
+        // 1. Get Production Order Item ID
         const poResult = await query(
-            `SELECT order_id FROM production_orders WHERE id = $1`,
+            `SELECT order_item_id FROM production_orders WHERE id = $1`,
             [id]
         );
 
@@ -31,11 +31,9 @@ export async function GET(
             }, { status: 404 });
         }
 
-        const orderId = poResult.rows[0].order_id;
+        const orderItemId = poResult.rows[0].order_item_id;
 
-        // 2. Get Order Items and their BOM (định mức từ bảng bom)
-        // Logic: order_details.item_id → items.product_id → bom → materials → items (NVL)
-        // Trả về item_id của NVL (vì production_material_request_details.material_id FK đến items)
+        // 2. Get Order Item and its BOM
         const result = await query(
             `WITH OrderItems AS (
                 SELECT 
@@ -47,9 +45,8 @@ export async function GET(
                     i.item_name as product_name
                 FROM order_details od
                 JOIN items i ON od.item_id = i.id
-                WHERE od.order_id = $1
+                WHERE od.id = $1
             ),
-            -- Sản phẩm: lấy định mức từ bảng bom, sau đó map sang items
             ProductBOM AS (
                 SELECT 
                     oi.product_name,
@@ -62,7 +59,6 @@ export async function GET(
                 JOIN items item_nvl ON item_nvl.material_id = b.material_id
                 WHERE oi.item_type = 'PRODUCT' AND oi.product_id IS NOT NULL
             ),
-            -- NVL: nếu item là NVL thì lấy chính item đó
             MaterialDirect AS (
                 SELECT 
                     oi.product_name,
@@ -91,7 +87,7 @@ export async function GET(
             JOIN items i ON ar.material_item_id = i.id
             GROUP BY ar.product_name, ar.product_item_id, ar.material_item_id, i.item_name, i.item_code, i.unit
             ORDER BY ar.product_name, i.item_name`,
-            [orderId]
+            [orderItemId]
         );
 
         return NextResponse.json<ApiResponse>({

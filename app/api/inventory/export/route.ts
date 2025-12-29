@@ -87,11 +87,11 @@ export async function GET(request: NextRequest) {
          WHERE itd.transaction_id = $2`,
         [trans.fromWarehouseId, trans.id]
       );
-      
+
       const hasInsufficientStock = detailsResult.rows.some(
         (d: any) => parseFloat(d.stock_qty) < parseFloat(d.requested_qty)
       );
-      
+
       return { id: trans.id, hasInsufficientStock };
     });
 
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { fromWarehouseId, notes, items, relatedOrderCode, relatedCustomerName } = body;
+    const { fromWarehouseId, notes, items, relatedOrderCode, relatedCustomerName, autoApprove } = body;
 
     if (!fromWarehouseId || !items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       'SELECT branch_id, warehouse_type FROM warehouses WHERE id = $1',
       [fromWarehouseId]
     );
-    
+
     if (warehouseCheck.rows.length === 0) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     const warehouseType = warehouseCheck.rows[0].warehouse_type;
-    
+
     if (currentUser.roleCode !== 'ADMIN' && warehouseCheck.rows[0].branch_id !== currentUser.branchId) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -166,14 +166,14 @@ export async function POST(request: NextRequest) {
     for (const item of items) {
       const isProduct = !!item.productId;
       const isMaterial = !!item.materialId;
-      
+
       if (warehouseType === 'NVL' && isProduct) {
         return NextResponse.json<ApiResponse>({
           success: false,
           error: 'Kho NVL chỉ chứa nguyên vật liệu, không có sản phẩm để xuất'
         }, { status: 400 });
       }
-      
+
       if (warehouseType === 'THANH_PHAM' && isMaterial) {
         return NextResponse.json<ApiResponse>({
           success: false,
@@ -190,12 +190,16 @@ export async function POST(request: NextRequest) {
     );
     const transactionCode = codeResult.rows[0].code;
 
+    const initialStatus = autoApprove ? 'APPROVED' : 'PENDING';
+    const approvedBy = autoApprove ? currentUser.id : null;
+    const approvedAt = autoApprove ? 'CURRENT_TIMESTAMP' : 'NULL';
+
     // Tạo phiếu xuất với thông tin đơn hàng
     const transResult = await query(
-      `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by, related_order_code, related_customer_name)
-       VALUES ($1, 'XUAT', $2, 'PENDING', $3, $4, $5, $6)
+      `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by, related_order_code, related_customer_name, approved_by, approved_at)
+       VALUES ($1, 'XUAT', $2, $3, $4, $5, $6, $7, $8, ${approvedAt})
        RETURNING id`,
-      [transactionCode, fromWarehouseId, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null]
+      [transactionCode, fromWarehouseId, initialStatus, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null, approvedBy]
     );
 
     const transactionId = transResult.rows[0].id;
@@ -237,6 +241,28 @@ export async function POST(request: NextRequest) {
          VALUES ($1, $2, $3, $4, $5)`,
         [transactionId, item.productId || null, item.materialId || null, item.quantity, item.notes || null]
       );
+    }
+
+    // Nếu autoApprove, trừ tồn kho ngay lập tức
+    if (autoApprove) {
+      for (const item of items) {
+        const existingBalance = await query(
+          `SELECT id, quantity FROM inventory_balances 
+                 WHERE warehouse_id = $1 
+                 AND product_id IS NOT DISTINCT FROM $2 
+                 AND material_id IS NOT DISTINCT FROM $3`,
+          [fromWarehouseId, item.productId || null, item.materialId || null]
+        );
+
+        if (existingBalance.rows.length > 0) {
+          await query(
+            `UPDATE inventory_balances 
+                     SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
+                     WHERE id = $2`,
+            [item.quantity, existingBalance.rows[0].id]
+          );
+        }
+      }
     }
 
     return NextResponse.json<ApiResponse>({

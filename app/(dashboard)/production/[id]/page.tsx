@@ -46,14 +46,14 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
         refetchOnWindowFocus: true,
     });
 
-    const { data: materialRequirements, isLoading: isLoadingMaterials } = useQuery({
-        queryKey: ["production-order-materials", id],
+    const { data: materialExports, isLoading: isLoadingExports } = useQuery({
+        queryKey: ["production-order-exports", id],
         queryFn: async () => {
-            const res = await fetch(`/api/production/orders/${id}/material-requirements`);
+            const res = await fetch(`/api/production/orders/${id}/material-exports`);
             const data = await res.json();
             return data.data || [];
         },
-        staleTime: 10 * 60 * 1000, // Cache
+        staleTime: 5 * 60 * 1000,
         enabled: !!id,
     });
 
@@ -333,8 +333,8 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             );
             const invoiceCode = invoiceMeasurement?.value || '';
 
-            // Lấy định mức NVL cho sản phẩm này
-            const itemMaterials = materialRequirements?.filter((mat: any) => mat.productId === item.itemId) || [];
+            // Lấy định mức NVL cho sản phẩm này (Đã bỏ phần định mức dự kiến)
+            const itemMaterials: any[] = [];
             const materialsData = itemMaterials.map((mat: any) => ({
                 label: mat.materialName,
                 value: mat.materialCode
@@ -682,37 +682,27 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                 </Col>
 
                 <Col span={24}>
-                    <Card title="Định mức vật tư (Dự kiến)" loading={isLoadingMaterials}>
+                    <Card title="Lịch sử xuất kho (Thực tế)" loading={isLoadingExports}>
                         <Table
-                            dataSource={materialRequirements}
-                            rowKey={(record: any) => `${record.materialId}_${record.productId} `}
+                            dataSource={materialExports}
+                            rowKey="requestId"
+                            // Note: One request can have multiple details. API returns flattened list. 
+                            // API returns pmr.id as requestId. But we have multiple rows per request? 
+                            // The API implementation: SELECT ... pmrd.quantity_actual ... JOIN items ... 
+                            // So each row is unique by (requestId, materialId). 
+                            // rowKey should be generated.
                             pagination={false}
                             columns={[
                                 {
-                                    title: "Sản phẩm",
-                                    dataIndex: "productName",
-                                    key: "productName",
-                                    render: (text, record: any, index) => {
-                                        const obj = {
-                                            children: <span className="font-medium">{text}</span>,
-                                            props: { rowSpan: 1 },
-                                        };
-                                        // Simple rowSpan logic
-                                        if (index > 0 && materialRequirements[index - 1].productId === record.productId) {
-                                            obj.props.rowSpan = 0;
-                                        } else {
-                                            let count = 0;
-                                            for (let i = index; i < materialRequirements.length; i++) {
-                                                if (materialRequirements[i].productId === record.productId) {
-                                                    count++;
-                                                } else {
-                                                    break;
-                                                }
-                                            }
-                                            obj.props.rowSpan = count;
-                                        }
-                                        return obj;
-                                    },
+                                    title: "Ngày xuất",
+                                    dataIndex: "date",
+                                    key: "date",
+                                    render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
+                                },
+                                {
+                                    title: "Kho xuất",
+                                    dataIndex: "warehouseName",
+                                    key: "warehouseName",
                                 },
                                 {
                                     title: "Tên vật tư",
@@ -730,10 +720,10 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                                     key: "unit",
                                 },
                                 {
-                                    title: "Tổng định mức",
-                                    dataIndex: "quantityPlanned",
-                                    key: "quantityPlanned",
-                                    render: (value) => formatQuantity(value),
+                                    title: "Số lượng thực xuất",
+                                    dataIndex: "quantityActual",
+                                    key: "quantityActual",
+                                    render: (value) => <span className="font-bold text-blue-600">{formatQuantity(value)}</span>,
                                 },
                             ]}
                         />

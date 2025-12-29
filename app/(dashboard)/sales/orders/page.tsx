@@ -992,6 +992,7 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
   const [stockData, setStockData] = useState<Record<string, number>>({});
   const [checkingStock, setCheckingStock] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const [exportedData, setExportedData] = useState<Record<number, { exported: number; pending: number }>>({}); // itemId -> { exported, pending }
 
   useEffect(() => {
     if (order) {
@@ -999,6 +1000,28 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
       form.resetFields();
       setSelectedWarehouseId(null);
       setStockData({});
+
+
+      // Fetch exported history
+      fetch(`/api/sales/orders/${order.id}/exported`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            if (data.success) {
+              const map: Record<number, { exported: number; pending: number }> = {};
+              data.data.forEach((item: any) => {
+                if (item.itemId) {
+                  map[item.itemId] = {
+                    exported: item.totalExported || 0,
+                    pending: item.totalPending || 0,
+                  };
+                }
+              });
+              setExportedData(map);
+            }
+          }
+        })
+        .catch(console.error);
 
       // showAll=true để xem tất cả kho của tất cả chi nhánh
       fetch('/api/inventory/warehouses?showAll=true')
@@ -1022,9 +1045,11 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
       form.resetFields();
       setSelectedWarehouseId(null);
       setStockData({});
+      setExportedData({});
       setWarehouses([]);
     }
   }, [order, form, message]);
+
 
   useEffect(() => {
     if (selectedWarehouseId && order?.details) {
@@ -1064,7 +1089,19 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
   const handleExport = async (values: any) => {
     if (!order) return;
 
-    // Cho phép xuất kho không cần thanh toán hết
+    // Filter items with quantity > 0
+    const itemsToExport = order.details?.map(item => {
+      const qty = values[`qty_${item.itemId}`] || 0;
+      return {
+        ...item,
+        exportQty: qty
+      };
+    }).filter(item => item.exportQty > 0);
+
+    if (!itemsToExport || itemsToExport.length === 0) {
+      message.warning('Vui lòng nhập số lượng xuất cho ít nhất 1 sản phẩm');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -1073,13 +1110,14 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fromWarehouseId: values.warehouseId,
-          notes: `Xuất kho cho đơn hàng ${order.orderCode} - KH: ${order.customerName}`,
+          notes: `Xuất kho đơn hàng ${order.orderCode} - KH: ${order.customerName}`,
           relatedOrderCode: order.orderCode,
           relatedCustomerName: order.customerName,
-          items: order.details?.map(item => ({
+          autoApprove: false, // Default to false as requested (Pending approval)
+          items: itemsToExport.map(item => ({
             productId: item.productId || undefined,
             materialId: item.materialId || undefined,
-            quantity: item.quantity,
+            quantity: item.exportQty,
             notes: item.notes
           }))
         })
@@ -1092,29 +1130,52 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
         return;
       }
 
-      const statusRes = await fetch(`/api/sales/orders/${order.id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'EXPORTED' })
-      });
-      const statusData = await statusRes.json();
-
-      if (statusData.success) {
-        message.success('Đã xuất kho thành công');
-        form.resetFields();
-        onSuccess();
-        onClose();
-      } else {
-        message.error(statusData.error || 'Lỗi khi cập nhật trạng thái đơn hàng');
-        setLoading(false);
+      // Check if order is finished
+      let isAutoFinished = true;
+      if (order.details) {
+        for (const item of order.details) {
+          if (item.itemId) {
+            const data = exportedData[item.itemId] || { exported: 0, pending: 0 };
+            const previousExported = data.exported + data.pending; // Count pending as exported for completion check? Ideally yes.
+            const currentExport = values[`qty_${item.itemId}`] || 0;
+            if (previousExported + currentExport < item.quantity) {
+              isAutoFinished = false;
+              break;
+            }
+          }
+        }
       }
+
+      const shouldFinish = isAutoFinished;
+
+      if (shouldFinish) {
+        const statusRes = await fetch(`/api/sales/orders/${order.id}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'EXPORTED' })
+        });
+        const statusData = await statusRes.json();
+        if (!statusData.success) {
+          message.warning('Xuất kho thành công nhưng lỗi cập nhật trạng thái đơn hàng');
+        } else {
+          message.success('Đã xuất kho và hoàn thành đơn hàng');
+        }
+      } else {
+        message.success('Đã xuất kho thành công');
+      }
+
+      form.resetFields();
+      onSuccess();
+      onClose();
 
     } catch (error) {
       console.error('Export error:', error);
       message.error('Có lỗi xảy ra khi xuất kho');
+    } finally {
       setLoading(false);
     }
   };
+
 
   const remainingAmount = order ? order.finalAmount - (order.depositAmount || 0) - (order.paidAmount || 0) : 0;
 
@@ -1152,46 +1213,67 @@ function ExportModal({ order, onClose, onSuccess }: ExportModalProps) {
           </Select>
         </Form.Item>
 
-        <Collapse
-          size="small"
-          defaultActiveKey={[]}
-          activeKey={selectedWarehouseId ? ['stock'] : undefined}
-          items={[{
-            key: 'stock',
-            label: (
-              <div className="flex items-center gap-2">
-                <Typography.Text strong>Kiểm tra tồn kho</Typography.Text>
-                {checkingStock && <Spin size="small" />}
-              </div>
-            ),
-            children: (
-              <ul className="list-disc pl-4 space-y-1">
-                {order?.details?.map((item, idx) => {
-                  const key = item.productId ? `p-${item.productId}` : `m-${item.materialId}`;
-                  const stock = stockData[key] || 0;
-                  const isEnough = stock >= item.quantity;
+        <div className="mb-4"></div>
 
-                  return (
-                    <li key={idx} className="text-sm">
-                      <div className="flex justify-between items-center">
-                        <span>{item.itemName}</span>
-                        <div className="flex gap-3">
-                          <span>SL: <strong>{formatQuantity(item.quantity)}</strong></span>
-                          {selectedWarehouseId && (
-                            <span className={isEnough ? "text-green-600" : "text-red-600 font-bold"}>
-                              (Tồn: {formatQuantity(stock)})
-                              {!isEnough && " ⚠️ Thiếu"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )
-          }]}
+        <Table
+          dataSource={order?.details || []}
+          rowKey="itemId"
+          pagination={false}
+          size="small"
+          columns={[
+            {
+              title: 'Sản phẩm',
+              dataIndex: 'itemName',
+              key: 'itemName',
+            },
+            {
+              title: 'Đặt hàng',
+              dataIndex: 'quantity',
+              key: 'quantity',
+              align: 'right',
+              render: (val) => formatQuantity(val)
+            },
+            {
+              title: 'Đã xuất',
+              key: 'exported',
+              align: 'right',
+              render: (_, record: any) => {
+                const data = exportedData[record.itemId] || { exported: 0, pending: 0 };
+                return (
+                  <div className="flex flex-col items-end">
+                    <span>{formatQuantity(data.exported)}</span>
+                  </div>
+                );
+              }
+            },
+            {
+              title: 'Tồn kho',
+              key: 'stock',
+              align: 'right',
+              render: (_, record: any) => {
+                if (!selectedWarehouseId) return '-';
+                const key = record.productId ? `p-${record.productId}` : `m-${record.materialId}`;
+                const stock = stockData[key] || 0;
+                return <span className={stock > 0 ? 'text-green-600' : 'text-red-500'}>{formatQuantity(stock)}</span>;
+              }
+            },
+            {
+              title: 'Xuất lần này',
+              key: 'exportQty',
+              width: 120,
+              render: (_, record: any) => (
+                <Form.Item
+                  name={`qty_${record.itemId}`}
+                  initialValue={0} // Default 0 to force user input? Or remaining? Let's default to remaining.
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber min={0} max={record.quantity} style={{ width: '100%' }} />
+                </Form.Item>
+              )
+            }
+          ]}
         />
+
 
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Hủy</Button>

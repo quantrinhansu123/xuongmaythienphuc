@@ -82,8 +82,6 @@ export default function ProductionPage() {
             render: (text: string, record: any) => (
                 <div className="flex flex-col">
                     <span className="font-medium text-blue-700">{text}</span>
-                    {record.itemCode && <span className="text-xs text-gray-500">{record.itemCode}</span>}
-                    {record.quantity && <span className="text-xs text-gray-500">SL: {record.quantity}</span>}
                 </div>
             )
         },

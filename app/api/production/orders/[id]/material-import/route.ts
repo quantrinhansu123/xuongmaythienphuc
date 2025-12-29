@@ -98,15 +98,25 @@ export async function POST(
 
             // 5. Update Production Order Status/Step và lưu kho nguồn
             // Chuyển sang bước CUTTING sau khi nhập NVL xong
-            await query(
-                `UPDATE production_orders 
-                 SET status = 'IN_PROGRESS', 
-                     current_step = 'CUTTING', 
-                     source_warehouse_id = $2,
-                     updated_at = NOW() 
-                 WHERE id = $1`,
-                [id, warehouseId]
-            );
+            // 5. Update Production Order Status/Step và lưu kho nguồn
+            const { isFinished } = body;
+
+            // Luôn cập nhật trạng thái là IN_PROGRESS và kho nguồn
+            // Chỉ chuyển bước sang CUTTING nếu người dùng tick "Hoàn thành"
+            const updateQuery = isFinished
+                ? `UPDATE production_orders 
+                   SET status = 'IN_PROGRESS', 
+                       current_step = 'CUTTING', 
+                       source_warehouse_id = $2,
+                       updated_at = NOW() 
+                   WHERE id = $1`
+                : `UPDATE production_orders 
+                   SET status = 'IN_PROGRESS', 
+                       source_warehouse_id = $2,
+                       updated_at = NOW() 
+                   WHERE id = $1`;
+
+            await query(updateQuery, [id, warehouseId]);
 
             await query('COMMIT');
 
