@@ -126,7 +126,9 @@ export async function GET(request: NextRequest) {
         u.full_name as "createdBy",
         o.created_at as "createdAt",
         b.id as "branchId",
-        b.branch_name as "branchName"
+        b.id as "branchId",
+        b.branch_name as "branchName",
+        (SELECT COUNT(*) FROM order_details od WHERE od.order_id = o.id) as "itemCount"
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
        LEFT JOIN users u ON u.id = o.created_by

@@ -52,7 +52,9 @@ export async function GET(request: NextRequest) {
         i.height,
         i.weight,
         i.thickness,
-        i.other_specs as "otherSpecs"
+        i.thickness,
+        i.other_specs as "otherSpecs",
+        EXISTS (SELECT 1 FROM bom b WHERE b.product_id = i.product_id) as "hasBom"
       FROM items i
       LEFT JOIN products p ON i.product_id = p.id
       LEFT JOIN materials m ON i.material_id = m.id
@@ -90,6 +92,12 @@ export async function GET(request: NextRequest) {
       sql += ` AND i.category_id = $${paramIndex}`;
       params.push(parseInt(categoryId));
       paramIndex++;
+    }
+
+    // Filter items without BOM
+    const missingBom = searchParams.get('missingBom') === 'true';
+    if (missingBom) {
+      sql += ` AND i.item_type = 'PRODUCT' AND NOT EXISTS (SELECT 1 FROM bom b WHERE b.product_id = i.product_id)`;
     }
 
     sql += ` ORDER BY i.id, i.created_at DESC`;

@@ -59,17 +59,42 @@ interface OrderItem {
   unitPrice: number;
   costPrice: number;
   totalAmount: number;
+
   notes: string;
-  measurements?: { attributeId: number; attributeName?: string; value: string }[];
+  templateId?: number; // Selected template ID
+  templateName?: string; // Selected template name
+  measurements?: {
+    id: number; // stores attributeId or measurementId
+    type: 'ATTRIBUTE' | 'MEASUREMENT';
+    name?: string;
+    value: string
+  }[];
   [key: string]: unknown; // Allow dynamic property access
 }
 
 interface CategoryAttribute {
   id: number;
-  category_id: number;
-  attribute_name: string;
-  attribute_type: string;
-  is_required: boolean;
+  categoryId: number;
+  attributeName: string;
+  attributeType: string;
+  isRequired: boolean;
+  options?: string | string[]; // JSON string or array
+}
+
+interface CategoryMeasurement {
+  id: number;
+  categoryId: number;
+  measurementName: string;
+  unit: string;
+  isRequired: boolean;
+}
+
+interface ItemTemplate {
+  id: number;
+  templateName: string;
+  categoryId: number;
+  attributeValues: Record<string, string>;
+  measurementValues: Record<string, string>;
 }
 
 interface Customer {
@@ -319,6 +344,11 @@ function OrderDetailDrawer({
           <Descriptions.Item label="Tổng tiền">
             <Typography.Text strong style={{ color: '#1890ff' }}>
               {formatCurrency(data.finalAmount)}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item label="Giảm giá">
+            <Typography.Text type="danger">
+              -{formatCurrency(data.discountAmount || 0)}
             </Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="Tiền đặt cọc">
@@ -1209,6 +1239,14 @@ export default function OrdersPage() {
       render: (value: string) => new Date(value).toLocaleDateString("vi-VN"),
     },
     {
+      title: "Số lượng SP",
+      dataIndex: "itemCount",
+      key: "itemCount",
+      width: 100,
+      align: 'center',
+      render: (value: number) => <span className="text-gray-600">{value}</span>,
+    },
+    {
       title: "Tổng tiền",
       dataIndex: "finalAmount",
       key: "finalAmount",
@@ -1284,20 +1322,34 @@ export default function OrdersPage() {
   const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | "all">("all");
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string | "all">("all");
-  const [currentUser, setCurrentUser] = useState<{ roleCode: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ roleCode: string; branchId?: number } | null>(null);
   const { modal } = App.useApp();
 
   // Form and mutation hooks
   const [form] = Form.useForm();
   const saveMutation = useMutation({
-    mutationFn: async (values: Record<string, unknown>) => {
+    mutationFn: async (values: any) => {
+      const payload = {
+        ...values,
+        items: orderItems.map(item => ({
+          ...item,
+          measurements: item.measurements?.map(m => ({
+            attributeId: m.type === 'ATTRIBUTE' ? m.id : undefined,
+            measurementId: m.type === 'MEASUREMENT' ? m.id : undefined,
+            value: m.value
+          }))
+        })),
+        customerId: values.customerId === "NEW" ? undefined : values.customerId,
+        newCustomer: values.customerId === "NEW" ? newCustomer : undefined,
+      };
+
       const url = editingOrderId
         ? `/api/sales/orders/${editingOrderId}`
         : "/api/sales/orders";
       const res = await fetch(url, {
         method: editingOrderId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Có lỗi xảy ra");
@@ -1363,7 +1415,7 @@ export default function OrdersPage() {
     customerId: "",
     orderDate: new Date().toISOString().split("T")[0],
     notes: "",
-    branchId: "", // Add branchId to form state
+    branchId: "" as string | number, // Add branchId to form state
   });
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -1387,7 +1439,15 @@ export default function OrdersPage() {
   const [showNewItemModal, setShowNewItemModal] = useState(false);
   const [newItemForm] = Form.useForm();
   const [savingItem, setSavingItem] = useState(false);
+
   const [itemDropdownOpen, setItemDropdownOpen] = useState<number | null>(null); // track which dropdown is open by index
+
+  // Template creation state
+  const [showNewTemplateModal, setShowNewTemplateModal] = useState(false);
+  const [newTemplateCategoryId, setNewTemplateCategoryId] = useState<number | null>(null);
+  const [activeTemplateItemIndex, setActiveTemplateItemIndex] = useState<number | null>(null);
+  const [newTemplateForm] = Form.useForm();
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // TanStack Query for data fetching
   // Fetch current user and branches
@@ -1398,6 +1458,10 @@ export default function OrdersPage() {
       const data = await res.json();
       if (data.success) {
         setCurrentUser(data.data.user);
+        // Set default branch for new orders if not already set
+        if (data.data.user.branchId && !orderForm.branchId) {
+          setOrderForm(prev => ({ ...prev, branchId: String(data.data.user.branchId) }));
+        }
         return data.data.user;
       }
       return null;
@@ -1550,7 +1614,7 @@ export default function OrdersPage() {
       customerId: "",
       orderDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD in local time
       notes: "",
-      branchId: "",
+      branchId: currentUser?.branchId ? String(currentUser.branchId) : "",
     });
     setOrderItems([]);
     setSelectedCustomer(null);
@@ -1693,22 +1757,24 @@ export default function OrdersPage() {
     setOrderItems(newItems);
   };
 
-  const updateItemMeasurement = (itemIndex: number, attributeId: number, value: string) => {
+  const updateItemMeasurement = (itemIndex: number, id: number, value: string, type: 'ATTRIBUTE' | 'MEASUREMENT') => {
     const newItems = [...orderItems];
     const item = newItems[itemIndex];
     if (!item.measurements) item.measurements = [];
 
-    const existingIdx = item.measurements.findIndex(m => m.attributeId === attributeId);
+    const existingIdx = item.measurements.findIndex(m => m.id === id && m.type === type);
     if (existingIdx >= 0) {
       item.measurements[existingIdx].value = value;
     } else {
-      item.measurements.push({ attributeId, value });
+      item.measurements.push({ id, type, value });
     }
     setOrderItems(newItems);
   };
 
-  // Cache for category attributes
+  // Cache for category attributes and templates
   const [categoryAttributes, setCategoryAttributes] = useState<Record<number, CategoryAttribute[]>>({});
+  const [categoryMeasurements, setCategoryMeasurements] = useState<Record<number, CategoryMeasurement[]>>({});
+  const [categoryTemplates, setCategoryTemplates] = useState<Record<number, ItemTemplate[]>>({});
 
   const fetchCategoryAttributes = async (categoryId: number) => {
     if (categoryAttributes[categoryId]) return categoryAttributes[categoryId];
@@ -1716,7 +1782,42 @@ export default function OrdersPage() {
       const res = await fetch(`/api/categories/${categoryId}/attributes`);
       const data = await res.json();
       if (data.success) {
-        setCategoryAttributes(prev => ({ ...prev, [categoryId]: data.data }));
+        // Parse options if string
+        const attrs = data.data.map((a: any) => ({
+          ...a,
+          options: typeof a.options === 'string' ? JSON.parse(a.options) : a.options
+        }));
+        setCategoryAttributes(prev => ({ ...prev, [categoryId]: attrs }));
+        return attrs;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  };
+
+  const fetchCategoryTemplates = async (categoryId: number) => {
+    if (categoryTemplates[categoryId]) return categoryTemplates[categoryId];
+    try {
+      const res = await fetch(`/api/products/categories/${categoryId}/templates`);
+      const data = await res.json();
+      if (data.success) {
+        setCategoryTemplates(prev => ({ ...prev, [categoryId]: data.data }));
+        return data.data;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  };
+
+  const fetchCategoryMeasurements = async (categoryId: number) => {
+    if (categoryMeasurements[categoryId]) return categoryMeasurements[categoryId];
+    try {
+      const res = await fetch(`/api/products/categories/${categoryId}/measurements`);
+      const data = await res.json();
+      if (data.success) {
+        setCategoryMeasurements(prev => ({ ...prev, [categoryId]: data.data }));
         return data.data;
       }
     } catch (e) {
@@ -1726,16 +1827,122 @@ export default function OrdersPage() {
   };
 
   useEffect(() => {
-    // Fetch attributes for items when they are added/changed
+    // Fetch attributes for items
     orderItems.forEach(async (item) => {
       if (item.itemId) {
         const foundItem = items.find((i: any) => i.id === item.itemId);
         if (foundItem?.categoryId) {
           await fetchCategoryAttributes(foundItem.categoryId);
+          await fetchCategoryMeasurements(foundItem.categoryId);
+          await fetchCategoryTemplates(foundItem.categoryId);
         }
       }
     });
   }, [orderItems, items]);
+
+  const handleOpenTemplateModal = (categoryId: number, itemIndex: number) => {
+    setNewTemplateCategoryId(categoryId);
+    setActiveTemplateItemIndex(itemIndex);
+    newTemplateForm.resetFields();
+    setShowNewTemplateModal(true);
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplateCategoryId) return;
+    try {
+      const values = await newTemplateForm.validateFields();
+      setSavingTemplate(true);
+
+      const { templateName, ...rest } = values;
+
+      // Separate attributes and measurements
+      // Keys are just IDs. We need to know which is which.
+      // Actually, we can check against categoryAttributes and categoryMeasurements lists.
+
+      const attrVals: Record<string, string> = {};
+      const measVals: Record<string, string> = {};
+
+      Object.entries(rest).forEach(([key, val]) => {
+        // Check if key is attribute or measurement
+        // The form names should probably be prefixed to be safe? 
+        // Current form uses just ID. If ID collides, we have issue.
+        // Let's prefix form fields in the Modal: 'attr_1', 'meas_1'.
+        if (key.startsWith('attr_')) {
+          attrVals[key.replace('attr_', '')] = String(val);
+        } else if (key.startsWith('meas_')) {
+          measVals[key.replace('meas_', '')] = String(val);
+        }
+      });
+
+      const res = await fetch(`/api/products/categories/${newTemplateCategoryId}/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateName,
+          attributeValues: attrVals,
+          measurementValues: measVals
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        message.success('Đã tạo mẫu mới');
+        setShowNewTemplateModal(false);
+        // Refresh templates
+        await fetchCategoryTemplates(newTemplateCategoryId);
+        // FORCE UPDATE
+        setCategoryTemplates(prev => {
+          const currentList = prev[newTemplateCategoryId] || [];
+          return { ...prev, [newTemplateCategoryId]: [...currentList, data.data] };
+        });
+
+        // If we have an active item index, auto-select this new template
+        if (activeTemplateItemIndex !== null) {
+          const newTemplate = data.data;
+          const newOrderItems = [...orderItems];
+          const item = newOrderItems[activeTemplateItemIndex];
+
+          item.templateId = newTemplate.id;
+          item.templateName = newTemplate.templateName;
+
+          // Populate measurements
+          item.measurements = [];
+
+          // Attributes
+          if (newTemplate.attributeValues) {
+            Object.entries(newTemplate.attributeValues).forEach(([key, val]) => {
+              // key is ID
+              item.measurements!.push({
+                id: parseInt(key),
+                type: 'ATTRIBUTE',
+                value: String(val)
+              });
+            });
+          }
+
+          // Measurements
+          if (newTemplate.measurementValues) {
+            Object.entries(newTemplate.measurementValues).forEach(([key, val]) => {
+              item.measurements!.push({
+                id: parseInt(key),
+                type: 'MEASUREMENT',
+                value: String(val)
+              });
+            });
+          }
+
+          setOrderItems(newOrderItems);
+          setActiveTemplateItemIndex(null); // Clear
+        }
+      } else {
+        message.error(data.error || 'Có lỗi xảy ra');
+      }
+    } catch (e) {
+      // validation error
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
 
   const calculateTotal = () => {
     return orderItems.reduce((sum, item) => sum + item.totalAmount, 0);
@@ -2234,11 +2441,11 @@ export default function OrdersPage() {
               setShowCreateModal(false);
               setEditingOrderId(null);
             }}
-            footer={null}
-            width={1200}
+            width="90%"
+            style={{ top: 20 }}
             destroyOnHidden
           >
-            <Form form={form} layout="vertical" onFinish={handleSubmitOrder}>
+            <Form form={form} layout="vertical" onFinish={(values) => saveMutation.mutate(values)}>
               <div className="flex gap-6">
                 {/* Cột trái: Thông tin khách hàng + Danh sách hàng hóa */}
                 <div className="flex-1 min-w-0">
@@ -2414,13 +2621,24 @@ export default function OrdersPage() {
                               const data = await res.json();
                               if (data.success) {
                                 message.success(`Đã tạo khách hàng: ${data.data.customerName}`);
-                                // Cập nhật danh sách khách hàng
+                                // Optimistically update cache
+                                queryClient.setQueryData(["customers"], (old: any[]) => {
+                                  return old ? [...old, data.data] : [data.data];
+                                });
+                                // Invalidate to ensure consistency
                                 queryClient.invalidateQueries({ queryKey: ["customers"] });
+
                                 // Chọn khách hàng vừa tạo
-                                setSelectedCustomer(data.data);
-                                setOrderForm({ ...orderForm, customerId: data.data.id.toString() });
+                                const newCust = data.data;
+                                setSelectedCustomer(newCust);
+
+                                // Reset form new customer
                                 setShowNewCustomer(false);
                                 setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
+
+                                // Update main form
+                                form.setFieldsValue({ customerId: newCust.id });
+                                setOrderForm(prev => ({ ...prev, customerId: String(newCust.id) }));
                               } else {
                                 message.error(data.error || "Có lỗi xảy ra");
                               }
@@ -2530,7 +2748,7 @@ export default function OrdersPage() {
                                   value={item.unitPrice}
                                   formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                   parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                                  disabled
+                                  disabled={!isAdmin}
                                 />
                               </div>
                               <div className="w-32">
@@ -2556,6 +2774,128 @@ export default function OrdersPage() {
                                 onChange={(e) => updateOrderItem(index, "notes", e.target.value)}
                               />
                             </div>
+                            {/* Hàng 3: Mẫu mã & Thông số */}
+                            {(() => {
+                              const foundItem = items.find((i: any) => i.id === item.itemId);
+                              const categoryId = foundItem?.categoryId;
+                              if (!categoryId) return null;
+
+                              const attrs = categoryAttributes[categoryId] || [];
+                              const templates = categoryTemplates[categoryId] || [];
+
+                              if (attrs.length === 0 && templates.length === 0) return null;
+
+                              return (
+                                <div className="mt-2 p-3 bg-blue-50/50 rounded border border-blue-100">
+                                  <div className="flex flex-wrap gap-4 items-end">
+                                    {/* Template Select */}
+                                    {templates.length > 0 && (
+                                      <div className="w-48">
+                                        <label className="text-xs font-medium text-gray-600 block mb-1">Mẫu sản phẩm</label>
+                                        <Select
+                                          placeholder="Chọn mẫu..."
+                                          style={{ width: '100%' }}
+                                          allowClear
+                                          value={item.templateId}
+                                          onChange={(val) => {
+                                            const newOrderItems = [...orderItems];
+                                            const currentItem = newOrderItems[index];
+
+                                            if (!val) {
+                                              // Clear template
+                                              currentItem.templateId = undefined;
+                                              currentItem.templateName = undefined;
+                                              // Reset measurements or keep them? Maybe keep them as custom? 
+                                              // User might want to edit from the template baseline. 
+                                              // But usually clears mean "I want to start over" or "Custom".
+                                              // Let's keep values but allow editing.
+                                            } else {
+                                              const tmpl = templates.find(t => t.id === val);
+                                              if (tmpl) {
+                                                currentItem.templateId = tmpl.id;
+                                                currentItem.templateName = tmpl.templateName;
+                                                if (!currentItem.measurements) currentItem.measurements = [];
+
+                                                // Fill attributes
+                                                if (tmpl.attributeValues) {
+                                                  Object.entries(tmpl.attributeValues).forEach(([attrId, val]) => {
+                                                    const id = parseInt(attrId);
+                                                    const idx = currentItem.measurements!.findIndex(m => m.id === id && m.type === 'ATTRIBUTE');
+                                                    if (idx >= 0) currentItem.measurements![idx].value = val as string;
+                                                    else currentItem.measurements!.push({ id, type: 'ATTRIBUTE', value: val as string });
+                                                  });
+                                                }
+
+                                                // Fill measurements
+                                                if (tmpl.measurementValues) {
+                                                  Object.entries(tmpl.measurementValues).forEach(([measId, val]) => {
+                                                    const id = parseInt(measId);
+                                                    const idx = currentItem.measurements!.findIndex(m => m.id === id && m.type === 'MEASUREMENT');
+                                                    if (idx >= 0) currentItem.measurements![idx].value = val as string;
+                                                    else currentItem.measurements!.push({ id, type: 'MEASUREMENT', value: val as string });
+                                                  });
+                                                }
+                                              }
+                                            }
+                                            setOrderItems(newOrderItems);
+                                          }}
+                                          dropdownRender={(menu) => (
+                                            <>
+                                              {menu}
+                                              <div style={{ padding: '8px', borderTop: '1px solid #e8e8e8' }}>
+                                                <Button type="text" block icon={<PlusOutlined />} onClick={() => handleOpenTemplateModal(foundItem.categoryId, index)}>
+                                                  Thêm mẫu mới
+                                                </Button>
+                                              </div>
+                                            </>
+                                          )}
+                                        >
+                                          {templates.map(t => (
+                                            <Select.Option key={t.id} value={t.id}>{t.templateName}</Select.Option>
+                                          ))}
+                                        </Select>
+                                      </div>
+                                    )}
+
+                                    {(() => {
+                                      const attrList = categoryAttributes[categoryId] || [];
+                                      const measList = categoryMeasurements[categoryId] || [];
+
+                                      // Only show attributes/measurements if a template is selected
+                                      if (!item.templateId) return null;
+
+                                      return (
+                                        <div className="flex flex-wrap gap-4 items-center pt-2">
+                                          {/* Attributes - Read Only Text */}
+                                          {attrList.map(attr => {
+                                            const m = item.measurements?.find(x => x.id === attr.id && x.type === 'ATTRIBUTE');
+                                            if (!m || !m.value) return null;
+                                            return (
+                                              <div key={`attr-${attr.id}`} className="text-sm bg-gray-50 px-3 py-1 rounded-md border border-gray-200 shadow-sm flex items-center">
+                                                <span className="text-gray-500 mr-1.5 font-medium">{attr.attributeName}:</span>
+                                                <span className="font-semibold text-gray-800">{m.value}</span>
+                                              </div>
+                                            );
+                                          })}
+
+                                          {/* Measurements - Read Only Text */}
+                                          {measList.map(meas => {
+                                            const m = item.measurements?.find(x => x.id === meas.id && x.type === 'MEASUREMENT');
+                                            if (!m || !m.value) return null;
+                                            return (
+                                              <div key={`meas-${meas.id}`} className="text-sm bg-gray-50 px-3 py-1 rounded-md border border-gray-200 shadow-sm flex items-center">
+                                                <span className="text-gray-500 mr-1.5 font-medium">{meas.measurementName}:</span>
+                                                <span className="font-semibold text-gray-800">{m.value} {meas.unit}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         ))}
                       </div>
@@ -2659,6 +2999,57 @@ export default function OrdersPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </Form>
+          </Modal>
+
+          {/* Create Template Modal */}
+          <Modal
+            title="Thêm mẫu mới"
+            open={showNewTemplateModal}
+            onCancel={() => setShowNewTemplateModal(false)}
+            onOk={handleCreateTemplate}
+            confirmLoading={savingTemplate}
+            destroyOnHidden
+          >
+            <Form form={newTemplateForm} layout="vertical">
+              <Form.Item name="templateName" label="Tên mẫu" rules={[{ required: true, message: 'Vui lòng nhập tên mẫu' }]}>
+                <Input placeholder="Ví dụ: Size M - Trắng" />
+              </Form.Item>
+              <div className="border-t pt-4 mt-4">
+                <h4 className="mb-3 text-sm font-semibold text-gray-600">Thuộc tính</h4>
+                {newTemplateCategoryId && categoryAttributes[newTemplateCategoryId]?.map(attr => (
+                  <Form.Item
+                    key={`attr_${attr.id}`}
+                    name={`attr_${attr.id}`}
+                    label={attr.attributeName}
+                    rules={[{ required: attr.isRequired, message: `Vui lòng nhập ${attr.attributeName}` }]}
+                  >
+                    {attr.options && Array.isArray(attr.options) && attr.options.length > 0 ? (
+                      <Select placeholder={`Chọn ${attr.attributeName}`}>
+                        {attr.options.map((opt: string) => (
+                          <Select.Option key={opt} value={opt}>{opt}</Select.Option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Input placeholder={`Nhập ${attr.attributeName}`} />
+                    )}
+                  </Form.Item>
+                ))}
+              </div>
+
+              <div className="border-t pt-4 mt-4">
+                <h4 className="mb-3 text-sm font-semibold text-gray-600">Thông số kỹ thuật</h4>
+                {newTemplateCategoryId && categoryMeasurements[newTemplateCategoryId]?.map(meas => (
+                  <Form.Item
+                    key={`meas_${meas.id}`}
+                    name={`meas_${meas.id}`}
+                    label={`${meas.measurementName} ${meas.unit ? `(${meas.unit})` : ''}`}
+                    rules={[{ required: meas.isRequired, message: `Vui lòng nhập ${meas.measurementName}` }]}
+                  >
+                    <Input placeholder={`Nhập ${meas.measurementName}`} />
+                  </Form.Item>
+                ))}
               </div>
             </Form>
           </Modal>
