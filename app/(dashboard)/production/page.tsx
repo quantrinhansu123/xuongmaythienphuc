@@ -126,43 +126,14 @@ export default function ProductionPage() {
         //     },
         // },
         {
-            title: "Công đoạn",
-            dataIndex: "currentStep",
-            key: "currentStep",
-            render: (step: string) => {
-                let text = step;
-                let color = "default";
-                switch (step) {
-                    case "MATERIAL_IMPORT":
-                        text = "Nhập NVL";
-                        color = "orange";
-                        break;
-                    case "CUTTING":
-                        text = "Cắt";
-                        color = "blue";
-                        break;
-                    case "SEWING":
-                        text = "May";
-                        color = "cyan";
-                        break;
-                    case "FINISHING":
-                        text = "Hoàn thiện";
-                        color = "purple";
-                        break;
-                    case "QC":
-                        text = "KCS";
-                        color = "geekblue";
-                        break;
-                    case "WAREHOUSE_IMPORT":
-                        text = "Nhập kho";
-                        color = "lime";
-                        break;
-                    case "COMPLETED":
-                        text = "Hoàn thành";
-                        color = "green";
-                        break;
+            title: "Trạng thái",
+            dataIndex: "status",
+            key: "status",
+            render: (status: string) => {
+                if (status === "COMPLETED") {
+                    return <Tag color="green">✓ Hoàn thành</Tag>;
                 }
-                return <Tag color={color}>{text}</Tag>;
+                return <Tag color="blue">🔄 Đang SX</Tag>;
             },
         },
         {

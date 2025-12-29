@@ -113,17 +113,21 @@ export default function MaterialImportModal({
             return;
         }
 
+        // Kiểm tra có ít nhất 1 item có số lượng > 0
+        const items = requirements.map((req: any) => ({
+            materialId: req.materialId,
+            quantityPlanned: req.quantityPlanned,
+            quantityActual: values[`qty_${req.materialId}_${req.productId}`] || 0,
+        }));
+
+        const totalQty = items.reduce((sum: number, item: any) => sum + Number(item.quantityActual || 0), 0);
+        if (totalQty <= 0) {
+            message.error("Vui lòng nhập số lượng xuất kho (phải > 0)");
+            return;
+        }
+
         setSubmitting(true);
         try {
-            const items = requirements.map((req: any) => ({
-                materialId: req.materialId,
-                quantityPlanned: req.quantityPlanned,
-                quantityActual: values[`qty_${req.materialId}_${req.productId}`] || 0,
-            }));
-
-            // Filter out items with 0 quantity if desired? No, maybe they want to record 0.
-            // But usually we only export what we have. 
-            // API expects items.
 
             const res = await fetch(
                 `/api/production/orders/${productionOrderId}/material-import`,

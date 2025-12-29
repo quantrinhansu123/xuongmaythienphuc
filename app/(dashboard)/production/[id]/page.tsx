@@ -4,7 +4,7 @@ import { useGetCompany } from "@/hooks/useCompany";
 import { formatQuantity } from "@/utils/format";
 import { ArrowRightOutlined, CalendarOutlined, CheckOutlined, DeleteOutlined, LeftOutlined, PrinterOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Checkbox, Col, DatePicker, Descriptions, Form, Input, message, Modal, Popconfirm, Row, Select, Space, Spin, Steps, Table, Tag, Typography, type CheckboxProps } from "antd";
+import { Button, Card, Checkbox, Col, DatePicker, Descriptions, Form, Input, message, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Typography, type CheckboxProps } from "antd";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
@@ -54,6 +54,18 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
             return data.data || [];
         },
         staleTime: 5 * 60 * 1000,
+        enabled: !!id,
+    });
+
+    // Lấy lịch sử nhập kho thành phẩm
+    const { data: finishedImportsData, isLoading: isLoadingFinishedImports } = useQuery({
+        queryKey: ["production-finished-imports", id],
+        queryFn: async () => {
+            const res = await fetch(`/api/production/orders/${id}/finished-imports`);
+            const data = await res.json();
+            return data.data || { imports: [], totalImported: 0 };
+        },
+        staleTime: 30 * 1000,
         enabled: !!id,
     });
 
@@ -240,45 +252,50 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     const getActionButton = () => {
         if (data.status === "COMPLETED") return null;
 
-        switch (data.currentStep) {
-            case "MATERIAL_IMPORT":
-                return (
-                    <Button
-                        type="primary"
-                        icon={<ArrowRightOutlined />}
-                        onClick={() => setIsMaterialImportModalOpen(true)}
-                    >
-                        Tiến hành nhập NVL
-                    </Button>
-                );
-            case "PRODUCTION":
-            case "CUTTING":
-            case "SEWING":
-            case "FINISHING":
-            case "QC":
-                return (
-                    <Button
-                        type="primary"
-                        icon={<ArrowRightOutlined />}
-                        onClick={handleNextStep}
-                        loading={isUpdatingStep}
-                    >
-                        Hoàn thành Sản Xuất & Chuyển nhập kho
-                    </Button>
-                );
-            case "WAREHOUSE_IMPORT":
-                return (
-                    <Button
-                        type="primary"
-                        icon={<CheckOutlined />}
-                        onClick={() => setIsFinishProductModalOpen(true)}
-                    >
-                        Nhập kho thành phẩm
-                    </Button>
-                );
-            default:
-                return null;
-        }
+        // Cho phép xuất NVL và nhập TP linh hoạt
+        return (
+            <Space>
+                <Button
+                    icon={<ArrowRightOutlined />}
+                    onClick={() => setIsMaterialImportModalOpen(true)}
+                >
+                    Xuất NVL
+                </Button>
+                <Button
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={() => setIsFinishProductModalOpen(true)}
+                >
+                    Nhập kho thành phẩm
+                </Button>
+            </Space>
+        );
+    };
+
+    // Nút hoàn thành đơn
+    const handleCompleteOrder = async () => {
+        Modal.confirm({
+            title: 'Hoàn thành đơn sản xuất?',
+            content: 'Đơn sản xuất sẽ được đánh dấu hoàn thành và không thể xuất/nhập thêm.',
+            okText: 'Hoàn thành',
+            cancelText: 'Hủy',
+            onOk: async () => {
+                try {
+                    const res = await fetch(`/api/production/orders/${id}/complete`, {
+                        method: 'POST',
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        message.success('Đã hoàn thành đơn sản xuất');
+                        queryClient.invalidateQueries({ queryKey: ['production-order', id] });
+                    } else {
+                        message.error(result.error || 'Lỗi');
+                    }
+                } catch {
+                    message.error('Lỗi kết nối');
+                }
+            },
+        });
     };
 
     // Hàm in phiếu sản xuất A5 cho từng sản phẩm
@@ -562,14 +579,57 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     <Button icon={<PrinterOutlined />} onClick={() => setShowPrintModal(true)}>
                         In phiếu SX
                     </Button>
-                    {getActionButton()}
                 </Space>
             </div>
 
             <Row gutter={[24, 24]}>
+                {/* Action Cards - Thay thế Steps */}
                 <Col span={24}>
-                    <Card className="mb-6">
-                        <Steps current={currentStepIndex} items={steps} />
+                    <Card className="mb-0" bodyStyle={{ padding: '16px' }}>
+                        <div className="flex items-center justify-between gap-4">
+                            {/* Trạng thái đơn */}
+                            <div className="flex items-center gap-3">
+                                <Tag color={data.status === "COMPLETED" ? "green" : "blue"} className="text-base px-3 py-1">
+                                    {data.status === "COMPLETED" ? "✓ Hoàn thành" : "🔄 Đang sản xuất"}
+                                </Tag>
+                                <span className="text-gray-500">|</span>
+                                <span className="text-sm text-gray-600">
+                                    Tiến độ: <strong className="text-blue-600">{formatQuantity(finishedImportsData?.totalImported || 0)}</strong>
+                                    <span className="text-gray-400"> / </span>
+                                    <strong>{formatQuantity(data.items?.[0]?.quantity || 0)}</strong> sản phẩm
+                                </span>
+                            </div>
+
+                            {/* Action Buttons */}
+                            {data.status !== "COMPLETED" && (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        icon={<ArrowRightOutlined />}
+                                        onClick={() => setIsMaterialImportModalOpen(true)}
+                                        className="flex items-center gap-1"
+                                    >
+                                        📦 Xuất NVL
+                                    </Button>
+                                    <Button
+                                        type="primary"
+                                        icon={<CheckOutlined />}
+                                        onClick={() => setIsFinishProductModalOpen(true)}
+                                        className="flex items-center gap-1"
+                                    >
+                                        🏭 Nhập TP
+                                    </Button>
+                                    {(finishedImportsData?.totalImported || 0) > 0 && (
+                                        <Button
+                                            type="primary"
+                                            danger
+                                            onClick={handleCompleteOrder}
+                                        >
+                                            ✓ Hoàn thành đơn
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </Card>
                 </Col>
 
@@ -681,49 +741,122 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                     </Card>
                 </Col>
 
-                <Col span={24}>
-                    <Card title="Lịch sử xuất kho (Thực tế)" loading={isLoadingExports}>
+                {/* Xuất kho NVL và Nhập kho thành phẩm - 2 cột */}
+                <Col span={12}>
+                    <Card
+                        title={
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">📦</span>
+                                <span>Lịch sử xuất kho NVL</span>
+                            </div>
+                        }
+                        loading={isLoadingExports}
+                        size="small"
+                    >
                         <Table
                             dataSource={materialExports}
-                            rowKey="requestId"
-                            // Note: One request can have multiple details. API returns flattened list. 
-                            // API returns pmr.id as requestId. But we have multiple rows per request? 
-                            // The API implementation: SELECT ... pmrd.quantity_actual ... JOIN items ... 
-                            // So each row is unique by (requestId, materialId). 
-                            // rowKey should be generated.
+                            rowKey={(record: any, index) => `${record.requestId}_${record.materialId}_${index}`}
                             pagination={false}
+                            size="small"
+                            scroll={{ y: 300 }}
                             columns={[
                                 {
                                     title: "Ngày xuất",
                                     dataIndex: "date",
                                     key: "date",
-                                    render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
+                                    width: 100,
+                                    render: (date) => dayjs(date).format("DD/MM/YY"),
                                 },
                                 {
-                                    title: "Kho xuất",
+                                    title: "Kho",
                                     dataIndex: "warehouseName",
                                     key: "warehouseName",
+                                    ellipsis: true,
                                 },
                                 {
-                                    title: "Tên vật tư",
+                                    title: "NVL",
                                     dataIndex: "materialName",
                                     key: "materialName",
+                                    ellipsis: true,
                                 },
                                 {
-                                    title: "Mã vật tư",
-                                    dataIndex: "materialCode",
-                                    key: "materialCode",
-                                },
-                                {
-                                    title: "ĐVT",
-                                    dataIndex: "unit",
-                                    key: "unit",
-                                },
-                                {
-                                    title: "Số lượng thực xuất",
+                                    title: "SL",
                                     dataIndex: "quantityActual",
                                     key: "quantityActual",
+                                    width: 80,
                                     render: (value) => <span className="font-bold text-blue-600">{formatQuantity(value)}</span>,
+                                },
+                            ]}
+                        />
+                    </Card>
+                </Col>
+
+                <Col span={12}>
+                    <Card
+                        title={
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg">🏭</span>
+                                    <span>Lịch sử nhập kho TP</span>
+                                </div>
+                                <span className="text-sm font-normal">
+                                    <span className="font-bold text-green-600">{formatQuantity(finishedImportsData?.totalImported || 0)}</span>
+                                    <span className="text-gray-400"> / </span>
+                                    <span className="font-bold">{formatQuantity(data.items?.[0]?.quantity || 0)}</span>
+                                    {(finishedImportsData?.totalImported || 0) >= (data.items?.[0]?.quantity || 0) && (
+                                        <span className="ml-2 text-green-600">✓</span>
+                                    )}
+                                </span>
+                            </div>
+                        }
+                        loading={isLoadingFinishedImports}
+                        size="small"
+                        extra={
+                            data.status !== "COMPLETED" && (finishedImportsData?.totalImported || 0) > 0 && (
+                                <Button
+                                    type="primary"
+                                    size="small"
+                                    danger
+                                    icon={<CheckOutlined />}
+                                    onClick={handleCompleteOrder}
+                                >
+                                    Hoàn thành
+                                </Button>
+                            )
+                        }
+                    >
+                        <Table
+                            dataSource={finishedImportsData?.imports || []}
+                            rowKey="id"
+                            pagination={false}
+                            size="small"
+                            scroll={{ y: 300 }}
+                            columns={[
+                                {
+                                    title: "Ngày",
+                                    dataIndex: "createdAt",
+                                    key: "createdAt",
+                                    width: 100,
+                                    render: (date) => dayjs(date).format("DD/MM/YY"),
+                                },
+                                {
+                                    title: "Kho",
+                                    dataIndex: "warehouseName",
+                                    key: "warehouseName",
+                                    ellipsis: true,
+                                },
+                                {
+                                    title: "SL",
+                                    dataIndex: "quantity",
+                                    key: "quantity",
+                                    width: 80,
+                                    render: (value) => <span className="font-bold text-green-600">{formatQuantity(value)}</span>,
+                                },
+                                {
+                                    title: "Người nhập",
+                                    dataIndex: "createdByName",
+                                    key: "createdByName",
+                                    ellipsis: true,
                                 },
                             ]}
                         />

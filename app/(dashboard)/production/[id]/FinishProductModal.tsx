@@ -1,8 +1,9 @@
 "use client";
 
+import { formatQuantity } from "@/utils/format";
 import { SaveOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Form, InputNumber, Modal, Select, Table, message } from "antd";
+import { Alert, Button, Form, InputNumber, Modal, Select, Table, message } from "antd";
 import { useEffect, useState } from "react";
 
 interface FinishProductModalProps {
@@ -20,7 +21,6 @@ export default function FinishProductModal({
     productionOrderId,
     orderItems,
     targetWarehouseId,
-    targetWarehouseName,
 }: FinishProductModalProps) {
     const [form] = Form.useForm();
     const [submitting, setSubmitting] = useState(false);
@@ -34,7 +34,7 @@ export default function FinishProductModal({
             const data = await res.json();
             return data.data || [];
         },
-        staleTime: 10 * 60 * 1000, // Cache
+        staleTime: 10 * 60 * 1000,
         enabled: open,
     });
 
@@ -45,30 +45,47 @@ export default function FinishProductModal({
             const data = await res.json();
             return data.data || [];
         },
-        staleTime: 10 * 60 * 1000, // Cache
+        staleTime: 10 * 60 * 1000,
         enabled: open,
+    });
+
+    // Lấy lịch sử nhập để biết đã nhập bao nhiêu
+    const { data: importHistory } = useQuery({
+        queryKey: ["production-finished-imports", productionOrderId],
+        queryFn: async () => {
+            const res = await fetch(`/api/production/orders/${productionOrderId}/finished-imports`);
+            const data = await res.json();
+            return data.data || { imports: [], totalImported: 0 };
+        },
+        staleTime: 30 * 1000,
+        enabled: open && !!productionOrderId,
     });
 
     const warehouses = [...(warehousesTP || []), ...(warehousesHH || [])];
     const loadingWarehouses = !warehousesTP && !warehousesHH;
 
+    const totalImported = importHistory?.totalImported || 0;
+    const orderedQty = orderItems?.[0]?.quantity || 0;
+    const remainingQty = Math.max(0, orderedQty - totalImported);
+
     // Initialize form values
     useEffect(() => {
         if (open) {
             const initialValues: any = {};
-            // Set warehouse nếu đã có
             if (targetWarehouseId) {
                 initialValues.warehouseId = targetWarehouseId;
             }
-            // Set quantities
+            // Set remaining quantity as default
             if (orderItems) {
                 orderItems.forEach((item: any) => {
-                    initialValues[`qty_${item.itemId}`] = item.quantity;
+                    const itemImported = totalImported; // Simplified for single item
+                    const remaining = Math.max(0, item.quantity - itemImported);
+                    initialValues[`qty_${item.itemId}`] = remaining;
                 });
             }
             form.setFieldsValue(initialValues);
         }
-    }, [orderItems, form, open, targetWarehouseId]);
+    }, [orderItems, form, open, targetWarehouseId, totalImported]);
 
     const handleFinish = async (values: any) => {
         if (!values.warehouseId) {
@@ -82,6 +99,14 @@ export default function FinishProductModal({
                 itemId: item.itemId,
                 quantity: values[`qty_${item.itemId}`] || 0,
             }));
+
+            // Kiểm tra có số lượng > 0
+            const totalQty = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+            if (totalQty <= 0) {
+                message.error("Vui lòng nhập số lượng thành phẩm (phải > 0)");
+                setSubmitting(false);
+                return;
+            }
 
             const res = await fetch(
                 `/api/production/orders/${productionOrderId}/finish-product`,
@@ -97,9 +122,12 @@ export default function FinishProductModal({
 
             const data = await res.json();
             if (data.success) {
-                message.success("Đã nhập kho thành phẩm thành công");
+                message.success(data.message || "Đã nhập kho thành phẩm");
                 queryClient.invalidateQueries({
                     queryKey: ["production-order", productionOrderId],
+                });
+                queryClient.invalidateQueries({
+                    queryKey: ["production-finished-imports", productionOrderId],
                 });
                 onCancel();
             } else {
@@ -130,18 +158,32 @@ export default function FinishProductModal({
                     loading={submitting}
                     onClick={() => form.submit()}
                 >
-                    Nhập kho & Hoàn thành
+                    Nhập kho
                 </Button>,
             ]}
         >
+            {/* Progress Alert */}
+            <Alert
+                type={totalImported >= orderedQty ? "success" : "info"}
+                showIcon
+                className="mb-4"
+                message={
+                    <span>
+                        Tiến độ nhập kho: <strong>{formatQuantity(totalImported)}</strong> / <strong>{formatQuantity(orderedQty)}</strong> sản phẩm
+                        {remainingQty > 0 && <span className="text-orange-600 ml-2">(Còn lại: {formatQuantity(remainingQty)})</span>}
+                        {totalImported >= orderedQty && <span className="text-green-600 ml-2">✓ Đủ số lượng!</span>}
+                    </span>
+                }
+            />
+
             <Form form={form} layout="vertical" onFinish={handleFinish}>
                 <Form.Item
                     name="warehouseId"
                     label="Kho nhập thành phẩm"
                     rules={[{ required: true, message: "Vui lòng chọn kho" }]}
                 >
-                    <Select 
-                        placeholder="Chọn kho thành phẩm hoặc hỗn hợp" 
+                    <Select
+                        placeholder="Chọn kho thành phẩm hoặc hỗn hợp"
                         loading={loadingWarehouses}
                     >
                         {warehouses?.map((w: any) => (
@@ -171,10 +213,15 @@ export default function FinishProductModal({
                             title: "SL đặt hàng",
                             dataIndex: "quantity",
                             key: "quantity",
-                            render: (val) => Number(val).toLocaleString("vi-VN"),
+                            render: (val) => formatQuantity(val),
                         },
                         {
-                            title: "SL nhập kho",
+                            title: "Đã nhập",
+                            key: "imported",
+                            render: () => <span className="font-semibold text-blue-600">{formatQuantity(totalImported)}</span>,
+                        },
+                        {
+                            title: "SL nhập lần này",
                             key: "quantityImport",
                             render: (_, record: any) => (
                                 <Form.Item
@@ -185,6 +232,7 @@ export default function FinishProductModal({
                                     <InputNumber
                                         style={{ width: "100%" }}
                                         min={0}
+                                        max={remainingQty}
                                         formatter={(value) =>
                                             `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                                         }

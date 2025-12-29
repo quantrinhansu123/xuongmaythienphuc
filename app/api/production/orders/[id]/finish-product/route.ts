@@ -18,7 +18,7 @@ export async function POST(
 
         const { id } = await params;
         const body = await request.json();
-        const { warehouseId, items } = body; // items: { itemId, quantity }[]
+        const { warehouseId, items, notes } = body; // items: { itemId, quantity }[]
 
         if (!warehouseId || !items || items.length === 0) {
             return NextResponse.json<ApiResponse>({
@@ -32,16 +32,18 @@ export async function POST(
         try {
             // 0. Lấy thông tin đơn hàng từ production order
             const orderInfoResult = await query(
-                `SELECT o.order_code, c.customer_name
+                `SELECT o.order_code, c.customer_name, od.quantity as "orderedQuantity"
                  FROM production_orders po
                  JOIN orders o ON po.order_id = o.id
                  JOIN customers c ON o.customer_id = c.id
+                 LEFT JOIN order_details od ON po.order_item_id = od.id
                  WHERE po.id = $1`,
                 [id]
             );
             const orderInfo = orderInfoResult.rows[0];
             const orderCode = orderInfo?.order_code || '';
             const customerName = orderInfo?.customer_name || '';
+            const orderedQuantity = Number(orderInfo?.orderedQuantity || 0);
 
             // 1. Generate transaction code
             const codeResult = await query(
@@ -60,9 +62,13 @@ export async function POST(
             );
             const transactionId = transResult.rows[0].id;
 
-            // 3. Create transaction details & update inventory
+            let totalImportedThisTime = 0;
+
+            // 3. Create transaction details & lưu vào production_finished_imports
             for (const item of items) {
                 if (item.quantity <= 0) continue;
+
+                totalImportedThisTime += Number(item.quantity);
 
                 // Get product_id from items table
                 const itemResult = await query(
@@ -78,36 +84,42 @@ export async function POST(
                     [transactionId, productId, item.quantity]
                 );
 
-                // Không update inventory balance ngay, chờ duyệt phiếu
-            }
-
-            // 4. Update production order status to COMPLETED and save target warehouse
-            const poResult = await query(
-                `UPDATE production_orders 
-                 SET status = 'COMPLETED', current_step = 'COMPLETED', end_date = NOW(), 
-                     target_warehouse_id = $2, updated_at = NOW() 
-                 WHERE id = $1
-                 RETURNING order_id`,
-                [id, warehouseId]
-            );
-
-            // 5. Update order status to IN_PRODUCTION (sẵn sàng xuất kho cho khách)
-            if (poResult.rows.length > 0) {
-                const orderId = poResult.rows[0].order_id;
+                // Lưu vào production_finished_imports (lịch sử nhập từng lần)
                 await query(
-                    `UPDATE orders 
-                     SET status = 'IN_PRODUCTION', updated_at = NOW()
-                     WHERE id = $1`,
-                    [orderId]
+                    `INSERT INTO production_finished_imports (production_order_id, warehouse_id, item_id, quantity, notes, created_by)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [id, warehouseId, item.itemId, item.quantity, notes || null, currentUser.id]
                 );
             }
+
+            // 4. Tính tổng đã nhập
+            const totalImportedResult = await query(
+                `SELECT COALESCE(SUM(quantity), 0) as total FROM production_finished_imports WHERE production_order_id = $1`,
+                [id]
+            );
+            const totalImported = Number(totalImportedResult.rows[0]?.total || 0);
+
+            // 5. Cập nhật target_warehouse_id (không complete đơn)
+            await query(
+                `UPDATE production_orders 
+                 SET target_warehouse_id = $2, updated_at = NOW() 
+                 WHERE id = $1`,
+                [id, warehouseId]
+            );
 
             await query('COMMIT');
 
             return NextResponse.json<ApiResponse>({
                 success: true,
-                message: 'Đã nhập kho thành phẩm và hoàn thành đơn sản xuất',
-                data: { transactionId, transactionCode }
+                message: `Đã nhập kho ${totalImportedThisTime} sản phẩm. Tổng đã nhập: ${totalImported}/${orderedQuantity}`,
+                data: {
+                    transactionId,
+                    transactionCode,
+                    importedThisTime: totalImportedThisTime,
+                    totalImported,
+                    orderedQuantity,
+                    isComplete: totalImported >= orderedQuantity
+                }
             });
 
         } catch (err) {
