@@ -89,6 +89,59 @@ export async function POST(
       // Lấy user hiện tại
       const { user } = await requirePermission('sales.orders', 'edit');
 
+      // --- INTEGRATION: Ghi vào sổ quỹ (Cashbook) ---
+      // 1. Lấy category "Thu tiền bán hàng" (THU001)
+      const categoryRes = await query(
+        `SELECT id FROM financial_categories WHERE category_code = 'THU001'`
+      );
+
+      let categoryId = null;
+      if (categoryRes.rows.length > 0) {
+        categoryId = categoryRes.rows[0].id;
+      } else {
+        // Fallback: Lấy category đầu tiên loại THU hoặc tạo mới nếu cần thiết (ở đây dùng fallback đơn giản)
+        const fallbackRes = await query(`SELECT id FROM financial_categories WHERE type = 'THU' LIMIT 1`);
+        if (fallbackRes.rows.length > 0) categoryId = fallbackRes.rows[0].id;
+      }
+
+      if (categoryId) {
+        // 2. Tạo mã phiếu thu (SQ + YYMMDD + xxxx)
+        const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // YYMMDD
+        const prefix = `SQ${dateStr}`;
+        const lastCodeResult = await query(
+          `SELECT transaction_code FROM cash_books WHERE transaction_code LIKE $1 ORDER BY transaction_code DESC LIMIT 1`,
+          [`${prefix}%`]
+        );
+
+        let sequence = 1;
+        if (lastCodeResult.rows.length > 0) {
+          const lastCode = lastCodeResult.rows[0].transaction_code;
+          sequence = parseInt(lastCode.slice(-4)) + 1;
+        }
+        const transactionCode = `${prefix}${sequence.toString().padStart(4, '0')}`;
+
+        // 3. Insert vào cash_books
+        await query(
+          `INSERT INTO cash_books 
+            (transaction_code, transaction_date, financial_category_id, amount, 
+             transaction_type, payment_method, bank_account_id, reference_id, 
+             reference_type, description, created_by, branch_id)
+           VALUES ($1, CURRENT_DATE, $2, $3, 'THU', $4, $5, $6, 'ORDER', $7, $8, $9)`,
+          [
+            transactionCode,
+            categoryId,
+            amount,
+            paymentMethod || 'CASH',
+            bankAccountId || null,
+            orderId,
+            isDeposit ? `Thu tiền cọc đơn hàng ${orderResult.rows[0].order_code || ''}` : `Thu tiền đơn hàng ${orderResult.rows[0].order_code || ''}`,
+            user.id,
+            user.branchId
+          ]
+        );
+      }
+      // ---------------------------------------------
+
       // Ghi vào order_payments
       await query(
         `INSERT INTO order_payments (order_id, payment_type, amount, payment_method, bank_account_id, notes, created_by)
