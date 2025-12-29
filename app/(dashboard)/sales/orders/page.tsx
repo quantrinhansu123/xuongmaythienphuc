@@ -26,6 +26,7 @@ import {
   App,
   Button,
   Card,
+  Checkbox,
   Collapse,
   DatePicker,
   Descriptions,
@@ -86,6 +87,7 @@ interface CategoryMeasurement {
   categoryId: number;
   measurementName: string;
   unit: string;
+  options?: string[];
   isRequired: boolean;
 }
 
@@ -3115,29 +3117,22 @@ export default function OrdersPage() {
                 <Input placeholder="Ví dụ: Size M - Trắng" />
               </Form.Item>
               <div className="border-t pt-4 mt-4">
-                <h4 className="mb-3 text-sm font-semibold text-gray-600">Thuộc tính</h4>
-                {newTemplateCategoryId && categoryAttributes[newTemplateCategoryId]?.map(attr => (
-                  <Form.Item
-                    key={`attr_${attr.id}`}
-                    name={`attr_${attr.id}`}
-                    label={attr.attributeName}
-                    rules={[{ required: attr.isRequired, message: `Vui lòng nhập ${attr.attributeName}` }]}
-                  >
-                    {attr.options && Array.isArray(attr.options) && attr.options.length > 0 ? (
-                      <Select placeholder={`Chọn ${attr.attributeName}`}>
-                        {attr.options.map((opt: string) => (
-                          <Select.Option key={opt} value={opt}>{opt}</Select.Option>
-                        ))}
-                      </Select>
-                    ) : (
-                      <Input placeholder={`Nhập ${attr.attributeName}`} />
-                    )}
-                  </Form.Item>
-                ))}
+                <h4 className="mb-3 text-sm font-semibold text-gray-600">Thuộc tính (đánh dấu thuộc tính áp dụng cho mẫu)</h4>
+                <Form.Item name="selectedAttributes">
+                  <Checkbox.Group>
+                    <div className="flex flex-wrap gap-2">
+                      {newTemplateCategoryId && categoryAttributes[newTemplateCategoryId]?.map(attr => (
+                        <Checkbox key={attr.id} value={attr.attributeName}>
+                          {attr.attributeName}
+                        </Checkbox>
+                      ))}
+                    </div>
+                  </Checkbox.Group>
+                </Form.Item>
               </div>
 
               <div className="border-t pt-4 mt-4">
-                <h4 className="mb-3 text-sm font-semibold text-gray-600">Thông số kỹ thuật</h4>
+                <h4 className="mb-3 text-sm font-semibold text-gray-600">Thông số đo</h4>
                 {newTemplateCategoryId && categoryMeasurements[newTemplateCategoryId]?.map(meas => (
                   <Form.Item
                     key={`meas_${meas.id}`}
@@ -3145,7 +3140,22 @@ export default function OrdersPage() {
                     label={`${meas.measurementName} ${meas.unit ? `(${meas.unit})` : ''}`}
                     rules={[{ required: meas.isRequired, message: `Vui lòng nhập ${meas.measurementName}` }]}
                   >
-                    <Input placeholder={`Nhập ${meas.measurementName}`} />
+                    {meas.options && Array.isArray(meas.options) && meas.options.length > 0 ? (
+                      <Select
+                        placeholder={`Chọn hoặc nhập ${meas.measurementName}`}
+                        allowClear
+                        showSearch
+                        mode="tags"
+                        tokenSeparators={[',']}
+                        maxCount={1}
+                      >
+                        {meas.options.map((opt: string) => (
+                          <Select.Option key={opt} value={opt}>{opt}</Select.Option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Input placeholder={`Nhập ${meas.measurementName}`} />
+                    )}
                   </Form.Item>
                 ))}
               </div>
