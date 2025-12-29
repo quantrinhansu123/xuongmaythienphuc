@@ -599,6 +599,12 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             <Descriptions.Item label="Ngày đặt">
                                 {new Date(data.orderDate).toLocaleDateString("vi-VN")}
                             </Descriptions.Item>
+                            <Descriptions.Item label="Sản phẩm">
+                                <span className="font-semibold text-blue-700">{data.items?.[0]?.itemName}</span>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Số lượng">
+                                <span className="font-semibold">{formatQuantity(data.items?.[0]?.quantity)}</span>
+                            </Descriptions.Item>
                             <Descriptions.Item label="Trạng thái">
                                 <Tag color={data.status === "PENDING" ? "orange" : "blue"}>{data.status}</Tag>
                             </Descriptions.Item>

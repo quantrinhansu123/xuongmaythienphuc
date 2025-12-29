@@ -516,7 +516,7 @@ function OrderDetailDrawer({
                 </div>
               </div>
 
-              {/* Bước 3: Nhập thông số & Sản xuất */}
+              {/* Bước 3: Tạo đơn sản xuất */}
               <div
                 className={`flex items-start gap-3 ${[
                   "PAID",
@@ -545,13 +545,13 @@ function OrderDetailDrawer({
                 </div>
                 <div className="flex-1">
                   <Typography.Text strong>
-                    {needsProduction === false ? "Đơn hàng có sẵn" : "Nhập thông số & Sản xuất"}
+                    {needsProduction === false ? "Đơn hàng có sẵn" : "Tạo đơn sản xuất"}
                   </Typography.Text>
                   <div className="text-xs text-gray-500">
                     {needsProduction === false
                       ? "Đơn hàng có sẵn tại kho - Sẵn sàng xuất kho"
                       : data.status === "PAID"
-                        ? "Nhập thông số để tạo đơn sản xuất"
+                        ? "Tạo lệnh sản xuất cho từng sản phẩm"
                         : data.status === "IN_PRODUCTION"
                           ? "Đang sản xuất"
                           : "Đã hoàn thành"}
@@ -561,11 +561,27 @@ function OrderDetailDrawer({
                       <Button
                         size="small"
                         type="primary"
-                        onClick={() => {
-                          window.location.href = `/sales/orders/${data.id}/measurements`;
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/production/orders', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ orderId: data.id })
+                            });
+                            const result = await res.json();
+                            if (result.success) {
+                              message.success(result.message);
+                              queryClient.invalidateQueries({ queryKey: ["orders"] });
+                              onUpdateStatus(data.id, "IN_PRODUCTION");
+                            } else {
+                              message.error(result.error);
+                            }
+                          } catch (e) {
+                            message.error('Có lỗi xảy ra');
+                          }
                         }}
                       >
-                        Nhập thông số & Tạo đơn SX
+                        Tạo đơn sản xuất
                       </Button>
                       <Button
                         size="small"

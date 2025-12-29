@@ -30,11 +30,16 @@ export async function GET(request: NextRequest) {
         o.order_date as "orderDate",
         po.created_at as "createdAt",
         b.id as "branchId",
-        b.branch_name as "branchName"
+        b.branch_name as "branchName",
+        i.item_name as "itemName",
+        i.item_code as "itemCode",
+        od.quantity as "quantity"
       FROM production_orders po
       JOIN orders o ON po.order_id = o.id
       JOIN customers c ON o.customer_id = c.id
       LEFT JOIN branches b ON o.branch_id = b.id
+      LEFT JOIN order_details od ON po.order_item_id = od.id
+      LEFT JOIN items i ON od.item_id = i.id
       WHERE 1=1
     `;
         const params: any[] = [];
@@ -47,7 +52,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (search) {
-            sql += ` AND (o.order_code ILIKE $${paramIndex} OR c.customer_name ILIKE $${paramIndex})`;
+            sql += ` AND (o.order_code ILIKE $${paramIndex} OR c.customer_name ILIKE $${paramIndex} OR i.item_name ILIKE $${paramIndex})`;
             params.push(`%${search}%`);
             paramIndex++;
         }
@@ -89,26 +94,60 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Check if exists
-        const check = await query('SELECT id FROM production_orders WHERE order_id = $1', [orderId]);
-        if (check.rows.length > 0) {
+        // 1. Get all items in the order that are PRODUCTS (assuming we only produce products)
+        // We join with items table to check type if necessary, or just assume all valid items in order need production if they are products
+        // Let's assume we fetch all items.
+        // Also check if they already have a production order.
+
+        const itemsResult = await query(
+            `SELECT od.id, od.item_id, i.item_type, i.item_name 
+             FROM order_details od
+             JOIN items i ON od.item_id = i.id
+             WHERE od.order_id = $1 AND i.item_type = 'PRODUCT'`,
+            [orderId]
+        );
+
+        if (itemsResult.rows.length === 0) {
             return NextResponse.json<ApiResponse>({
-                success: true,
-                data: check.rows[0],
-                message: 'Đơn sản xuất đã tồn tại'
-            });
+                success: false,
+                error: 'Không tìm thấy sản phẩm nào trong đơn hàng để sản xuất'
+            }, { status: 400 });
         }
 
-        const result = await query(
-            `INSERT INTO production_orders (order_id, status, current_step, start_date, source_warehouse_id, target_warehouse_id)
-       VALUES ($1, 'MATERIAL_IMPORT', 'MATERIAL_IMPORT', NOW(), $2, $3)
-       RETURNING id`,
-            [orderId, sourceWarehouseId || null, targetWarehouseId || null]
-        );
+        const createdOrders = [];
+        const existingOrders = [];
+
+        // 2. Loop and create production order for each item
+        for (const item of itemsResult.rows) {
+            // Check existence
+            const check = await query(
+                'SELECT id FROM production_orders WHERE order_item_id = $1',
+                [item.id]
+            );
+
+            if (check.rows.length > 0) {
+                existingOrders.push({ itemId: item.id, productionOrderId: check.rows[0].id });
+                continue;
+            }
+
+            // Create
+            const insert = await query(
+                `INSERT INTO production_orders (order_id, order_item_id, status, current_step, start_date, source_warehouse_id, target_warehouse_id)
+                 VALUES ($1, $2, 'MATERIAL_IMPORT', 'MATERIAL_IMPORT', NOW(), $3, $4)
+                 RETURNING id`,
+                [orderId, item.id, sourceWarehouseId || null, targetWarehouseId || null]
+            );
+
+            createdOrders.push(insert.rows[0]);
+        }
+
+        // Also update the main order status if not already executing
+        await query(`UPDATE orders SET status = 'IN_PRODUCTION' WHERE id = $1 AND status != 'IN_PRODUCTION'`, [orderId]);
 
         return NextResponse.json<ApiResponse>({
             success: true,
-            data: result.rows[0]
+            data: { created: createdOrders.length, existing: existingOrders.length },
+            message: `Đã tạo ${createdOrders.length} đơn sản xuất. ${existingOrders.length} sản phẩm đã có đơn sản xuất.`
         });
 
     } catch (error) {
