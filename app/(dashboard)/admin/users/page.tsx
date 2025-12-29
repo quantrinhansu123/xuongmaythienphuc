@@ -3,30 +3,31 @@
 import CommonTable from "@/components/CommonTable";
 import UserDetailDrawer from "@/components/users/UserDetailDrawer";
 import UserFormModal, {
-    type UserFormValues,
+  type UserFormValues,
 } from "@/components/users/UserFormModal";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-    useCreateUser,
-    useDeleteUser,
-    USER_KEYS,
-    useUpdateUser,
-    useUsers,
+  useCreateUser,
+  useDeleteUser,
+  USER_KEYS,
+  useResetPassword,
+  useUpdateUser,
+  useUsers,
 } from "@/hooks/useUserQuery";
-import { branchService, roleService } from "@/services/commonService";
+import { branchService, departmentService, roleService } from "@/services/commonService";
 import type { User } from "@/services/userService";
 import {
-    DeleteOutlined,
-    DownloadOutlined,
-    EditOutlined,
-    LockOutlined,
-    MoreOutlined,
-    PlusOutlined,
-    UnlockOutlined,
-    UploadOutlined
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  LockOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  UnlockOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -49,9 +50,15 @@ export default function UsersPage() {
     queryFn: branchService.getAll,
     staleTime: 10 * 60 * 1000, // Cache
   });
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: departmentService.getAll,
+    staleTime: 10 * 60 * 1000, // Cache
+  });
   const deleteMutation = useDeleteUser();
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
+  const resetPasswordMutation = useResetPassword();
 
   // Apply filter to get filtered users
   const filteredUsers = applyFilter(users);
@@ -62,6 +69,7 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const { modal } = App.useApp();
+
   const handleView = (user: User) => {
     setSelectedUser(user);
     setDrawerVisible(true);
@@ -90,6 +98,16 @@ export default function UsersPage() {
     });
   };
 
+  const handleResetPassword = async (id: number) => {
+    modal.confirm({
+      title: "Xác nhận reset mật khẩu",
+      content: "Mật khẩu sẽ được reset về mặc định (1). Bạn có chắc chắn?",
+      okText: "Reset",
+      cancelText: "Hủy",
+      onOk: () => resetPasswordMutation.mutate(id),
+    });
+  };
+
   const handleModalSubmit = (values: UserFormValues) => {
     if (modalMode === "create") {
       createMutation.mutate(
@@ -102,6 +120,8 @@ export default function UsersPage() {
         email: values.email,
         phone: values.phone,
         branchId: values.branchId,
+        branchIds: values.branchIds,
+        departmentId: values.departmentId,
         roleId: values.roleId,
         isActive: !!values.isActive,
       };
@@ -135,8 +155,24 @@ export default function UsersPage() {
     },
     {
       title: "Chi nhánh",
-      dataIndex: "branchName",
-      key: "branchName",
+      dataIndex: "branches",
+      key: "branches",
+      width: 200,
+      render: (branches: any[], record: User) => {
+        if (branches && branches.length > 0) {
+          return branches.map(b => (
+            <Tag key={b.id} style={{ marginRight: 4, marginBottom: 4 }}>
+              {b.branchName}
+            </Tag>
+          ));
+        }
+        return record.branchName ? <Tag>{record.branchName}</Tag> : null;
+      }
+    },
+    {
+      title: "Phòng ban",
+      dataIndex: "departmentName",
+      key: "departmentName",
       width: 150,
     },
     { title: "Vai trò", dataIndex: "roleName", key: "roleName", width: 150 },
@@ -168,6 +204,12 @@ export default function UsersPage() {
             label: "Sửa",
             icon: <EditOutlined />,
             onClick: () => handleEdit(record),
+          });
+          menuItems.push({
+            key: "reset-password",
+            label: "Reset MK",
+            icon: <LockOutlined />,
+            onClick: () => handleResetPassword(record.id),
           });
         }
 
@@ -207,25 +249,25 @@ export default function UsersPage() {
           refetchDataWithKeys: USER_KEYS.all,
           buttonEnds: can("admin.users", "create")
             ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: () => {},
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: () => {},
-                  icon: <UploadOutlined />,
-                },
-              ]
+              {
+                type: "primary",
+                name: "Thêm",
+                onClick: handleCreate,
+                icon: <PlusOutlined />,
+              },
+              {
+                type: "default",
+                name: "Xuất Excel",
+                onClick: () => { },
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: "default",
+                name: "Nhập Excel",
+                onClick: () => { },
+                icon: <UploadOutlined />,
+              },
+            ]
             : undefined,
           searchInput: {
             placeholder: "Tìm kiếm người dùng",
@@ -248,6 +290,12 @@ export default function UsersPage() {
                   { label: "Quản lý chi nhánh", value: "STAFF" },
                   { label: "Nhân viên", value: "MANAGER" },
                 ],
+              },
+              {
+                type: "select",
+                name: "departmentId",
+                label: "Phòng ban",
+                options: departments.map(d => ({ label: d.departmentName, value: d.id })),
               },
               {
                 type: "select",
@@ -302,6 +350,7 @@ export default function UsersPage() {
         user={selectedUser}
         roles={roles}
         branches={branches}
+        departments={departments}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         onCancel={() => setModalVisible(false)}
         onSubmit={handleModalSubmit}

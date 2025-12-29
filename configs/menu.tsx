@@ -244,6 +244,12 @@ export const allMenuItems: Array<{
           permission: "admin.branches",
         },
         {
+          icon: <ClusterOutlined />,
+          title: "Phòng ban",
+          href: "/admin/departments",
+          permission: "admin.users", // Assuming same permission as users for now, or create new one
+        },
+        {
           icon: <InboxOutlined />,
           title: "Kho hàng",
           href: "/admin/warehouses",

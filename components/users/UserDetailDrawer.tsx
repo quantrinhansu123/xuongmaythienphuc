@@ -2,14 +2,14 @@
 
 import type { User } from "@/services/userService";
 import {
-    DeleteOutlined,
-    DesktopOutlined,
-    EditOutlined,
-    ExclamationCircleOutlined,
-    LockOutlined,
-    MobileOutlined,
-    TabletOutlined,
-    UnlockOutlined,
+  DeleteOutlined,
+  DesktopOutlined,
+  EditOutlined,
+  ExclamationCircleOutlined,
+  LockOutlined,
+  MobileOutlined,
+  TabletOutlined,
+  UnlockOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Descriptions, Divider, Drawer, message, Modal, Popconfirm, Space, Table, Tag, Typography } from "antd";
@@ -186,6 +186,9 @@ export default function UserDetailDrawer({
             </Descriptions.Item>
             <Descriptions.Item label="Chi nhánh">
               {user.branchName}
+            </Descriptions.Item>
+            <Descriptions.Item label="Phòng ban">
+              {user.departmentName || "-"}
             </Descriptions.Item>
             <Descriptions.Item label="Vai trò">
               {user.roleName}

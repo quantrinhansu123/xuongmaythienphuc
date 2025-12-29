@@ -50,6 +50,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/admin/users": "Quản lý người dùng",
   "/admin/roles": "Quản lý vai trò",
   "/admin/branches": "Quản lý chi nhánh",
+  "/admin/departments": "Quản lý phòng ban",
   "/admin/warehouses": "Quản lý kho hàng",
   "/products": "Quản lý sản phẩm",
   "/products/categories": "Danh mục sản phẩm",

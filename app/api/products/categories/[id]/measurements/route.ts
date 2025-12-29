@@ -8,7 +8,7 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { hasPermission, error } = await requirePermission('sales.orders', 'view');
+        const { hasPermission, error } = await requirePermission('products.categories', 'view');
         if (!hasPermission) {
             return NextResponse.json<ApiResponse>({
                 success: false,
@@ -20,10 +20,9 @@ export async function GET(
         const categoryId = parseInt(resolvedParams.id);
 
         const result = await query(
-            `SELECT id, category_id as "categoryId", attribute_name as "attributeName", 
-                    attribute_type as "attributeType", is_required as "isRequired",
-                    COALESCE(options, '[]'::jsonb) as "options"
-       FROM category_attributes 
+            `SELECT id, category_id as "categoryId", measurement_name as "measurementName", 
+                    unit, is_required as "isRequired"
+       FROM category_measurements 
        WHERE category_id = $1 
        ORDER BY id`,
             [categoryId]
@@ -35,7 +34,7 @@ export async function GET(
         });
 
     } catch (error) {
-        console.error('Get attributes error:', error);
+        console.error('Get measurements error:', error);
         return NextResponse.json<ApiResponse>({
             success: false,
             error: 'Lỗi server'
@@ -48,7 +47,7 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { hasPermission, error } = await requirePermission('sales.orders', 'edit'); // Using edit permission for now
+        const { hasPermission, error } = await requirePermission('products.categories', 'create');
         if (!hasPermission) {
             return NextResponse.json<ApiResponse>({
                 success: false,
@@ -59,25 +58,20 @@ export async function POST(
         const resolvedParams = await params;
         const categoryId = parseInt(resolvedParams.id);
         const body = await request.json();
-        console.log('POST attributes body:', body);
-        const { attributeName, attributeType = 'text', isRequired = false, options = [] } = body;
+        const { measurementName, unit, isRequired = false } = body;
 
-        if (!attributeName) {
+        if (!measurementName) {
             return NextResponse.json<ApiResponse>({
                 success: false,
-                error: 'Tên thuộc tính là bắt buộc'
+                error: 'Tên thông số là bắt buộc'
             }, { status: 400 });
         }
 
-        // Ensure options is an array
-        const optionsArray = Array.isArray(options) ? options : [];
-        console.log('Options to save:', optionsArray);
-
         const result = await query(
-            `INSERT INTO category_attributes (category_id, attribute_name, attribute_type, is_required, options)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, attribute_name as "attributeName", attribute_type as "attributeType", is_required as "isRequired", options`,
-            [categoryId, attributeName, attributeType, isRequired, JSON.stringify(optionsArray)]
+            `INSERT INTO category_measurements (category_id, measurement_name, unit, is_required)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+            [categoryId, measurementName, unit, isRequired]
         );
 
         return NextResponse.json<ApiResponse>({
@@ -86,49 +80,7 @@ export async function POST(
         });
 
     } catch (error) {
-        console.error('Create attribute error:', error);
-        return NextResponse.json<ApiResponse>({
-            success: false,
-            error: 'Lỗi server'
-        }, { status: 500 });
-    }
-}
-
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { hasPermission, error } = await requirePermission('sales.orders', 'edit');
-        if (!hasPermission) {
-            return NextResponse.json<ApiResponse>({
-                success: false,
-                error: error || 'Không có quyền chỉnh sửa'
-            }, { status: 403 });
-        }
-
-        const { searchParams } = new URL(request.url);
-        const attributeId = searchParams.get('id');
-
-        if (!attributeId) {
-            return NextResponse.json<ApiResponse>({
-                success: false,
-                error: 'ID thuộc tính là bắt buộc'
-            }, { status: 400 });
-        }
-
-        await query(
-            `DELETE FROM category_attributes WHERE id = $1`,
-            [attributeId]
-        );
-
-        return NextResponse.json<ApiResponse>({
-            success: true,
-            message: 'Xóa thuộc tính thành công'
-        });
-
-    } catch (error) {
-        console.error('Delete attribute error:', error);
+        console.error('Create measurement error:', error);
         return NextResponse.json<ApiResponse>({
             success: false,
             error: 'Lỗi server'
@@ -141,7 +93,7 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { hasPermission, error } = await requirePermission('sales.orders', 'edit');
+        const { hasPermission, error } = await requirePermission('products.categories', 'edit');
         if (!hasPermission) {
             return NextResponse.json<ApiResponse>({
                 success: false,
@@ -150,33 +102,75 @@ export async function PUT(
         }
 
         const { searchParams } = new URL(request.url);
-        const attributeId = searchParams.get('id');
+        const measurementId = searchParams.get('id');
         const body = await request.json();
-        const { attributeName, attributeType, isRequired } = body;
+        const { measurementName, unit, isRequired } = body;
 
-        if (!attributeId) {
+        if (!measurementId) {
             return NextResponse.json<ApiResponse>({
                 success: false,
-                error: 'ID thuộc tính là bắt buộc'
+                error: 'ID thông số là bắt buộc'
             }, { status: 400 });
         }
 
         await query(
-            `UPDATE category_attributes 
-             SET attribute_name = COALESCE($1, attribute_name),
-                 attribute_type = COALESCE($2, attribute_type),
+            `UPDATE category_measurements 
+             SET measurement_name = COALESCE($1, measurement_name),
+                 unit = COALESCE($2, unit),
                  is_required = COALESCE($3, is_required)
              WHERE id = $4`,
-            [attributeName, attributeType, isRequired, attributeId]
+            [measurementName, unit, isRequired, measurementId]
         );
 
         return NextResponse.json<ApiResponse>({
             success: true,
-            message: 'Cập nhật thuộc tính thành công'
+            message: 'Cập nhật thông số thành công'
         });
 
     } catch (error) {
-        console.error('Update attribute error:', error);
+        console.error('Update measurement error:', error);
+        return NextResponse.json<ApiResponse>({
+            success: false,
+            error: 'Lỗi server'
+        }, { status: 500 });
+    }
+}
+
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { hasPermission, error } = await requirePermission('products.categories', 'delete');
+        if (!hasPermission) {
+            return NextResponse.json<ApiResponse>({
+                success: false,
+                error: error || 'Không có quyền chỉnh sửa'
+            }, { status: 403 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const measurementId = searchParams.get('id');
+
+        if (!measurementId) {
+            return NextResponse.json<ApiResponse>({
+                success: false,
+                error: 'ID thông số là bắt buộc'
+            }, { status: 400 });
+        }
+
+        await query(
+            `DELETE FROM category_measurements WHERE id = $1`,
+            [measurementId]
+        );
+
+        return NextResponse.json<ApiResponse>({
+            success: true,
+            message: 'Xóa thông số thành công'
+        });
+
+    } catch (error) {
+        console.error('Delete measurement error:', error);
         return NextResponse.json<ApiResponse>({
             success: false,
             error: 'Lỗi server'

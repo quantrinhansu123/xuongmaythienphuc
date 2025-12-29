@@ -20,11 +20,15 @@ export async function GET() {
         ic.category_name as "categoryName",
         ic.parent_id as "parentId",
         ic.description,
+        COALESCE(ic.type, 'PRODUCT') as "type",
         ic.is_active as "isActive",
         ic.created_at as "createdAt",
-        parent.category_name as "parentName"
+        parent.category_name as "parentName",
+        COUNT(DISTINCT i.id)::INTEGER as "itemCount"
        FROM item_categories ic
        LEFT JOIN item_categories parent ON ic.parent_id = parent.id
+       LEFT JOIN items i ON i.category_id = ic.id
+       GROUP BY ic.id, parent.category_name
        ORDER BY COALESCE(parent.category_name, ic.category_name), ic.parent_id NULLS FIRST, ic.category_name`
     );
 
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { categoryName, parentId, description } = body;
+    const { categoryName, parentId, description, type } = body;
 
     if (!categoryName) {
       return NextResponse.json<ApiResponse>({
@@ -77,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // Xử lý parentId - chỉ nhận ID số, không tạo mới
     let finalParentId: number | null = null;
-    
+
     if (parentId) {
       const numValue = typeof parentId === 'number' ? parentId : parseInt(parentId);
       if (!isNaN(numValue)) {
@@ -96,10 +100,10 @@ export async function POST(request: NextRequest) {
     const categoryCode = await generateCategoryCode();
 
     const result = await query(
-      `INSERT INTO item_categories (category_code, category_name, parent_id, description)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, category_code as "categoryCode", category_name as "categoryName"`,
-      [categoryCode, categoryName, finalParentId, description || null]
+      `INSERT INTO item_categories (category_code, category_name, parent_id, description, type)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, category_code as "categoryCode", category_name as "categoryName", type`,
+      [categoryCode, categoryName, finalParentId, description || null, type || 'PRODUCT']
     );
 
     return NextResponse.json<ApiResponse>({

@@ -6,11 +6,25 @@ export interface User {
   fullName: string;
   email?: string;
   phone?: string;
-  branchId: number;
+  departmentId?: number;
+  departmentName?: string;
+  branchId: number; // Primary branch for backward compatibility
+  branchName?: string;
   roleId: number;
+  roleName?: string;
+  roleCode?: string;
   isActive: boolean;
+  isDefaultPassword?: boolean;
+  branches?: Branch[]; // List of all accessible branches
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Department {
+  id: number;
+  departmentCode: string;
+  departmentName: string;
+  description?: string;
 }
 
 export interface Role {
@@ -28,6 +42,31 @@ export interface Branch {
   phone?: string;
   email?: string;
   isActive: boolean;
+}
+
+// Product & Category Types
+export type CategoryType = 'PRODUCT' | 'MATERIAL';
+
+export interface CategoryMeasurement {
+  id: number;
+  categoryId: number;
+  measurementName: string;
+  unit: string;
+  isRequired: boolean;
+}
+
+export interface ItemCategory {
+  id: number;
+  categoryCode: string;
+  categoryName: string;
+  parentId?: number;
+  parentName?: string;
+  description?: string;
+  type: CategoryType; // New field
+  isActive: boolean;
+  itemCount?: number; // New field
+  items?: any[]; // For future use
+  createdAt: string;
 }
 
 // API Response Types

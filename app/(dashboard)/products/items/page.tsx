@@ -833,11 +833,17 @@ export default function ItemsPage() {
                     showSearch
                     optionFilterProp="children"
                   >
-                    {categories.map((c: ItemCategory) => (
-                      <Select.Option key={c.id} value={c.id}>
-                        {c.categoryName}
-                      </Select.Option>
-                    ))}
+                    {categories
+                      .filter((c: ItemCategory & { type?: string }) => {
+                        const currentType = form.getFieldValue("itemType");
+                        if (!currentType) return true;
+                        return c.type === currentType;
+                      })
+                      .map((c: ItemCategory) => (
+                        <Select.Option key={c.id} value={c.id}>
+                          {c.categoryName}
+                        </Select.Option>
+                      ))}
                   </Select>
                 </Form.Item>
               </div>

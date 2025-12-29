@@ -20,16 +20,33 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { fullName, email, phone, branchId, roleId, isActive, employmentStatus } = body;
+    const { fullName, email, phone, branchIds, departmentId, roleId, isActive, employmentStatus } = body;
+
+    // Determine primary branch (first one or null)
+    const primaryBranchId = (branchIds && branchIds.length > 0) ? branchIds[0] : null;
 
     const result = await query(
       `UPDATE users 
-       SET full_name = $1, email = $2, phone = $3, branch_id = $4, role_id = $5, is_active = $6,
-           employment_status = COALESCE($8, employment_status)
-       WHERE id = $7
+       SET full_name = $1, email = $2, phone = $3, branch_id = $4, department_id = $5, role_id = $6, is_active = $7,
+           employment_status = COALESCE($9, employment_status)
+       WHERE id = $8
        RETURNING id, user_code as "userCode", username, full_name as "fullName", employment_status as "employmentStatus"`,
-      [fullName, email, phone, branchId, roleId, isActive, id, employmentStatus]
+      [fullName, email, phone, primaryBranchId, departmentId, roleId, isActive, id, employmentStatus]
     );
+
+    // Update user_branches if branchIds is provided
+    if (branchIds && Array.isArray(branchIds)) {
+      // Delete old branches
+      await query('DELETE FROM user_branches WHERE user_id = $1', [id]);
+
+      if (branchIds.length > 0) {
+        const values = branchIds.map((bid: number) => `(${id}, ${bid}, ${bid === primaryBranchId})`).join(',');
+        await query(`
+           INSERT INTO user_branches (user_id, branch_id, is_primary)
+           VALUES ${values}
+         `);
+      }
+    }
 
     // Nếu set nhân viên nghỉ việc, vô hiệu hóa tất cả sessions
     if (employmentStatus === 'RESIGNED') {
@@ -97,7 +114,7 @@ export async function DELETE(
     console.error('Delete user error:', error);
     console.error('Error code:', error?.code);
     console.error('Error detail:', error?.detail);
-    
+
     // Xử lý lỗi foreign key constraint
     if (error?.code === '23503' || error?.constraint) {
       return NextResponse.json<ApiResponse>({

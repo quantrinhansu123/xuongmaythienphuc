@@ -1,6 +1,6 @@
 "use client";
 
-import type { Branch, Role } from "@/services/commonService";
+import type { Branch, Department, Role } from "@/services/commonService";
 import type { User } from "@/services/userService";
 import { Col, Form, Input, Modal, Row, Select, Switch } from "antd";
 import { useEffect } from "react";
@@ -14,7 +14,9 @@ export type UserFormValues = {
   fullName: string;
   email?: string;
   phone?: string;
-  branchId: number;
+  branchId?: number; // Primary (optional if we prioritize branchIds)
+  branchIds: number[]; // All branches
+  departmentId?: number;
   roleId: number;
   isActive?: boolean;
 };
@@ -25,6 +27,7 @@ type Props = {
   user: User | null;
   roles?: Role[];
   branches?: Branch[];
+  departments?: Department[];
   confirmLoading?: boolean;
   onCancel: () => void;
   onSubmit: (values: UserFormValues) => void;
@@ -36,6 +39,7 @@ export default function UserFormModal({
   user,
   roles = [],
   branches = [],
+  departments = [],
   confirmLoading = false,
   onCancel,
   onSubmit,
@@ -52,7 +56,9 @@ export default function UserFormModal({
           email: user.email,
           phone: user.phone,
           roleId: user.roleId,
-          branchId: user.branchId,
+          // branchId: user.branchId, // Old single branch
+          branchIds: user.branches?.map(b => b.id) || (user.branchId ? [user.branchId] : []),
+          departmentId: user.departmentId,
           isActive: user.isActive,
         });
       } else {
@@ -132,22 +138,39 @@ export default function UserFormModal({
           </Col>
           <Col span={12}>
             <Form.Item
-              name="branchId"
-              label="Chi nhánh"
-              rules={[{ required: true, message: "Vui lòng chọn chi nhánh" }]}
+              name="branchIds"
+              label="Chi nhánh (Có thể chọn nhiều)"
+              rules={[{ required: true, message: "Vui lòng chọn ít nhất 1 chi nhánh" }]}
             >
               <Select
+                mode="multiple"
                 placeholder="Chọn chi nhánh"
                 options={branches.map((b) => ({
                   label: b.branchName,
                   value: b.id,
                 }))}
+                optionFilterProp="label"
               />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="departmentId"
+              label="Phòng ban"
+            >
+              <Select
+                placeholder="Chọn phòng ban"
+                options={departments.map((d) => ({
+                  label: d.departmentName,
+                  value: d.id,
+                }))}
+                allowClear
+              />
+            </Form.Item>
+          </Col>
           <Col span={12}>
             <Form.Item
               name="roleId"
@@ -165,6 +188,7 @@ export default function UserFormModal({
               <Form.Item
                 name="password"
                 label="Mật khẩu"
+                initialValue="123456"
                 rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
               >
                 <Input.Password placeholder="Nhập mật khẩu" />

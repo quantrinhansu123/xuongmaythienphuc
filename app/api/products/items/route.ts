@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const itemType = searchParams.get('type') || '';
+    const categoryId = searchParams.get('categoryId') || '';
     const sellableOnly = searchParams.get('sellable') === 'true';
 
     let sql = `
@@ -83,6 +84,12 @@ export async function GET(request: NextRequest) {
 
     if (sellableOnly) {
       sql += ` AND COALESCE(i.is_sellable, i.item_type = 'PRODUCT') = true`;
+    }
+
+    if (categoryId) {
+      sql += ` AND i.category_id = $${paramIndex}`;
+      params.push(parseInt(categoryId));
+      paramIndex++;
     }
 
     sql += ` ORDER BY i.id, i.created_at DESC`;

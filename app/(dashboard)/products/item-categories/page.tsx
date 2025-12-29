@@ -1,7 +1,6 @@
 "use client";
 
-import AttributeManager from "@/components/AttributeManager";
-import CategoryAttributesViewer from "@/components/CategoryAttributesViewer";
+import CategoryItemsViewer from "@/components/CategoryItemsViewer";
 import CommonTable from "@/components/CommonTable";
 import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
@@ -9,6 +8,7 @@ import useColumn from "@/hooks/useColumn";
 import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
+import { ItemCategory } from "@/types";
 import { PropRowDetails } from "@/types/table";
 import { DownloadOutlined, PlusOutlined, SettingOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,31 +20,24 @@ import {
     message,
     Modal,
     Select,
+    Tabs,
     Tag
 } from "antd";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const { TextArea } = Input;
 
-interface ItemCategory {
-    id: number;
-    categoryCode: string;
-    categoryName: string;
-    parentId?: number;
-    parentName?: string;
-    description?: string;
-    isActive: boolean;
-    createdAt: string;
-}
+
 
 export default function ItemCategoriesPage() {
     const { can, loading: permLoading } = usePermissions();
     const queryClient = useQueryClient();
+    const router = useRouter();
     const [showModal, setShowModal] = useState(false);
     const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(
         null
     );
-    const [managingCategory, setManagingCategory] = useState<ItemCategory | null>(null);
     const [form] = Form.useForm();
     const [expandedKeys, setExpandedKeys] = useState<Set<number>>(new Set());
 
@@ -55,6 +48,7 @@ export default function ItemCategoriesPage() {
         reset,
         applyFilter,
         handlePageChange,
+        resetPage
     } = useFilter();
 
     // Fetch categories using TanStack Query
@@ -134,13 +128,11 @@ export default function ItemCategoriesPage() {
             categoryName: category.categoryName,
             parentId: category.parentId || undefined,
             description: category.description,
+            type: category.type || 'PRODUCT',
         });
         setShowModal(true);
     };
 
-    const handleManageAttributes = (category: ItemCategory) => {
-        setManagingCategory(category);
-    };
 
     const onConfirmDelete = (id: number) => {
         Modal.confirm({
@@ -231,14 +223,36 @@ export default function ItemCategoriesPage() {
         setExpandedKeys(new Set());
     };
 
-    // Filter categories using useFilter with custom logic
-    let filteredCategories = applyFilter(categories);
+    // Filter categories - exclude 'type' from generic applyFilter since we handle it separately
+    // First, apply generic filters (search, etc.) but NOT type
+    const queryWithoutType = { ...query };
+    delete queryWithoutType.type;
+
+    // Use a simple search filter instead of applyFilter to avoid type conflicts
+    let filteredCategories = categories.filter((c: ItemCategory) => {
+        // Apply search filter if present
+        const searchTerm = query.search || query['search,categoryCode,categoryName'] || '';
+        if (searchTerm) {
+            const searchLower = String(searchTerm).toLowerCase();
+            const matchesCode = c.categoryCode?.toLowerCase().includes(searchLower);
+            const matchesName = c.categoryName?.toLowerCase().includes(searchLower);
+            if (!matchesCode && !matchesName) return false;
+        }
+        return true;
+    });
 
     // Apply custom filters for isActive
     if (query.isActive !== undefined && query.isActive !== null && query.isActive !== "") {
         const isActiveValue = query.isActive === true || query.isActive === "true";
         filteredCategories = filteredCategories.filter((c: ItemCategory) => c.isActive === isActiveValue);
     }
+
+    // Apply type filter - default to PRODUCT
+    const currentTypeFilter = query.type || 'PRODUCT';
+    filteredCategories = filteredCategories.filter((c: ItemCategory) => {
+        const itemType = c.type || 'PRODUCT';
+        return itemType === currentTypeFilter;
+    });
 
     // Build tree and flatten for display
     const treeData = buildTree(filteredCategories);
@@ -260,6 +274,16 @@ export default function ItemCategoriesPage() {
                     </Tag>
                 );
             },
+        },
+        {
+            title: "Số lượng HH",
+            dataIndex: "itemCount",
+            key: "itemCount",
+            width: 120,
+            align: "center" as const,
+            render: (count: number) => (
+                <Tag color="cyan">{count || 0}</Tag>
+            ),
         },
         {
             title: "Tên danh mục",
@@ -360,10 +384,10 @@ export default function ItemCategoriesPage() {
                     onDelete={() => onConfirmDelete(record.id)}
                     extraActions={[
                         {
-                            title: "Thuộc tính",
+                            title: "Cài đặt",
                             icon: <SettingOutlined />,
-                            onClick: () => handleManageAttributes(record),
-                            can: can("products.categories", "edit"),
+                            onClick: () => router.push(`/products/item-categories/${record.id}`),
+                            can: can("products.categories", "view"),
                         },
                     ]}
                 />
@@ -429,6 +453,7 @@ export default function ItemCategoriesPage() {
                     },
                     customToolbar: (
                         <div className="flex flex-wrap gap-2 items-center">
+
                             <Select
                                 placeholder="Trạng thái"
                                 allowClear
@@ -455,6 +480,20 @@ export default function ItemCategoriesPage() {
                     },
                 }}
             >
+
+                <Tabs
+                    activeKey={query.type || 'PRODUCT'}
+                    onChange={(key) => {
+                        updateQueries([{ key: "type", value: key }]);
+                        resetPage();
+                    }}
+                    items={[
+                        { key: 'PRODUCT', label: 'Thành phẩm (Sản phẩm)' },
+                        { key: 'MATERIAL', label: 'Nguyên phụ liệu' }
+                    ]}
+                    style={{ marginBottom: 16 }}
+                />
+
                 <CommonTable
                     DrawerDetails={({ data, onClose }: PropRowDetails<ItemCategory>) => {
                         return (
@@ -472,6 +511,9 @@ export default function ItemCategoriesPage() {
                                     <Descriptions.Item label="Mô tả">
                                         {data?.description || "-"}
                                     </Descriptions.Item>
+                                    <Descriptions.Item label="Số lượng hàng hoá">
+                                        {data?.itemCount || 0}
+                                    </Descriptions.Item>
                                     <Descriptions.Item label="Trạng thái">
                                         <Tag color={data?.isActive ? "success" : "default"}>
                                             {data?.isActive ? "Hoạt động" : "Ngừng"}
@@ -483,11 +525,8 @@ export default function ItemCategoriesPage() {
                                 </Descriptions>
 
                                 {data && (
-                                    <CategoryAttributesViewer
+                                    <CategoryItemsViewer
                                         categoryId={data.id}
-                                        onManage={() => {
-                                            handleManageAttributes(data);
-                                        }}
                                         onEdit={() => {
                                             handleEdit(data);
                                             onClose();
@@ -499,34 +538,6 @@ export default function ItemCategoriesPage() {
                                         canDelete={can("products.categories", "delete")}
                                     />
                                 )}
-
-                                {/* <div className="flex gap-2 justify-end mt-4">
-                  {can("products.categories", "edit") && (
-                    <Button
-                      type="primary"
-                      onClick={() => {
-                        if (data) {
-                          handleEdit(data);
-                          onClose();
-                        }
-                      }}
-                    >
-                      Sửa
-                    </Button>
-                  )}
-                  {can("products.categories", "delete") && (
-                    <Button
-                      danger
-                      onClick={() => {
-                        if (data) {
-                          onConfirmDelete(data.id);
-                        }
-                      }}
-                    >
-                      Xóa
-                    </Button>
-                  )}
-                </div> */}
                             </div>
                         );
                     }}
@@ -553,6 +564,20 @@ export default function ItemCategoriesPage() {
                             <Input value={editingCategory.categoryCode} disabled />
                         </Form.Item>
                     )}
+
+                    <Form.Item
+                        name="type"
+                        label="Loại danh mục"
+                        initialValue={query.type || "PRODUCT"}
+                        rules={[{ required: true, message: "Vui lòng chọn loại" }]}
+                    >
+                        <Select
+                            options={[
+                                { label: "Thành phẩm", value: "PRODUCT" },
+                                { label: "Nguyên phụ liệu", value: "MATERIAL" },
+                            ]}
+                        />
+                    </Form.Item>
 
                     <Form.Item
                         name="parentId"
@@ -587,12 +612,7 @@ export default function ItemCategoriesPage() {
                 </Form>
             </Modal>
 
-            <AttributeManager
-                categoryId={managingCategory?.id || null}
-                categoryName={managingCategory?.categoryName}
-                open={!!managingCategory}
-                onClose={() => setManagingCategory(null)}
-            />
+
         </>
     );
 }

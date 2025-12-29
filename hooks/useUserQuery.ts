@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { userService, type CreateUserDto, type UpdateUserDto } from "@/services/userService";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { message } from "antd";
 
 export const USER_KEYS = {
@@ -11,10 +11,10 @@ export const USER_KEYS = {
 };
 
 // Hook để fetch tất cả users
-export function useUsers() {
+export function useUsers(filters?: { departmentId?: number }) {
   return useQuery({
-    queryKey: USER_KEYS.lists(),
-    queryFn: userService.getAll,
+    queryKey: USER_KEYS.list(filters),
+    queryFn: () => userService.getAll(filters),
     staleTime: 5 * 60 * 1000, // Cache
   });
 }
@@ -75,6 +75,19 @@ export function useDeleteUser() {
     },
     onError: (error: Error) => {
       message.error(error.message || "Lỗi khi xóa người dùng");
+    },
+  });
+}
+
+// Hook để reset password
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (id: number) => userService.resetPassword(id),
+    onSuccess: () => {
+      message.success("Đã reset mật khẩu về mặc định (1)");
+    },
+    onError: (error: Error) => {
+      message.error(error.message || "Lỗi khi reset mật khẩu");
     },
   });
 }
