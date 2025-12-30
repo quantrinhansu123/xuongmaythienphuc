@@ -8,7 +8,6 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePermissions } from "@/hooks/usePermissions";
-import { PropRowDetails } from "@/types/table";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
   CalendarOutlined,
@@ -2622,16 +2621,7 @@ export default function OrdersPage() {
         <div className="flex gap-4">
           <div className={`space-y-4 transition-all duration-300`}>
             <CommonTable
-              drawerWidth={1000}
-              DrawerDetails={({ data }: PropRowDetails<Order>) => (
-                <OrderDetailDrawer
-                  orderId={data?.id || null}
-                  canEdit={can("sales.orders", "edit")}
-                  onUpdateStatus={updateStatus}
-                  onExportOrder={handleExportOrder}
-                  onEditOrder={handleEditOrder}
-                />
-              )}
+              onRowClick={(record: Order) => router.push(`/sales/orders/${record.id}`)}
               columns={getVisibleColumns()}
               dataSource={filteredOrders}
               loading={permLoading || isLoading || isFetching}
