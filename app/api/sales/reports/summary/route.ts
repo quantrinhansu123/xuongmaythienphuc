@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (salesEmployeeId && salesEmployeeId !== 'all') {
-      branchFilter += ` AND pic_staff_id = $${paramIndex}`;
+      branchFilter += ` AND created_by = $${paramIndex}`;
       params.push(parseInt(salesEmployeeId));
       paramIndex++;
     }
