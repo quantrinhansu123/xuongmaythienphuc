@@ -142,8 +142,29 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Tự động tạo mã nếu không có
-    if (!itemCode) {
+    // Tự động tạo mã nếu không có HOẶC kiểm tra trùng
+    let finalItemCode = itemCode;
+
+    if (itemCode) {
+      // Kiểm tra xem mã đã tồn tại chưa
+      const existingCode = await query(
+        `SELECT 1 FROM (
+          SELECT item_code as code FROM items WHERE item_code = $1
+          UNION ALL
+          SELECT product_code as code FROM products WHERE product_code = $1
+          UNION ALL
+          SELECT material_code as code FROM materials WHERE material_code = $1
+        ) combined LIMIT 1`,
+        [itemCode]
+      );
+
+      // Nếu mã đã tồn tại, tạo mã mới
+      if (existingCode.rows.length > 0) {
+        finalItemCode = ''; // Reset để trigger auto-generation
+      }
+    }
+
+    if (!finalItemCode) {
       const prefix = 'HH';
 
       // Get the latest code from ALL tables (items, products, materials)
@@ -168,8 +189,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      itemCode = `${prefix}${sequence.toString().padStart(4, '0')}`;
+      finalItemCode = `${prefix}${sequence.toString().padStart(4, '0')}`;
     }
+
+    itemCode = finalItemCode;
 
     if (!['PRODUCT', 'MATERIAL'].includes(itemType)) {
       return NextResponse.json<ApiResponse>({

@@ -545,11 +545,15 @@ export default function ItemsPage() {
 
   // Handle export to Excel
   const handleExportExcel = () => {
+    // Xuất với giá trị thô để có thể nhập lại dễ dàng
     const dataToExport = filteredItems.map(item => ({
-      ...item,
-      itemType: item.itemType === 'PRODUCT' ? 'Sản phẩm' : 'Nguyên vật liệu',
+      itemCode: item.itemCode || '',
+      itemName: item.itemName,
+      categoryName: item.categoryName || '',
+      itemType: item.itemType, // Giữ nguyên PRODUCT/MATERIAL
+      unit: item.unit,
+      costPrice: item.costPrice,
       isSellable: item.isSellable ? 'Có' : 'Không',
-      categoryName: item.categoryName || ''
     }));
     exportToXlsx(dataToExport, "hang-hoa");
   };
@@ -561,9 +565,9 @@ export default function ItemsPage() {
         try {
           // Validate data - support both Vietnamese and English headers
           const validItems = data.filter((row: any) => {
-            const itemName = row['itemName'] || row['Tên hàng'];
+            const itemName = row['itemName'] || row['Tên hàng hoá'];
             const itemType = row['itemType'] || row['Loại'];
-            const unit = row['unit'] || row['Đơn vị'];
+            const unit = row['unit'] || row['ĐVT'];
             return itemName && itemType && unit;
           });
 
@@ -575,13 +579,29 @@ export default function ItemsPage() {
           // Transform data
           const items = validItems.map((row: any) => {
             const itemType = row['itemType'] || row['Loại'];
+            const isSellable = row['isSellable'] || row['Có thể bán'];
+
+            // Xử lý itemType: hỗ trợ cả tiếng Việt và raw value
+            let finalItemType = 'PRODUCT';
+            if (itemType === 'MATERIAL' || itemType === 'Nguyên vật liệu' || itemType === 'NVL') {
+              finalItemType = 'MATERIAL';
+            }
+
+            // Xử lý isSellable
+            let finalIsSellable = finalItemType === 'PRODUCT'; // Default
+            if (isSellable === 'Có' || isSellable === 'TRUE' || isSellable === true) {
+              finalIsSellable = true;
+            } else if (isSellable === 'Không' || isSellable === 'FALSE' || isSellable === false) {
+              finalIsSellable = false;
+            }
+
             return {
-              itemCode: row['itemCode'] || row['Mã hàng'] || undefined,
-              itemName: row['itemName'] || row['Tên hàng'],
-              itemType: itemType === 'MATERIAL' ? 'MATERIAL' : 'PRODUCT',
-              unit: row['unit'] || row['Đơn vị'],
-              costPrice: parseFloat(row['costPrice'] || row['Giá vốn']) || 0,
-              isSellable: (row['isSellable'] || row['Có thể bán']) === 'TRUE' || itemType === 'PRODUCT',
+              itemCode: row['itemCode'] || row['Mã hàng'] || undefined, // undefined = tự động tạo
+              itemName: row['itemName'] || row['Tên hàng hoá'],
+              itemType: finalItemType,
+              unit: row['unit'] || row['ĐVT'],
+              costPrice: parseFloat(row['costPrice'] || row['Giá bán']) || 0,
+              isSellable: finalIsSellable,
             };
           });
 

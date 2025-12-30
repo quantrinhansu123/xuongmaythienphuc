@@ -16,6 +16,7 @@ import {
   useUpdateCustomer,
 } from "@/hooks/useCustomerQuery";
 import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Customer } from "@/services/customerService";
@@ -27,6 +28,7 @@ import {
   UnlockOutlined,
   UploadOutlined
 } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import { App, Select, Tag } from "antd";
 import { useRouter } from "next/navigation";
@@ -36,6 +38,7 @@ export default function CustomersPage() {
   const router = useRouter();
   const { can } = usePermissions();
   const { modal, message } = App.useApp();
+  const queryClient = useQueryClient();
 
   // Filter hook
   const {
@@ -74,6 +77,7 @@ export default function CustomersPage() {
     { title: "Trạng thái", dataIndex: "isActive", key: "isActive" },
   ];
   const { exportToXlsx } = useFileExport(exportColumns);
+  const { openFileDialog } = useFileImport();
 
   // Event handlers
   const handleCreate = () => {
@@ -151,19 +155,90 @@ export default function CustomersPage() {
 
   const handleExportExcel = () => {
     const filteredData = applyFilter(customers);
+    // Xuất với giá trị thô để có thể nhập lại
     const dataToExport = filteredData.map(customer => ({
-      ...customer,
-      isActive: customer.isActive ? 'Hoạt động' : 'Ngừng',
-      debtAmount: customer.debtAmount || 0
+      customerCode: customer.customerCode || '',
+      customerName: customer.customerName,
+      phone: customer.phone || '',
+      email: customer.email || '',
+      address: customer.address || '',
+      groupName: customer.groupName || '',
+      debtAmount: customer.debtAmount || 0,
+      isActive: customer.isActive ? 'Có' : 'Không',
     }));
     exportToXlsx(dataToExport, "khach_hang");
   };
 
   const handleImportExcel = () => {
-    modal.info({
-      title: "Nhập Excel",
-      content: "Tính năng nhập Excel đang được phát triển",
-    });
+    openFileDialog(
+      async (data: any[]) => {
+        try {
+          const validCustomers = data.filter((row: any) => {
+            const customerName = row['customerName'] || row['Tên khách hàng'];
+            return customerName;
+          });
+
+          if (validCustomers.length === 0) {
+            message.error('Không có dữ liệu hợp lệ trong file Excel');
+            return;
+          }
+
+          const customers = validCustomers.map((row: any) => {
+            const isActive = row['isActive'] || row['Trạng thái'];
+
+            return {
+              customerCode: row['customerCode'] || row['Mã KH'] || undefined,
+              customerName: row['customerName'] || row['Tên khách hàng'],
+              phone: row['phone'] || row['Điện thoại'] || undefined,
+              email: row['email'] || row['Email'] || undefined,
+              address: row['address'] || row['Địa chỉ'] || undefined,
+              isActive: isActive === 'Có' || isActive === 'TRUE' || isActive === true || isActive === undefined,
+            };
+          });
+
+          message.loading({ content: `Đang import ${customers.length} khách hàng...`, key: 'import' });
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const customer of customers) {
+            try {
+              const res = await fetch('/api/sales/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(customer),
+              });
+
+              const result = await res.json();
+              if (result.success) {
+                successCount++;
+              } else {
+                errorCount++;
+                console.error(`Lỗi import ${customer.customerName}:`, result.error);
+              }
+            } catch (error) {
+              errorCount++;
+              console.error(`Lỗi import ${customer.customerName}:`, error);
+            }
+          }
+
+          message.success({
+            content: `Import thành công ${successCount}/${customers.length} khách hàng${errorCount > 0 ? `, ${errorCount} lỗi` : ''}`,
+            key: 'import',
+            duration: 3
+          });
+
+          queryClient.invalidateQueries({ queryKey: CUSTOMER_KEYS.all });
+        } catch (error) {
+          message.error({ content: 'Có lỗi xảy ra khi import', key: 'import' });
+          console.error('Import error:', error);
+        }
+      },
+      (error: string) => {
+        message.error('Không thể đọc file Excel. Vui lòng kiểm tra định dạng file.');
+        console.error('File read error:', error);
+      }
+    );
   };
 
   // Apply client-side filtering

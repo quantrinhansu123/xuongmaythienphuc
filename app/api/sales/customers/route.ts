@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const whereConditions: string[] = ['1=1'];
     const params: any[] = [];
     let paramIndex = 1;
-    
+
     // Branch filter
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereConditions.push(`c.branch_id = $${paramIndex}`);
@@ -123,28 +123,57 @@ export async function POST(request: NextRequest) {
           error: 'Số điện thoại không hợp lệ (phải là 10-11 số, bắt đầu bằng 0 hoặc +84)'
         }, { status: 400 });
       }
-      phone = cleanPhone; // Lưu số điện thoại đã clean
+      phone = cleanPhone;
     }
 
-    // Tự động tạo mã khách hàng nếu không có
-    if (!customerCode) {
+    // Tự động tạo mã khách hàng - LOGIC MỚI ĐƠN GIẢN HƠN
+    let finalCustomerCode = customerCode;
+
+    // Nếu có mã, kiểm tra trùng
+    if (customerCode) {
+      const checkResult = await query(
+        'SELECT id FROM customers WHERE customer_code = $1',
+        [customerCode]
+      );
+      if (checkResult.rows.length > 0) {
+        finalCustomerCode = ''; // Trùng thì reset
+      }
+    }
+
+    // Nếu không có mã hoặc mã bị trùng, tạo mã mới
+    if (!finalCustomerCode) {
       if (phone) {
-        // Tạo mã dựa trên số điện thoại: KH + 6 số cuối
+        // Tạo mã từ SĐT
         const last6Digits = phone.slice(-6);
-        customerCode = `KH${last6Digits}`;
-        
-        // Kiểm tra trùng, nếu trùng thì thêm số thứ tự
-        const checkResult = await query(
-          'SELECT customer_code FROM customers WHERE customer_code LIKE $1 ORDER BY customer_code DESC LIMIT 1',
-          [`${customerCode}%`]
+        const baseCode = `KH${last6Digits}`;
+
+        // Tìm tất cả mã có dạng KH654333 hoặc KH654333_XX
+        const existingCodes = await query(
+          `SELECT customer_code FROM customers 
+           WHERE customer_code = $1 OR customer_code LIKE $2
+           ORDER BY customer_code`,
+          [baseCode, `${baseCode}_%`]
         );
-        
-        if (checkResult.rows.length > 0) {
-          const existingCode = checkResult.rows[0].customer_code;
-          // Nếu trùng, thêm số thứ tự (KH123456_01, KH123456_02, ...)
-          const match = existingCode.match(/_(\d+)$/);
-          const nextNum = match ? parseInt(match[1]) + 1 : 1;
-          customerCode = `${customerCode}_${nextNum.toString().padStart(2, '0')}`;
+
+        if (existingCodes.rows.length === 0) {
+          // Chưa có mã nào
+          finalCustomerCode = baseCode;
+        } else {
+          // Đã có mã, tìm số thứ tự lớn nhất
+          let maxNum = 0;
+          for (const row of existingCodes.rows) {
+            const code = row.customer_code;
+            if (code === baseCode) {
+              maxNum = Math.max(maxNum, 0);
+            } else if (code.startsWith(baseCode + '_')) {
+              const suffix = code.substring(baseCode.length + 1);
+              const num = parseInt(suffix);
+              if (!isNaN(num)) {
+                maxNum = Math.max(maxNum, num);
+              }
+            }
+          }
+          finalCustomerCode = `${baseCode}_${(maxNum + 1).toString().padStart(2, '0')}`;
         }
       } else {
         // Không có SĐT, tạo mã tuần tự
@@ -156,22 +185,11 @@ export async function POST(request: NextRequest) {
            END), 0) + 1)::TEXT, 6, '0') as code
            FROM customers`
         );
-        customerCode = codeResult.rows[0].code;
-      }
-    } else {
-      // Kiểm tra mã khách hàng trùng nếu có customerCode
-      const checkResult = await query(
-        'SELECT id FROM customers WHERE customer_code = $1',
-        [customerCode]
-      );
-
-      if (checkResult.rows.length > 0) {
-        return NextResponse.json<ApiResponse>({
-          success: false,
-          error: 'Mã khách hàng đã tồn tại'
-        }, { status: 400 });
+        finalCustomerCode = codeResult.rows[0].code;
       }
     }
+
+    customerCode = finalCustomerCode;
 
     const result = await query(
       `INSERT INTO customers (
