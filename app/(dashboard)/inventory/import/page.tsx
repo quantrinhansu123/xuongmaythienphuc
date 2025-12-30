@@ -363,8 +363,8 @@ export default function Page() {
                 onChange={(dates) => {
                   if (dates) {
                     updateQueries([
-                      { key: "startDate", value: dates[0]?.startOf('day').toISOString() },
-                      { key: "endDate", value: dates[1]?.endOf('day').toISOString() },
+                      { key: "startDate", value: dates[0]?.format('YYYY-MM-DD') },
+                      { key: "endDate", value: dates[1]?.format('YYYY-MM-DD') },
                     ]);
                   } else {
                     updateQueries([

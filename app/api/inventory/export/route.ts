@@ -44,17 +44,17 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    console.log('Export Filter Params:', { startDate, endDate, status, warehouseId });
-
     if (startDate) {
+      // Force Vietnam Timezone (+07) for start of day
       whereClause += ` AND it.created_at >= $${paramIndex}::timestamptz`;
-      params.push(startDate);
+      params.push(`${startDate} 00:00:00+07`);
       paramIndex++;
     }
 
     if (endDate) {
+      // Force Vietnam Timezone (+07) for end of day
       whereClause += ` AND it.created_at <= $${paramIndex}::timestamptz`;
-      params.push(endDate);
+      params.push(`${endDate} 23:59:59.999+07`);
       paramIndex++;
     }
 

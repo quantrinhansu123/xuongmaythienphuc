@@ -61,6 +61,18 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
+    // DEBUG LOGGING
+    console.log('DEBUG QUERY:', {
+      whereClause,
+      params,
+      warehouseId,
+      status
+    });
+
+    const timeCheck = await query("SELECT NOW() as db_now, current_setting('TIMEZONE') as db_tz, '2025-12-30 14:00:00+07'::timestamptz as test_tz");
+    console.log('DB TIME CHECK:', timeCheck.rows[0]);
+
+
     // Pagination
     const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
 
