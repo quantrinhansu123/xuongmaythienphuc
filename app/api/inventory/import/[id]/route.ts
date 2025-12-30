@@ -58,8 +58,6 @@ export async function GET(
         COALESCE(m.material_name, p.product_name) as "itemName",
         COALESCE(m.unit, p.unit) as unit,
         itd.quantity,
-        itd.unit_price as "unitPrice",
-        itd.total_amount as "totalAmount",
         itd.notes
        FROM inventory_transaction_details itd
        LEFT JOIN materials m ON m.id = itd.material_id
@@ -140,19 +138,15 @@ export async function PUT(
     await query(`DELETE FROM inventory_transaction_details WHERE transaction_id = $1`, [transactionId]);
 
     for (const item of items) {
-      const itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-
       await query(
         `INSERT INTO inventory_transaction_details 
-         (transaction_id, material_id, product_id, quantity, unit_price, total_amount, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         (transaction_id, material_id, product_id, quantity, notes)
+         VALUES ($1, $2, $3, $4, $5)`,
         [
           transactionId,
           item.materialId || null,
           item.productId || null,
           item.quantity || 0,
-          item.unitPrice || 0,
-          itemTotal,
           item.notes || null
         ]
       );

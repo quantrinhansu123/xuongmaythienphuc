@@ -40,7 +40,6 @@ type ImportTransaction = {
   toWarehouseId: number;
   toWarehouseName: string;
   status: "PENDING" | "APPROVED" | "COMPLETED";
-  totalAmount: number;
   notes?: string;
   relatedOrderCode?: string;
   relatedCustomerName?: string;
@@ -240,8 +239,6 @@ export default function Page() {
     itemName: string;
     quantity: number;
     unit: string;
-    unitPrice?: number;
-    totalAmount?: number;
     notes?: string;
   };
 

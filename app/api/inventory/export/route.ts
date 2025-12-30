@@ -75,8 +75,7 @@ export async function GET(request: NextRequest) {
         it.created_at as "createdAt",
         it.approved_by as "approvedBy",
         u2.full_name as "approvedByName",
-        it.approved_at as "approvedAt",
-        COALESCE((SELECT SUM(itd.total_amount) FROM inventory_transaction_details itd WHERE itd.transaction_id = it.id), 0) as "totalAmount"
+        it.approved_at as "approvedAt"
        FROM inventory_transactions it
        LEFT JOIN warehouses w ON w.id = it.from_warehouse_id
        LEFT JOIN users u1 ON u1.id = it.created_by

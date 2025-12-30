@@ -48,8 +48,6 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    console.log('Filter Params:', { startDate, endDate, status, warehouseId });
-
     if (startDate) {
       whereClause += ` AND it.created_at >= $${paramIndex}`;
       params.push(getUTCRange(startDate, false));
@@ -61,18 +59,6 @@ export async function GET(request: NextRequest) {
       params.push(getUTCRange(endDate, true));
       paramIndex++;
     }
-
-    // DEBUG LOGGING
-    console.log('DEBUG QUERY:', {
-      whereClause,
-      params,
-      warehouseId,
-      status
-    });
-
-    const timeCheck = await query("SELECT NOW() as db_now, current_setting('TIMEZONE') as db_tz, '2025-12-30 14:00:00+07'::timestamptz as test_tz");
-    console.log('DB TIME CHECK:', timeCheck.rows[0]);
-
 
     // Pagination
     const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500);
@@ -92,8 +78,7 @@ export async function GET(request: NextRequest) {
         it.created_at as "createdAt",
         it.approved_by as "approvedBy",
         u2.full_name as "approvedByName",
-        it.approved_at as "approvedAt",
-        COALESCE((SELECT SUM(itd.total_amount) FROM inventory_transaction_details itd WHERE itd.transaction_id = it.id), 0) as "totalAmount"
+        it.approved_at as "approvedAt"
        FROM inventory_transactions it
        LEFT JOIN warehouses w ON w.id = it.to_warehouse_id
        LEFT JOIN users u1 ON u1.id = it.created_by
@@ -203,15 +188,13 @@ export async function POST(request: NextRequest) {
     // Thêm chi tiết (chưa cập nhật tồn kho)
     for (const item of items) {
       await query(
-        `INSERT INTO inventory_transaction_details (transaction_id, product_id, material_id, quantity, unit_price, total_amount, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO inventory_transaction_details (transaction_id, product_id, material_id, quantity, notes)
+         VALUES ($1, $2, $3, $4, $5)`,
         [
           transactionId,
           item.productId || null,
           item.materialId || null,
           item.quantity,
-          item.unitPrice || 0,
-          (item.quantity * (item.unitPrice || 0)),
           item.notes || null
         ]
       );

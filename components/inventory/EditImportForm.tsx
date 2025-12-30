@@ -1,5 +1,6 @@
 "use client";
 
+import { formatQuantity } from "@/utils/format";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Form, Input, InputNumber, Select, Space, Table, message } from "antd";
@@ -16,8 +17,6 @@ type EditImportFormProps = {
       itemName: string;
       quantity: number;
       unit: string;
-      unitPrice?: number;
-      totalAmount?: number;
       materialId?: number;
       productId?: number;
     }>;
@@ -34,8 +33,6 @@ type ImportItem = {
   itemName: string;
   quantity: number;
   unit: string;
-  unitPrice: number;
-  totalAmount: number;
 };
 
 export default function EditImportForm({ transactionId, warehouseId, initialData, onSuccess, onCancel }: EditImportFormProps) {
@@ -67,8 +64,6 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
         itemName: d.itemName,
         quantity: d.quantity,
         unit: d.unit,
-        unitPrice: d.unitPrice || 0,
-        totalAmount: d.totalAmount || d.quantity * (d.unitPrice || 0),
       }));
       setItems(mappedItems);
     }
@@ -81,15 +76,13 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
   const handleWarehouseChange = (newWarehouseId: number) => {
     const newWarehouse = warehousesData.find((w: any) => w.id === newWarehouseId);
     if (!newWarehouse) return;
-    
+
     setSelectedWarehouseId(newWarehouseId);
-    
+
     // Nếu kho mới là hỗn hợp, giữ nguyên tất cả
     if (newWarehouse.warehouseType === 'HON_HOP') return;
-    
+
     // Lọc items theo loại kho mới
-    // Note: Với phiếu nhập, items có thể không có itemType nên cần xử lý khác
-    // Tạm thời clear items khi đổi kho để user thêm lại
     if (items.length > 0) {
       message.info('Đã xóa danh sách hàng hóa do đổi kho. Vui lòng thêm lại.');
       setItems([]);
@@ -105,7 +98,7 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
       const res = await fetch(`/api/products/items`);
       const body = await res.json();
       if (!body.success || !body.data) return [];
-      
+
       const allItems = body.data;
       return allItems.filter((item: any) => {
         if (warehouseType === "HON_HOP") return true;
@@ -130,16 +123,14 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
     if (!selectedItem) return;
 
     const existingItemIndex = items.findIndex(item => item.itemCode === selectedItemCode);
-    
+
     if (existingItemIndex !== -1) {
       const updatedItems = [...items];
       const existingItem = updatedItems[existingItemIndex];
       existingItem.quantity += quantity;
-      existingItem.totalAmount = existingItem.quantity * existingItem.unitPrice;
       setItems(updatedItems);
       message.success(`Đã cộng thêm ${quantity} vào ${selectedItem.itemName}`);
     } else {
-      const unitPrice = selectedItem.costPrice || 0;
       const newItem: ImportItem = {
         key: Date.now().toString(),
         materialId: selectedItem.materialId,
@@ -148,12 +139,10 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
         itemName: selectedItem.itemName,
         quantity,
         unit: selectedItem.unit,
-        unitPrice,
-        totalAmount: quantity * unitPrice,
       };
       setItems([...items, newItem]);
     }
-    
+
     form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 
@@ -181,7 +170,6 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
             materialId: item.materialId,
             productId: item.productId,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
           })),
         }),
       });
@@ -204,24 +192,8 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
   const columns = [
     { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 120 },
     { title: "Tên", dataIndex: "itemName", key: "itemName" },
-    { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 100, align: "right" as const },
+    { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 100, align: "right" as const, render: (val: number) => formatQuantity(val) },
     { title: "ĐVT", dataIndex: "unit", key: "unit", width: 80 },
-    {
-      title: "Đơn giá",
-      dataIndex: "unitPrice",
-      key: "unitPrice",
-      width: 120,
-      align: "right" as const,
-      render: (val: number) => val.toLocaleString(),
-    },
-    {
-      title: "Thành tiền",
-      dataIndex: "totalAmount",
-      key: "totalAmount",
-      width: 120,
-      align: "right" as const,
-      render: (val: number) => val.toLocaleString(),
-    },
     {
       title: "Thao tác",
       key: "action",
@@ -231,8 +203,6 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
       ),
     },
   ];
-
-  const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
 
   return (
     <div className="space-y-4">
@@ -279,17 +249,6 @@ export default function EditImportForm({ transactionId, warehouseId, initialData
         dataSource={items}
         pagination={false}
         size="small"
-        summary={() => (
-          <Table.Summary.Row>
-            <Table.Summary.Cell index={0} colSpan={5} align="right">
-              <strong>Tổng cộng:</strong>
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={1} align="right">
-              <strong>{totalAmount.toLocaleString()}</strong>
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={2} />
-          </Table.Summary.Row>
-        )}
       />
 
       <Form form={form} layout="vertical">

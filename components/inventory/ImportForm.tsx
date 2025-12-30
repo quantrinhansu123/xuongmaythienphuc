@@ -1,5 +1,6 @@
 "use client";
 
+import { formatQuantity } from "@/utils/format";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Form, Input, InputNumber, Select, Space, Table, message } from "antd";
@@ -19,8 +20,6 @@ type ImportItem = {
     itemName: string;
     quantity: number;
     unit: string;
-    unitPrice: number;
-    totalAmount: number;
 };
 
 export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportFormProps) {
@@ -94,7 +93,6 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
             const updatedItems = [...items];
             const existingItem = updatedItems[existingItemIndex];
             existingItem.quantity += quantity;
-            existingItem.totalAmount = existingItem.quantity * existingItem.unitPrice;
             setItems(updatedItems);
             message.success(`Đã cộng thêm ${quantity} vào ${selectedItem.itemName}`);
         } else {
@@ -109,8 +107,6 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
                 itemName: selectedItem.itemName,
                 quantity,
                 unit: selectedItem.unit,
-                unitPrice,
-                totalAmount: quantity * unitPrice,
             };
 
             setItems([...items, newItem]);
@@ -143,7 +139,6 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
                         materialId: item.materialId,
                         productId: item.productId,
                         quantity: item.quantity,
-                        unitPrice: item.unitPrice,
                     })),
                 }),
             });
@@ -166,24 +161,8 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
     const columns = [
         { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 120 },
         { title: "Tên", dataIndex: "itemName", key: "itemName" },
-        { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 100, align: "right" as const },
+        { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 100, align: "right" as const, render: (val: number) => formatQuantity(val) },
         { title: "ĐVT", dataIndex: "unit", key: "unit", width: 80 },
-        {
-            title: "Đơn giá",
-            dataIndex: "unitPrice",
-            key: "unitPrice",
-            width: 120,
-            align: "right" as const,
-            render: (val: number) => val.toLocaleString(),
-        },
-        {
-            title: "Thành tiền",
-            dataIndex: "totalAmount",
-            key: "totalAmount",
-            width: 120,
-            align: "right" as const,
-            render: (val: number) => val.toLocaleString(),
-        },
         {
             title: "Thao tác",
             key: "action",
@@ -193,8 +172,6 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
             ),
         },
     ];
-
-    const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
 
     return (
         <div className="space-y-4">
@@ -208,13 +185,6 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
                             filterOption={(input, option) =>
                                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
                             }
-                            onChange={(itemCode) => {
-                                // Tự động điền đơn giá khi chọn hàng hoá
-                                const selectedItem = availableItems.find((item: any) => item.itemCode === itemCode);
-                                if (selectedItem && selectedItem.costPrice) {
-                                    form.setFieldsValue({ unitPrice: selectedItem.costPrice });
-                                }
-                            }}
                             options={availableItems.map((item: any, index: number) => ({
                                 label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'MATERIAL' ? 'NVL' : 'SP'})`,
                                 value: item.itemCode,
@@ -236,17 +206,6 @@ export default function ImportForm({ warehouseId, onSuccess, onCancel }: ImportF
                 dataSource={items}
                 pagination={false}
                 size="small"
-                summary={() => (
-                    <Table.Summary.Row>
-                        <Table.Summary.Cell index={0} colSpan={5} align="right">
-                            <strong>Tổng cộng:</strong>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={1} align="right">
-                            <strong>{totalAmount.toLocaleString()}</strong>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={2} />
-                    </Table.Summary.Row>
-                )}
             />
 
             <Form form={form} layout="vertical">

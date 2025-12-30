@@ -40,7 +40,6 @@ type ExportTransaction = {
   fromWarehouseId: number;
   fromWarehouseName: string;
   status: "PENDING" | "APPROVED" | "COMPLETED";
-  totalAmount: number;
   notes?: string;
   relatedOrderCode?: string;
   relatedCustomerName?: string;
@@ -246,8 +245,6 @@ export default function Page() {
     itemName: string;
     quantity: number;
     unit: string;
-    unitPrice?: number;
-    totalAmount?: number;
     notes?: string;
     stockQuantity?: number;
   };

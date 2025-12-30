@@ -147,9 +147,15 @@ export async function PUT(
     for (const item of items) {
       await query(
         `INSERT INTO inventory_transaction_details 
-         (transaction_id, material_id, product_id, quantity)
-         VALUES ($1, $2, $3, $4)`,
-        [transactionId, item.materialId || null, item.productId || null, item.quantity]
+         (transaction_id, product_id, material_id, quantity, notes)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          transactionId,
+          item.productId || null,
+          item.materialId || null,
+          item.quantity,
+          item.notes || null
+        ]
       );
     }
 

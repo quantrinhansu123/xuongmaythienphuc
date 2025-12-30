@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCurrency, formatQuantity } from "@/utils/format";
+import { formatQuantity } from "@/utils/format";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Form, Input, InputNumber, Select, Space, Table, message } from "antd";
@@ -119,16 +119,16 @@ export default function EditExportForm({ transactionId, warehouseId, initialData
 
     const availableQty = parseFloat(selectedItem.quantity);
     const existingItemIndex = items.findIndex(item => item.itemCode === selectedItemCode);
-    
+
     if (existingItemIndex !== -1) {
       const existingItem = items[existingItemIndex];
       const totalQuantity = existingItem.quantity + quantity;
-      
+
       if (totalQuantity > availableQty) {
         message.error(`Tổng số lượng xuất (${totalQuantity}) không được vượt quá tồn kho (${availableQty})`);
         return;
       }
-      
+
       const updatedItems = [...items];
       updatedItems[existingItemIndex].quantity = totalQuantity;
       setItems(updatedItems);
@@ -153,7 +153,7 @@ export default function EditExportForm({ transactionId, warehouseId, initialData
 
       setItems([...items, newItem]);
     }
-    
+
     form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 
@@ -203,15 +203,15 @@ export default function EditExportForm({ transactionId, warehouseId, initialData
   const columns = [
     { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 120 },
     { title: "Tên", dataIndex: "itemName", key: "itemName" },
-    { 
-      title: "Loại", 
-      dataIndex: "itemType", 
-      key: "itemType", 
+    {
+      title: "Loại",
+      dataIndex: "itemType",
+      key: "itemType",
       width: 80,
       render: (val: string) => val === 'NVL' ? 'NVL' : 'SP'
     },
-    { title: "Số lượng xuất", dataIndex: "quantity", key: "quantity", width: 120, align: "right" as const },
-    { title: "Tồn kho", dataIndex: "availableQuantity", key: "availableQuantity", width: 100, align: "right" as const },
+    { title: "Số lượng xuất", dataIndex: "quantity", key: "quantity", width: 120, align: "right" as const, render: (val: number) => formatQuantity(val) },
+    { title: "Tồn kho", dataIndex: "availableQuantity", key: "availableQuantity", width: 100, align: "right" as const, render: (val: number) => formatQuantity(val) },
     { title: "ĐVT", dataIndex: "unit", key: "unit", width: 80 },
     {
       title: "Thao tác",
@@ -248,7 +248,7 @@ export default function EditExportForm({ transactionId, warehouseId, initialData
                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               options={availableItems.map((item: any) => ({
-                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${formatQuantity(parseFloat(item.quantity))} ${item.unit} - Giá: ${formatCurrency(item.unitPrice || 0)}`,
+                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${formatQuantity(parseFloat(item.quantity))} ${item.unit}`,
                 value: item.itemCode,
               }))}
             />

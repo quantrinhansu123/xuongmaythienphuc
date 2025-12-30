@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCurrency, formatQuantity } from "@/utils/format";
+import { formatQuantity } from "@/utils/format";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Form, Input, InputNumber, Select, Space, Table, message } from "antd";
@@ -47,12 +47,12 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
     enabled: !!warehouse,
     queryFn: async () => {
       console.log(`🔍 [ExportForm] Fetching balance for warehouse ${warehouseId}, type: ${warehouse.warehouseType}`);
-      
+
       // Dùng API balance với showAll=false để chỉ lấy items có tồn kho > 0
       const res = await fetch(`/api/inventory/balance?warehouseId=${warehouseId}&showAll=false`);
       const body = await res.json();
       console.log(`📦 [ExportForm] Balance response:`, body);
-      
+
       if (body.success && body.data) {
         // API trả về { details, summary } - lấy details
         const details = body.data.details || body.data || [];
@@ -78,20 +78,20 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
     if (!selectedItem) return;
 
     const availableQty = parseFloat(selectedItem.quantity);
-    
+
     // Kiểm tra đã thêm item này chưa
     const existingItemIndex = items.findIndex(item => item.itemCode === selectedItemCode);
-    
+
     if (existingItemIndex !== -1) {
       // Đã có -> kiểm tra tổng số lượng
       const existingItem = items[existingItemIndex];
       const totalQuantity = existingItem.quantity + quantity;
-      
+
       if (totalQuantity > availableQty) {
         message.error(`Tổng số lượng xuất (${totalQuantity}) không được vượt quá tồn kho (${availableQty})`);
         return;
       }
-      
+
       // Cộng dồn số lượng
       const updatedItems = [...items];
       updatedItems[existingItemIndex].quantity = totalQuantity;
@@ -118,7 +118,7 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
 
       setItems([...items, newItem]);
     }
-    
+
     form.setFieldsValue({ selectedItem: undefined, quantity: undefined });
   };
 
@@ -168,15 +168,15 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
   const columns = [
     { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 120 },
     { title: "Tên", dataIndex: "itemName", key: "itemName" },
-    { 
-      title: "Loại", 
-      dataIndex: "itemType", 
-      key: "itemType", 
+    {
+      title: "Loại",
+      dataIndex: "itemType",
+      key: "itemType",
       width: 80,
       render: (val: string) => val === 'NVL' ? 'NVL' : 'SP'
     },
-    { title: "Số lượng xuất", dataIndex: "quantity", key: "quantity", width: 120, align: "right" as const },
-    { title: "Tồn kho", dataIndex: "availableQuantity", key: "availableQuantity", width: 100, align: "right" as const },
+    { title: "Số lượng xuất", dataIndex: "quantity", key: "quantity", width: 120, align: "right" as const, render: (val: number) => formatQuantity(val) },
+    { title: "Tồn kho", dataIndex: "availableQuantity", key: "availableQuantity", width: 100, align: "right" as const, render: (val: number) => formatQuantity(val) },
     { title: "ĐVT", dataIndex: "unit", key: "unit", width: 80 },
     {
       title: "Thao tác",
@@ -201,7 +201,7 @@ export default function ExportForm({ warehouseId, onSuccess, onCancel }: ExportF
                 String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               options={availableItems.map((item: any) => ({
-                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${formatQuantity(parseFloat(item.quantity))} ${item.unit} - Giá: ${formatCurrency(item.unitPrice || 0)}`,
+                label: `${item.itemCode} - ${item.itemName} (${item.itemType === 'NVL' ? 'NVL' : 'SP'}) - Tồn: ${formatQuantity(parseFloat(item.quantity))} ${item.unit}`,
                 value: item.itemCode,
               }))}
             />

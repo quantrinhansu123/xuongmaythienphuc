@@ -89,19 +89,38 @@ export async function POST(
       // Lấy user hiện tại
       const { user } = await requirePermission('sales.orders', 'edit');
 
-      // --- INTEGRATION: Ghi vào sổ quỹ (Cashbook) ---
-      // 1. Lấy category "Thu tiền bán hàng" (THU001)
-      const categoryRes = await query(
-        `SELECT id FROM financial_categories WHERE category_code = 'THU001'`
+      // 1. Lấy danh mục tài chính "Bán hàng" (THU)
+      let categoryId: number | null = null;
+
+      // 1.1 Tìm theo tên
+      const categoryResult = await query(
+        `SELECT id FROM financial_categories 
+         WHERE category_name = 'Bán hàng' AND type = 'THU' AND is_active = true 
+         LIMIT 1`
       );
 
-      let categoryId = null;
-      if (categoryRes.rows.length > 0) {
-        categoryId = categoryRes.rows[0].id;
+      if (categoryResult.rows.length > 0) {
+        categoryId = categoryResult.rows[0].id;
       } else {
-        // Fallback: Lấy category đầu tiên loại THU hoặc tạo mới nếu cần thiết (ở đây dùng fallback đơn giản)
-        const fallbackRes = await query(`SELECT id FROM financial_categories WHERE type = 'THU' LIMIT 1`);
-        if (fallbackRes.rows.length > 0) categoryId = fallbackRes.rows[0].id;
+        // 1.2 Tìm theo mã
+        const categoryCodeResult = await query(
+          `SELECT id FROM financial_categories 
+           WHERE category_code = 'BAN_HANG' AND type = 'THU' AND is_active = true 
+           LIMIT 1`
+        );
+
+        if (categoryCodeResult.rows.length > 0) {
+          categoryId = categoryCodeResult.rows[0].id;
+        } else {
+          // 1.3 Tạo mới nếu chưa có
+          const newCategoryResult = await query(
+            `INSERT INTO financial_categories 
+             (category_code, category_name, type, is_active, description, created_at) 
+             VALUES ('BAN_HANG', 'Bán hàng', 'THU', true, 'Doanh thu bán hàng', NOW()) 
+             RETURNING id`
+          );
+          categoryId = newCategoryResult.rows[0].id;
+        }
       }
 
       if (categoryId) {
