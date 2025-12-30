@@ -72,14 +72,35 @@ export async function PUT(
     const resolvedParams = await params;
     const groupId = parseInt(resolvedParams.id);
     const body = await request.json();
-    const { groupName, priceMultiplier, description } = body;
+    const { groupName, priceMultiplier, description, categoryPrices } = body;
 
+    // Cập nhật thông tin nhóm
     await query(
       `UPDATE customer_groups 
        SET group_name = $1, price_multiplier = $2, description = $3
        WHERE id = $4`,
       [groupName, parseFloat(priceMultiplier), description || null, groupId]
     );
+
+    // Cập nhật hệ số giá theo danh mục (nếu có)
+    if (Array.isArray(categoryPrices) && categoryPrices.length > 0) {
+      // Xóa các giá cũ
+      await query(
+        'DELETE FROM customer_group_category_prices WHERE customer_group_id = $1',
+        [groupId]
+      );
+
+      // Thêm các hệ số giá mới
+      for (const item of categoryPrices) {
+        if (item.categoryId && item.priceMultiplier !== undefined) {
+          await query(
+            `INSERT INTO customer_group_category_prices (customer_group_id, category_id, price_multiplier)
+             VALUES ($1, $2, $3)`,
+            [groupId, item.categoryId, parseFloat(item.priceMultiplier)]
+          );
+        }
+      }
+    }
 
     return NextResponse.json<ApiResponse>({
       success: true,

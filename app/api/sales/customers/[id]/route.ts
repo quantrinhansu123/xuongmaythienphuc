@@ -3,6 +3,62 @@ import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { hasPermission, error } = await requirePermission('sales.customers', 'view');
+    if (!hasPermission) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: error || 'Không có quyền xem khách hàng'
+      }, { status: 403 });
+    }
+
+    const resolvedParams = await params;
+    const customerId = parseInt(resolvedParams.id);
+
+    const result = await query(
+      `SELECT 
+        c.id,
+        c.customer_code as "customerCode",
+        c.customer_name as "customerName",
+        c.phone,
+        c.email,
+        c.address,
+        c.customer_group_id as "customerGroupId",
+        cg.group_name as "groupName",
+        c.debt_amount as "debtAmount",
+        c.is_active as "isActive",
+        c.created_at as "createdAt"
+       FROM customers c
+       LEFT JOIN customer_groups cg ON cg.id = c.customer_group_id
+       WHERE c.id = $1`,
+      [customerId]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy khách hàng'
+      }, { status: 404 });
+    }
+
+    return NextResponse.json<ApiResponse>({
+      success: true,
+      data: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Get customer detail error:', error);
+    return NextResponse.json<ApiResponse>({
+      success: false,
+      error: 'Lỗi server'
+    }, { status: 500 });
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -24,10 +24,144 @@ import {
   EditOutlined,
   PlusOutlined,
   UploadOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { App, Button, Descriptions } from "antd";
+import { App, Button, Descriptions, Divider, Spin, Table } from "antd";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+// Component hiển thị chi tiết nhóm KH + danh sách khách hàng
+function CustomerGroupDrawerDetails({
+  data,
+  onClose,
+  onEdit,
+  onDelete,
+  canEdit,
+  canDelete
+}: {
+  data: CustomerGroup;
+  onClose: () => void;
+  onEdit: (group: CustomerGroup) => void;
+  onDelete: (id: number) => void;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
+  const router = useRouter();
+
+  // Fetch customers in this group
+  const { data: customers = [], isLoading } = useQuery({
+    queryKey: ["customers-in-group", data.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales/customers?customerGroupId=${data.id}`);
+      const result = await res.json();
+      return result.success ? result.data || [] : [];
+    },
+    staleTime: 2 * 60 * 1000,
+    enabled: !!data.id,
+  });
+
+  return (
+    <>
+      <Descriptions column={1} bordered size="small">
+        <Descriptions.Item label="Mã nhóm">
+          <span className="font-mono">{data.groupCode}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Tên nhóm">
+          <span className="font-medium">{data.groupName}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Hệ số giá mặc định">
+          <span className="font-semibold text-blue-600">
+            {data.priceMultiplier}%
+          </span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Mô tả">
+          {data.description || "-"}
+        </Descriptions.Item>
+        <Descriptions.Item label="Ngày tạo">
+          {new Date(data.createdAt).toLocaleString("vi-VN")}
+        </Descriptions.Item>
+      </Descriptions>
+
+      <Divider className="my-3" />
+
+      <div className="flex items-center gap-2 mb-2">
+        <UserOutlined className="text-blue-500" />
+        <span className="font-semibold">Khách hàng ({customers.length})</span>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-4"><Spin /></div>
+      ) : customers.length === 0 ? (
+        <div className="text-gray-400 text-center py-4 border border-dashed rounded">
+          Chưa có khách hàng nào thuộc nhóm này
+        </div>
+      ) : (
+        <Table
+          dataSource={customers}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 5, size: "small" }}
+          scroll={{ y: 200 }}
+          onRow={(record: { id: number }) => ({
+            onClick: () => {
+              onClose();
+              router.push(`/sales/customers/${record.id}`);
+            },
+            style: { cursor: "pointer" },
+          })}
+          columns={[
+            {
+              title: "Mã KH",
+              dataIndex: "customerCode",
+              width: 100,
+              render: (val: string) => <span className="font-mono text-xs">{val}</span>,
+            },
+            {
+              title: "Tên khách hàng",
+              dataIndex: "customerName",
+              render: (val: string) => <span className="font-medium">{val}</span>,
+            },
+            {
+              title: "SĐT",
+              dataIndex: "phone",
+              width: 120,
+            },
+          ]}
+        />
+      )}
+
+      <div className="flex gap-2 justify-end mt-4">
+        {canEdit && (
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => {
+              onClose();
+              onEdit(data);
+            }}
+          >
+            Sửa
+          </Button>
+        )}
+        {canDelete && (
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => {
+              onClose();
+              onDelete(data.id);
+            }}
+          >
+            Xóa
+          </Button>
+        )}
+      </div>
+    </>
+  );
+}
+
 
 export default function CustomerGroupsPage() {
   const { can } = usePermissions();
@@ -279,58 +413,14 @@ export default function CustomerGroupsPage() {
           pagination={{ ...pagination, onChange: handlePageChange }}
           rank={true}
           DrawerDetails={({ data, onClose }) => (
-            <>
-              <Descriptions column={1} bordered>
-                <Descriptions.Item label="Mã nhóm">
-                  <span className="font-mono">{data.groupCode}</span>
-                </Descriptions.Item>
-                <Descriptions.Item label="Tên nhóm">
-                  <span className="font-medium">{data.groupName}</span>
-                </Descriptions.Item>
-                <Descriptions.Item label="Hệ số giá">
-                  <span className="font-semibold text-blue-600">
-                    {data.priceMultiplier}%
-                  </span>
-                </Descriptions.Item>
-                <Descriptions.Item label="Mô tả">
-                  {data.description || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="Số khách hàng">
-                  <span className="font-semibold">
-                    {data.customerCount || 0} khách hàng
-                  </span>
-                </Descriptions.Item>
-                <Descriptions.Item label="Ngày tạo">
-                  {new Date(data.createdAt).toLocaleString("vi-VN")}
-                </Descriptions.Item>
-              </Descriptions>
-              <div className="flex gap-2 justify-end mt-4">
-                {can("sales.customers", "edit") && (
-                  <Button
-                    type="primary"
-                    icon={<EditOutlined />}
-                    onClick={() => {
-                      onClose();
-                      handleEdit(data);
-                    }}
-                  >
-                    Sửa
-                  </Button>
-                )}
-                {can("sales.customers", "delete") && (
-                  <Button
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => {
-                      onClose();
-                      handleDelete(data.id);
-                    }}
-                  >
-                    Xóa
-                  </Button>
-                )}
-              </div>
-            </>
+            <CustomerGroupDrawerDetails
+              data={data}
+              onClose={onClose}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              canEdit={can("sales.customers", "edit")}
+              canDelete={can("sales.customers", "delete")}
+            />
           )}
         />
       </WrapperContent>

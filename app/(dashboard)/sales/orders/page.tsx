@@ -1535,6 +1535,9 @@ export default function OrdersPage() {
   const [depositAccountId, setDepositAccountId] = useState<number | null>(null);
   const [depositMethod, setDepositMethod] = useState<string>('CASH');
 
+  // State để lưu hệ số giá theo danh mục của khách hàng đã chọn
+  const [customerCategoryPrices, setCustomerCategoryPrices] = useState<Record<number, number>>({});
+
   // Quick item creation state
   const [showNewItemModal, setShowNewItemModal] = useState(false);
   const [newItemForm] = Form.useForm();
@@ -1765,10 +1768,11 @@ export default function OrdersPage() {
     setShowCreateModal(true);
   };
 
-  const handleCustomerChange = (customerId: string) => {
+  const handleCustomerChange = async (customerId: string) => {
     if (customerId === "NEW") {
       setShowNewCustomer(true);
       setSelectedCustomer(null);
+      setCustomerCategoryPrices({});
       setOrderForm({ ...orderForm, customerId: "" });
       return;
     }
@@ -1780,13 +1784,33 @@ export default function OrdersPage() {
     setSelectedCustomer(customer);
     setOrderForm({ ...orderForm, customerId });
 
-    // Cập nhật giá cho các items đã có
+    // Fetch hệ số giá theo danh mục của nhóm khách hàng
+    let categoryPricesMap: Record<number, number> = {};
+    if (customer?.customerGroupId) {
+      try {
+        const res = await fetch(`/api/sales/customer-groups/${customer.customerGroupId}/category-prices`);
+        const result = await res.json();
+        if (result.success && result.data) {
+          result.data.forEach((cp: { categoryId: number; priceMultiplier: number; isCustom: boolean }) => {
+            categoryPricesMap[cp.categoryId] = cp.priceMultiplier;
+          });
+        }
+      } catch (e) {
+        console.error("Error fetching category prices:", e);
+      }
+    }
+    setCustomerCategoryPrices(categoryPricesMap);
+
+    // Cập nhật giá cho các items đã có - dùng hệ số theo danh mục
     if (customer && orderItems.length > 0 && Array.isArray(items)) {
       const updatedItems = orderItems.map((item) => {
-        const foundItem = items.find((i) => i.id === item.itemId);
+        const foundItem = items.find((i: any) => i.id === item.itemId);
         if (foundItem) {
           const basePrice = foundItem.costPrice || 0;
-          const discountPercent = customer.priceMultiplier || 0;
+          // Ưu tiên hệ số theo danh mục, fallback về hệ số mặc định của nhóm
+          const discountPercent = (foundItem.categoryId && categoryPricesMap[foundItem.categoryId] !== undefined)
+            ? categoryPricesMap[foundItem.categoryId]
+            : (customer.priceMultiplier || 0);
           const unitPrice = Math.round(basePrice * (1 - discountPercent / 100));
           return { ...item, unitPrice, totalAmount: item.quantity * unitPrice };
         }
@@ -1827,7 +1851,10 @@ export default function OrdersPage() {
         : null;
       if (item) {
         const basePrice = item.costPrice || 0;
-        const discountPercent = selectedCustomer?.priceMultiplier || 0;
+        // Ưu tiên hệ số theo danh mục, fallback về hệ số mặc định của nhóm
+        const discountPercent = (item.categoryId && customerCategoryPrices[item.categoryId] !== undefined)
+          ? customerCategoryPrices[item.categoryId]
+          : (selectedCustomer?.priceMultiplier || 0);
         const unitPrice = Math.round(basePrice * (1 - discountPercent / 100));
 
         newItems[index] = {
@@ -2840,8 +2867,21 @@ export default function OrdersPage() {
                                   onChange={(val) => updateOrderItem(index, "quantity", val)}
                                 />
                               </div>
-                              <div className="w-28">
-                                <label className="text-xs font-medium text-gray-600 block mb-1">Đơn giá</label>
+                              <div className="w-36">
+                                <label className="text-xs font-medium text-gray-600 block mb-1">
+                                  Đơn giá
+                                  {(() => {
+                                    const foundItem = items.find((i: any) => i.id === item.itemId);
+                                    if (!foundItem || !selectedCustomer) return null;
+                                    const discountPct = (foundItem.categoryId && customerCategoryPrices[foundItem.categoryId] !== undefined)
+                                      ? customerCategoryPrices[foundItem.categoryId]
+                                      : (selectedCustomer.priceMultiplier || 0);
+                                    if (discountPct > 0) {
+                                      return <span className="ml-1 text-green-600 font-semibold">(-{discountPct}%)</span>;
+                                    }
+                                    return null;
+                                  })()}
+                                </label>
                                 <InputNumber
                                   min={0}
                                   className="w-full"
