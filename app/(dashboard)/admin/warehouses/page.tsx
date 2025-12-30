@@ -5,22 +5,24 @@ import WarehouseForm from "@/components/WarehouseForm";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { useBranches } from "@/hooks/useCommonQuery";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { WarehouseType } from "@/types/enum";
 import {
-    Warehouse,
-    WarehouseFormValues,
-    WarehouseOptions,
+  Warehouse,
+  WarehouseFormValues,
+  WarehouseOptions,
 } from "@/types/warehouse";
 import {
-    DeleteOutlined,
-    DownloadOutlined,
-    EditOutlined,
-    EyeOutlined,
-    MoreOutlined,
-    PlusOutlined,
-    UploadOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  EyeOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -138,6 +140,41 @@ export default function WarehousesPage() {
     }
   };
 
+  // Export logic
+  const exportColumns = [
+    { title: "Mã kho", dataIndex: "warehouseCode", key: "warehouseCode" },
+    { title: "Tên kho", dataIndex: "warehouseName", key: "warehouseName" },
+    { title: "Loại kho", dataIndex: "warehouseType", key: "warehouseType" },
+    { title: "Chi nhánh", dataIndex: "branchName", key: "branchName" },
+    { title: "Địa chỉ", dataIndex: "address", key: "address" },
+    { title: "Trạng thái", dataIndex: "isActive", key: "isActive" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
+  const { openFileDialog } = useFileImport();
+
+  const handleExportExcel = () => {
+    const dataToExport = filtered.map(item => ({
+      ...item,
+      isActive: item.isActive ? "Hoạt động" : "Khóa",
+      warehouseType: item.warehouseType === "NVL" ? "NVL" : item.warehouseType === "THANH_PHAM" ? "Thành phẩm" : "Hỗn hợp",
+      address: item.address || "-",
+    }));
+    exportToXlsx(dataToExport, "danh-sach-kho");
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log("Imported:", data);
+        alert("Tính năng đang phát triển");
+      },
+      (err) => console.error(err)
+    );
+  };
+
+
+
   const columnsAll: TableColumnsType<Warehouse> = [
     {
       title: "Mã kho",
@@ -232,25 +269,25 @@ export default function WarehousesPage() {
           refetchDataWithKeys: ["warehouses"],
           buttonEnds: can("admin.warehouses", "create")
             ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: () => {},
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: () => {},
-                  icon: <UploadOutlined />,
-                },
-              ]
+              {
+                type: "primary",
+                name: "Thêm",
+                onClick: handleCreate,
+                icon: <PlusOutlined />,
+              },
+              {
+                type: "default",
+                name: "Xuất Excel",
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: "default",
+                name: "Nhập Excel",
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : undefined,
           searchInput: {
             placeholder: "Tìm kiếm kho",
@@ -382,17 +419,17 @@ export default function WarehousesPage() {
           initialValues={
             selected
               ? {
-                  warehouseCode: selected.warehouseCode,
-                  warehouseName: selected.warehouseName,
-                  branchId: selected.branchId,
-                  address: selected.address,
-                  warehouseType: selected.warehouseType,
-                  isActive: selected.isActive,
-                }
+                warehouseCode: selected.warehouseCode,
+                warehouseName: selected.warehouseName,
+                branchId: selected.branchId,
+                address: selected.address,
+                warehouseType: selected.warehouseType,
+                isActive: selected.isActive,
+              }
               : {
-                  warehouseType: WarehouseType.THANH_PHAM,
-                  isActive: true,
-                }
+                warehouseType: WarehouseType.THANH_PHAM,
+                isActive: true,
+              }
           }
           branches={branches}
           onCancel={() => setModalOpen(false)}

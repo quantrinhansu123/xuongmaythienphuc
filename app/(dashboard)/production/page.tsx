@@ -36,9 +36,6 @@ export default function ProductionPage() {
     // Fetch branches for filter
     const { data: branches = [] } = useBranches();
 
-    // Export hook
-    const { exportToXlsx } = useFileExport([]);
-
     const { data, isLoading, isFetching } = useQuery({
         queryKey: [
             "production-orders",
@@ -97,34 +94,6 @@ export default function ProductionPage() {
             key: "orderDate",
             render: (date: string) => formatDate(date),
         },
-        // {
-        //     title: "Trạng thái",
-        //     dataIndex: "status",
-        //     key: "status",
-        //     render: (status: string) => {
-        //         let color = "default";
-        //         let text = status;
-        //         switch (status) {
-        //             case "PENDING":
-        //                 color = "orange";
-        //                 text = "Chờ xử lý";
-        //                 break;
-        //             case "IN_PROGRESS":
-        //                 color = "blue";
-        //                 text = "Đang sản xuất";
-        //                 break;
-        //             case "COMPLETED":
-        //                 color = "green";
-        //                 text = "Hoàn thành";
-        //                 break;
-        //             case "CANCELLED":
-        //                 color = "red";
-        //                 text = "Đã hủy";
-        //                 break;
-        //         }
-        //         return <Tag color={color}>{text}</Tag>;
-        //     },
-        // },
         {
             title: "Trạng thái",
             dataIndex: "status",
@@ -147,9 +116,34 @@ export default function ProductionPage() {
     const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
         useColumn({ defaultColumns });
 
+    const exportColumns = [
+        { title: "Mã đơn hàng", dataIndex: "orderCode", key: "orderCode" },
+        { title: "Khách hàng", dataIndex: "customerName", key: "customerName" },
+        { title: "Sản phẩm", dataIndex: "itemName", key: "itemName" },
+        { title: "Chi nhánh", dataIndex: "branchName", key: "branchName" },
+        { title: "Ngày đặt", dataIndex: "orderDate", key: "orderDate" },
+        { title: "Trạng thái", dataIndex: "status", key: "status" },
+        { title: "Ngày bắt đầu", dataIndex: "startDate", key: "startDate" },
+    ];
+
+    // Export hook
+    const { exportToXlsx } = useFileExport(exportColumns);
+
     const handleExportExcel = () => {
         if (data?.data) {
-            exportToXlsx(data.data, "don-san-xuat");
+            const statusMap: Record<string, string> = {
+                PENDING: "Chờ xử lý",
+                IN_PROGRESS: "Đang sản xuất",
+                COMPLETED: "Hoàn thành",
+                CANCELLED: "Đã hủy"
+            };
+            const dataToExport = data.data.map((item: any) => ({
+                ...item,
+                status: statusMap[item.status] || item.status,
+                orderDate: item.orderDate ? formatDate(item.orderDate) : '',
+                startDate: item.startDate ? formatDate(item.startDate) : ''
+            }));
+            exportToXlsx(dataToExport, "don-san-xuat");
         }
     };
 

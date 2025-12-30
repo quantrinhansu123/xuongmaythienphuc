@@ -26,6 +26,7 @@ interface PurchaseOrder {
   createdBy: string;
 }
 
+import { useFileExport } from '@/hooks/useFileExport';
 import { useRef } from 'react';
 import * as XLSX from 'xlsx';
 
@@ -390,23 +391,21 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const handleExportExcel = () => {
-    const dataToExport = filteredOrders.map(o => ({
-      'Mã đơn': o.poCode,
-      'Nhà cung cấp': o.supplierName,
-      'Ngày đặt': new Date(o.orderDate).toLocaleDateString('vi-VN'),
-      'Ngày dự kiến': o.expectedDate ? new Date(o.expectedDate).toLocaleDateString('vi-VN') : '',
-      'Tổng tiền': o.totalAmount,
-      'Đã thanh toán': o.paidAmount,
-      'Còn nợ': o.totalAmount - (o.paidAmount || 0),
-      'Trạng thái': o.status,
-      'Người tạo': o.createdBy
-    }));
+  const exportColumns: TableColumnsType<PurchaseOrder> = [
+    { title: 'Mã đơn', dataIndex: 'poCode', key: 'poCode' },
+    { title: 'Nhà cung cấp', dataIndex: 'supplierName', key: 'supplierName' },
+    { title: 'Ngày đặt', dataIndex: 'orderDate', key: 'orderDate' },
+    { title: 'Ngày dự kiến', dataIndex: 'expectedDate', key: 'expectedDate' },
+    { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount' },
+    { title: 'Đã thanh toán', dataIndex: 'paidAmount', key: 'paidAmount' },
+    { title: 'Trạng thái', dataIndex: 'status', key: 'status' },
+    { title: 'Người tạo', dataIndex: 'createdBy', key: 'createdBy' },
+  ];
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "DonDatHang");
-    XLSX.writeFile(wb, `DonDatHang_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const { exportToXlsx } = useFileExport(exportColumns);
+
+  const handleExportExcel = () => {
+    exportToXlsx(filteredOrders, 'DonDatHang');
   };
 
   const handleImportExcel = () => {

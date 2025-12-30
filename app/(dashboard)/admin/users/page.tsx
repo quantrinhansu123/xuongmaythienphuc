@@ -7,6 +7,8 @@ import UserFormModal, {
 } from "@/components/users/UserFormModal";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -131,6 +133,40 @@ export default function UsersPage() {
         { onSuccess: () => setModalVisible(false) }
       );
     }
+  };
+
+
+
+  // Export logic
+  const exportColumns = [
+    { title: "Mã", dataIndex: "userCode", key: "userCode" },
+    { title: "Họ tên", dataIndex: "fullName", key: "fullName" },
+    { title: "Tên đăng nhập", dataIndex: "username", key: "username" },
+    { title: "Phòng ban", dataIndex: "departmentName", key: "departmentName" },
+    { title: "Vai trò", dataIndex: "roleName", key: "roleName" },
+    { title: "Trạng thái", dataIndex: "isActive", key: "isActive" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
+  const { openFileDialog } = useFileImport();
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredUsers.map(item => ({
+      ...item,
+      isActive: item.isActive ? "Hoạt động" : "Khóa",
+      branches: item.branches?.map((b: any) => b.branchName).join(", ") || item.branchName || "-",
+    }));
+    exportToXlsx(dataToExport, "danh-sach-nhan-vien");
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log("Imported:", data);
+        alert("Tính năng đang phát triển");
+      },
+      (err) => console.error(err)
+    );
   };
 
   const columnsAll: TableColumnsType<User> = [
@@ -258,13 +294,13 @@ export default function UsersPage() {
               {
                 type: "default",
                 name: "Xuất Excel",
-                onClick: () => { },
+                onClick: handleExportExcel,
                 icon: <DownloadOutlined />,
               },
               {
                 type: "default",
                 name: "Nhập Excel",
-                onClick: () => { },
+                onClick: handleImportExcel,
                 icon: <UploadOutlined />,
               },
             ]

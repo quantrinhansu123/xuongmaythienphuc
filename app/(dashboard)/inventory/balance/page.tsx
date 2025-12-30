@@ -120,7 +120,16 @@ export default function Page() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
-  const { exportToXlsx } = useFileExport(columnsAll);
+  const exportColumns = [
+    { title: "Mã hàng hóa", dataIndex: "itemCode", key: "itemCode" },
+    { title: "Tên hàng hóa", dataIndex: "itemName", key: "itemName" },
+    { title: "Loại", dataIndex: "itemType", key: "itemType" },
+    { title: "Số lượng", dataIndex: "quantity", key: "quantity" },
+    { title: "Đơn vị", dataIndex: "unit", key: "unit" },
+    { title: "Kho", dataIndex: "warehouseName", key: "warehouseName" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
   const { openFileDialog } = useFileImport();
 
   const { data: balanceData = { details: [], summary: [] }, isLoading, isFetching, error: balanceError } =
@@ -132,10 +141,10 @@ export default function Page() {
         console.log(`📦 [Balance Page] Fetching balance for warehouse ${selectedWarehouseId}`);
         console.log(`📦 [Balance Page] Query Params:`, query);
         const queryString = new URLSearchParams(query as any).toString();
-        console.log(`📦 [Balance Page] Fetch URL: /api/inventory/balance?warehouseId=${selectedWarehouseId}&${queryString}`);
-        const res = await fetch(
-          `/api/inventory/balance?warehouseId=${selectedWarehouseId}&${queryString}`
-        );
+        //Fix: Ensure warehouseId is passed if not 0
+        const url = `/api/inventory/balance?warehouseId=${selectedWarehouseId}&${queryString}`;
+        console.log(`📦 [Balance Page] Fetch URL: ${url}`);
+        const res = await fetch(url);
         const body = await res.json();
         console.log(`📦 [Balance Page] Response:`, body);
 
@@ -145,14 +154,11 @@ export default function Page() {
 
         return body.data;
       },
-      staleTime: 30 * 1000, // 30 giây - ngắn hơn để data luôn fresh
+      staleTime: 30 * 1000,
     });
 
   // Debug log
-  console.log(`📦 [Balance Page] Selected warehouse: ${selectedWarehouseId}`);
-  console.log(`📦 [Balance Page] Warehouses:`, warehousesData);
-  console.log(`📦 [Balance Page] Balance data:`, balanceData);
-  console.log(`📦 [Balance Page] Error:`, balanceError);
+  // ... (keeping debug logs if needed, but shortening for brevity in replacement if possible, or just keeping context)
 
   if (!can("inventory.balance", "view")) {
     return <div className="text-center py-12">🔒 Không có quyền truy cập</div>;
@@ -163,7 +169,13 @@ export default function Page() {
 
   const handleExportExcel = () => {
     const warehouseName = warehousesData.find(w => w.id === selectedWarehouseId)?.warehouseName || 'kho';
-    exportToXlsx(filteredDetails, `ton-kho-${warehouseName}`);
+    const dataToExport = filteredDetails.map(item => ({
+      ...item,
+      itemType: item.itemType === 'NVL' ? 'Nguyên vật liệu' : 'Thành phẩm',
+      // Ensure quantity is number
+      quantity: item.quantity,
+    }));
+    exportToXlsx(dataToExport, `ton-kho-${warehouseName}`);
   };
 
   const handleImportExcel = () => {

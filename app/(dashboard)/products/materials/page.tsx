@@ -5,24 +5,26 @@ import TableActions from "@/components/TableActions";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { useBranches } from "@/hooks/useCommonQuery";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import {
-    DownloadOutlined,
-    PlusOutlined,
-    UploadOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    App,
-    Descriptions,
-    Form,
-    Input,
-    Modal,
-    Select,
-    Tag,
-    type TableColumnsType as AntdTableColumnsType,
+  App,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Tag,
+  type TableColumnsType as AntdTableColumnsType,
 } from "antd";
 import { useState } from "react";
 
@@ -251,9 +253,34 @@ export default function MaterialsPage() {
   // Apply client-side filtering
   const filteredMaterials = applyFilter(materials);
 
-  // Export handler (placeholder)
+  // Export handler
+  const exportColumns = [
+    { title: "Mã NVL", dataIndex: "materialCode", key: "materialCode" },
+    { title: "Tên nguyên vật liệu", dataIndex: "materialName", key: "materialName" },
+    { title: "Đơn vị", dataIndex: "unit", key: "unit" },
+    { title: "Mô tả", dataIndex: "description", key: "description" },
+    { title: "Chi nhánh", dataIndex: "branchName", key: "branchName" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
+  const { openFileDialog } = useFileImport();
+
   const handleExportExcel = () => {
-    // TODO: Implement export functionality
+    const dataToExport = filteredMaterials.map((item: any) => ({
+      ...item,
+      description: item.description || "-",
+    }));
+    exportToXlsx(dataToExport, "nguyen-vat-lieu");
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log("Imported:", data);
+        alert("Tính năng đang phát triển");
+      },
+      (err) => console.error(err)
+    );
   };
 
   const columns: AntdTableColumnsType<Material> = getVisibleColumns();
@@ -270,25 +297,25 @@ export default function MaterialsPage() {
           refetchDataWithKeys: ["materials"],
           buttonEnds: can("products.materials", "create")
             ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: handleExportExcel,
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: () => {},
-                  icon: <UploadOutlined />,
-                },
-              ]
+              {
+                type: "primary",
+                name: "Thêm",
+                onClick: handleCreate,
+                icon: <PlusOutlined />,
+              },
+              {
+                type: "default",
+                name: "Xuất Excel",
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: "default",
+                name: "Nhập Excel",
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : undefined,
           searchInput: {
             placeholder: "Tìm kiếm nguyên vật liệu",

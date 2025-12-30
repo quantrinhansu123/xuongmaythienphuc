@@ -2,23 +2,25 @@
 
 import BranchDetailDrawer from "@/components/branches/BranchDetailDrawer";
 import BranchFormModal, {
-    type BranchFormValues,
+  type BranchFormValues,
 } from "@/components/branches/BranchFormModal";
 import CommonTable from "@/components/CommonTable";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { BRANCH_KEYS, useBranches } from "@/hooks/useCommonQuery";
+import { useFileExport } from "@/hooks/useFileExport";
+import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Branch } from "@/services/commonService";
 import {
-    DeleteOutlined,
-    DownloadOutlined,
-    EditOutlined,
-    EyeOutlined,
-    MoreOutlined,
-    PlusOutlined,
-    UploadOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  EyeOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -107,6 +109,37 @@ export default function BranchesPage() {
     }
   };
 
+  // Export logic
+  const exportColumns = [
+    { title: "Mã", dataIndex: "branchCode", key: "branchCode" },
+    { title: "Tên chi nhánh", dataIndex: "branchName", key: "branchName" },
+    { title: "Địa chỉ", dataIndex: "address", key: "address" },
+    { title: "Điện thoại", dataIndex: "phone", key: "phone" },
+    { title: "Trạng thái", dataIndex: "isActive", key: "isActive" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
+  const { openFileDialog } = useFileImport();
+
+  const handleExportExcel = () => {
+    const dataToExport = filtered.map((item: any) => ({
+      ...item,
+      isActive: item.isActive ? "Hoạt động" : "Khóa",
+      address: item.address || "-",
+    }));
+    exportToXlsx(dataToExport, "danh-sach-chi-nhanh");
+  };
+
+  const handleImportExcel = () => {
+    openFileDialog(
+      (data) => {
+        console.log("Imported:", data);
+        alert("Tính năng đang phát triển");
+      },
+      (err) => console.error(err)
+    );
+  };
+
   const columnsAll: TableColumnsType<Branch> = [
     {
       title: "Mã",
@@ -182,7 +215,7 @@ export default function BranchesPage() {
 
   const confirmLoading = Boolean(
     (createMutation as unknown as { isPending?: boolean }).isPending ||
-      (updateMutation as unknown as { isPending?: boolean }).isPending
+    (updateMutation as unknown as { isPending?: boolean }).isPending
   );
 
   return (
@@ -194,25 +227,25 @@ export default function BranchesPage() {
           refetchDataWithKeys: BRANCH_KEYS.all,
           buttonEnds: can("admin.branches", "create")
             ? [
-                {
-                  type: "primary",
-                  name: "Thêm",
-                  onClick: handleCreate,
-                  icon: <PlusOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Xuất Excel",
-                  onClick: () => {},
-                  icon: <DownloadOutlined />,
-                },
-                {
-                  type: "default",
-                  name: "Nhập Excel",
-                  onClick: () => {},
-                  icon: <UploadOutlined />,
-                },
-              ]
+              {
+                type: "primary",
+                name: "Thêm",
+                onClick: handleCreate,
+                icon: <PlusOutlined />,
+              },
+              {
+                type: "default",
+                name: "Xuất Excel",
+                onClick: handleExportExcel,
+                icon: <DownloadOutlined />,
+              },
+              {
+                type: "default",
+                name: "Nhập Excel",
+                onClick: handleImportExcel,
+                icon: <UploadOutlined />,
+              },
+            ]
             : undefined,
           searchInput: {
             placeholder: "Tìm kiếm chi nhánh",

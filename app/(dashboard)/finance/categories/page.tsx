@@ -226,7 +226,16 @@ export default function FinancialCategoriesPage() {
   const { exportToXlsx } = useFileExport(exportColumns);
 
   const handleExportExcel = () => {
-    exportToXlsx(filteredCategories, 'danh-muc-tai-chinh');
+    const dataToExport = filteredCategories.map(item => ({
+      ...item,
+      type: item.type === 'THU' ? 'Thu' : 'Chi',
+      isActive: item.isActive ? 'Hoạt động' : 'Ngừng',
+      // Ensure amounts are numbers
+      totalIn: item.totalIn,
+      totalOut: item.totalOut,
+      balance: item.balance,
+    }));
+    exportToXlsx(dataToExport, 'danh-muc-tai-chinh');
   };
 
   const filteredCategories = applyFilter(categories);

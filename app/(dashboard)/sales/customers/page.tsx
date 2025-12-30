@@ -64,7 +64,16 @@ export default function CustomersPage() {
   const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
   // File export hook
-  const { exportToXlsx } = useFileExport([]);
+  const exportColumns = [
+    { title: "Mã KH", dataIndex: "customerCode", key: "customerCode" },
+    { title: "Tên khách hàng", dataIndex: "customerName", key: "customerName" },
+    { title: "Điện thoại", dataIndex: "phone", key: "phone" },
+    { title: "Địa chỉ", dataIndex: "address", key: "address" },
+    { title: "Nhóm KH", dataIndex: "groupName", key: "groupName" },
+    { title: "Công nợ", dataIndex: "debtAmount", key: "debtAmount" },
+    { title: "Trạng thái", dataIndex: "isActive", key: "isActive" },
+  ];
+  const { exportToXlsx } = useFileExport(exportColumns);
 
   // Event handlers
   const handleCreate = () => {
@@ -139,9 +148,15 @@ export default function CustomersPage() {
     }
   };
 
+
   const handleExportExcel = () => {
     const filteredData = applyFilter(customers);
-    exportToXlsx(filteredData, "khach_hang");
+    const dataToExport = filteredData.map(customer => ({
+      ...customer,
+      isActive: customer.isActive ? 'Hoạt động' : 'Ngừng',
+      debtAmount: customer.debtAmount || 0
+    }));
+    exportToXlsx(dataToExport, "khach_hang");
   };
 
   const handleImportExcel = () => {

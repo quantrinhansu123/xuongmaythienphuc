@@ -3,6 +3,7 @@
 import CommonTable from '@/components/CommonTable';
 import TableActions from '@/components/TableActions';
 import WrapperContent from '@/components/WrapperContent';
+import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
@@ -164,8 +165,26 @@ export default function SuppliersPage() {
     setSearchTerm('');
   };
 
+  const exportColumns = [
+    { title: 'Mã NCC', dataIndex: 'supplierCode', key: 'supplierCode' },
+    { title: 'Tên nhà cung cấp', dataIndex: 'supplierName', key: 'supplierName' },
+    { title: 'Điện thoại', dataIndex: 'phone', key: 'phone' },
+    { title: 'Email', dataIndex: 'email', key: 'email' },
+    { title: 'Địa chỉ', dataIndex: 'address', key: 'address' },
+    { title: 'Nhóm', dataIndex: 'groupName', key: 'groupName' },
+    { title: 'Công nợ', dataIndex: 'debtAmount', key: 'debtAmount' },
+    { title: 'Trạng thái', dataIndex: 'isActive', key: 'isActive' },
+  ];
+  const { exportToXlsx } = useFileExport(exportColumns);
+
   const handleExportExcel = () => {
-    alert('Chức năng xuất Excel đang được phát triển');
+    const dataToExport = filteredSuppliers.map(s => ({
+      ...s,
+      isActive: s.isActive ? 'Hoạt động' : 'Ngừng',
+      debtAmount: s.debtAmount || 0,
+      groupName: s.groupName || ''
+    }));
+    exportToXlsx(dataToExport, 'nha-cung-cap');
   };
 
   const handleImportExcel = () => {

@@ -247,7 +247,15 @@ export default function CashBooksPage() {
   const { exportToXlsx } = useFileExport(exportColumns);
 
   const handleExportExcel = () => {
-    exportToXlsx(filteredCashbooks, 'so-quy');
+    const dataToExport = filteredCashbooks.map(cb => ({
+      ...cb,
+      transactionDate: new Date(cb.transactionDate).toLocaleDateString('vi-VN'),
+      paymentMethod: cb.paymentMethod === 'CASH' ? 'Tiền mặt' :
+        cb.paymentMethod === 'BANK' ? 'Chuyển khoản' : 'Khác',
+      // Ensure amount is number
+      amount: cb.amount,
+    }));
+    exportToXlsx(dataToExport, 'so-quy');
   };
 
   const filteredCashbooks = cashbooks.filter(cb => {

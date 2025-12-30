@@ -297,13 +297,36 @@ export default function Page() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
-  const { exportToXlsx } = useFileExport(columnsAll);
+  const exportColumns = [
+    { title: "Mã phiếu", dataIndex: "transactionCode", key: "transactionCode" },
+    { title: "Kho xuất", dataIndex: "fromWarehouseName", key: "fromWarehouseName" },
+    { title: "Kho nhập", dataIndex: "toWarehouseName", key: "toWarehouseName" },
+    { title: "Trạng thái", dataIndex: "status", key: "status" },
+    { title: "Tổng tiền", dataIndex: "totalAmount", key: "totalAmount" },
+    { title: "Người tạo", dataIndex: "createdByName", key: "createdByName" },
+    { title: "Ngày tạo", dataIndex: "createdAt", key: "createdAt" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
   const { openFileDialog } = useFileImport();
 
   const filtered = applyFilter<TransferTransaction>(transfers);
 
   const handleExportExcel = () => {
-    exportToXlsx(filtered, 'phieu-luan-chuyen-kho');
+    const statusLabels: Record<string, string> = {
+      PENDING: "Chờ duyệt",
+      APPROVED: "Đã duyệt",
+      COMPLETED: "Hoàn thành",
+    };
+
+    const dataToExport = filtered.map(item => ({
+      ...item,
+      status: statusLabels[item.status] || item.status,
+      createdAt: new Date(item.createdAt).toLocaleString("vi-VN"),
+      // Ensure number
+      totalAmount: item.totalAmount,
+    }));
+    exportToXlsx(dataToExport, 'phieu-luan-chuyen-kho');
   };
 
   const handleImportExcel = () => {

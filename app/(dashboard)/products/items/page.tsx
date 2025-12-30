@@ -529,12 +529,29 @@ export default function ItemsPage() {
     useColumn({ defaultColumns });
 
   // Initialize file export hook
-  const { exportToXlsx } = useFileExport(getVisibleColumns());
+  // Define export columns explicitly
+  const exportColumns = [
+    { title: "Mã hàng", dataIndex: "itemCode", key: "itemCode" },
+    { title: "Tên hàng hoá", dataIndex: "itemName", key: "itemName" },
+    { title: "Danh mục", dataIndex: "categoryName", key: "categoryName" },
+    { title: "Loại", dataIndex: "itemType", key: "itemType" },
+    { title: "ĐVT", dataIndex: "unit", key: "unit" },
+    { title: "Giá bán", dataIndex: "costPrice", key: "costPrice" },
+    { title: "Có thể bán", dataIndex: "isSellable", key: "isSellable" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
   const { openFileDialog } = useFileImport();
 
   // Handle export to Excel
   const handleExportExcel = () => {
-    exportToXlsx(filteredItems, "items");
+    const dataToExport = filteredItems.map(item => ({
+      ...item,
+      itemType: item.itemType === 'PRODUCT' ? 'Sản phẩm' : 'Nguyên vật liệu',
+      isSellable: item.isSellable ? 'Có' : 'Không',
+      categoryName: item.categoryName || ''
+    }));
+    exportToXlsx(dataToExport, "hang-hoa");
   };
 
   // Handle import from Excel

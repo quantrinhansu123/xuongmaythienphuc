@@ -211,11 +211,22 @@ export default function CategoriesPage() {
     useColumn({ defaultColumns });
 
   // Initialize file export hook
-  const { exportToXlsx } = useFileExport(getVisibleColumns());
+  const exportColumns = [
+    { title: "Mã danh mục", dataIndex: "categoryCode", key: "categoryCode" },
+    { title: "Tên danh mục", dataIndex: "categoryName", key: "categoryName" },
+    { title: "Cấp độ", dataIndex: "parentName", key: "parentName" },
+    { title: "Mô tả", dataIndex: "description", key: "description" },
+  ];
+  const { exportToXlsx } = useFileExport(exportColumns);
 
   // Handle export to Excel
   const handleExportExcel = () => {
-    exportToXlsx(filteredCategories, "categories");
+    const dataToExport = filteredCategories.map((item: any) => ({
+      ...item,
+      parentName: item.parentName || "-",
+      description: item.description || "-",
+    }));
+    exportToXlsx(dataToExport, "danh-muc-san-pham");
   };
 
   return (

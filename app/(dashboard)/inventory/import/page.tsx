@@ -311,13 +311,37 @@ export default function Page() {
   const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
     useColumn({ defaultColumns: columnsAll });
 
-  const { exportToXlsx } = useFileExport(columnsAll);
+  // Define export columns explicitly
+  const exportColumns = [
+    { title: "Mã phiếu", dataIndex: "transactionCode", key: "transactionCode" },
+    { title: "Đơn hàng", dataIndex: "relatedOrderCode", key: "relatedOrderCode" },
+    { title: "Khách hàng", dataIndex: "relatedCustomerName", key: "relatedCustomerName" },
+    { title: "Kho nhập", dataIndex: "toWarehouseName", key: "toWarehouseName" },
+    { title: "Trạng thái", dataIndex: "status", key: "status" },
+    { title: "Người tạo", dataIndex: "createdByName", key: "createdByName" },
+    { title: "Ngày tạo", dataIndex: "createdAt", key: "createdAt" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
   const { openFileDialog } = useFileImport();
 
   const filtered = applyFilter<ImportTransaction>(imports, ['startDate', 'endDate']);
 
   const handleExportExcel = () => {
-    exportToXlsx(filtered, 'phieu-nhap-kho');
+    const statusLabels: Record<string, string> = {
+      PENDING: "Chờ duyệt",
+      APPROVED: "Đã duyệt",
+      COMPLETED: "Hoàn thành",
+    };
+
+    const dataToExport = filtered.map(item => ({
+      ...item,
+      status: statusLabels[item.status] || item.status,
+      createdAt: new Date(item.createdAt).toLocaleString("vi-VN"),
+      relatedOrderCode: item.relatedOrderCode || '',
+      relatedCustomerName: item.relatedCustomerName || '',
+    }));
+    exportToXlsx(dataToExport, 'phieu-nhap-kho');
   };
 
   const handleImportExcel = () => {

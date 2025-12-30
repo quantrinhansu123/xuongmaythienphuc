@@ -2369,10 +2369,36 @@ export default function OrdersPage() {
   // Apply client-side filtering
   const filteredOrders = applyFilter(orders as Order[]);
 
-  const { exportToXlsx } = useFileExport(getVisibleColumns());
+  // Define export columns explicitly for better control over formatting
+  const exportColumns: TableColumnsType<Order> = [
+    { title: "Mã đơn", dataIndex: "orderCode", key: "orderCode" },
+    { title: "Khách hàng", dataIndex: "customerName", key: "customerName" },
+    { title: "Chi nhánh", dataIndex: "branchName", key: "branchName" },
+    { title: "Ngày đặt", dataIndex: "orderDate", key: "orderDate" },
+    { title: "Số lượng SP", dataIndex: "itemCount", key: "itemCount" },
+    { title: "Tổng tiền", dataIndex: "finalAmount", key: "finalAmount" },
+    { title: "Đã thanh toán", dataIndex: "paidAmount", key: "paidAmount" },
+    { title: "Còn lại", dataIndex: "remainingAmount", key: "remainingAmount" },
+    { title: "Trạng thái", dataIndex: "status", key: "status" },
+    { title: "Trạng thái TT", dataIndex: "paymentStatus", key: "paymentStatus" },
+    { title: "Người tạo", dataIndex: "createdBy", key: "createdBy" },
+  ];
+
+  const { exportToXlsx } = useFileExport(exportColumns);
 
   const handleExportExcel = () => {
-    exportToXlsx(filteredOrders, "don-hang");
+    // Transform data for export (format dates, translate status, etc.)
+    const dataToExport = filteredOrders.map(order => ({
+      ...order,
+      orderDate: new Date(order.orderDate).toLocaleDateString('vi-VN'),
+      finalAmount: order.finalAmount, // Keep number for Excel calculation
+      paidAmount: order.paidAmount,
+      remainingAmount: order.finalAmount - (order.depositAmount || 0) - (order.paidAmount || 0),
+      status: getStatusText(order.status),
+      paymentStatus: order.paymentStatus === 'PAID' ? 'Đã thanh toán' :
+        order.paymentStatus === 'PARTIAL' ? 'Thanh toán một phần' : 'Chưa thanh toán'
+    }));
+    exportToXlsx(dataToExport, "don-hang-ban");
   };
 
   const handleImportExcel = () => {
@@ -2394,6 +2420,7 @@ export default function OrdersPage() {
         isNotAccessible={!can("sales.orders", "view")}
         isLoading={permLoading || isLoading}
         header={{
+
           searchInput: {
             placeholder: "Tìm theo mã đơn, khách hàng...",
             filterKeys: ["orderCode", "customerName"],
@@ -2494,41 +2521,36 @@ export default function OrdersPage() {
               />
             </>
           ),
-          buttonEnds: can("sales.orders", "create")
-            ? [
-              {
-                type: "default",
-                name: "Đặt lại",
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
-              {
-                type: "primary",
-                name: "Thêm",
-                onClick: handleCreateOrder,
-                icon: <PlusOutlined />,
-              },
-              {
-                type: "default",
-                name: "Xuất Excel",
-                onClick: handleExportExcel,
-                icon: <DownloadOutlined />,
-              },
-              {
-                type: "default",
-                name: "Nhập Excel",
-                onClick: handleImportExcel,
-                icon: <UploadOutlined />,
-              },
-            ]
-            : [
-              {
-                type: "default",
-                name: "Đặt lại",
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
-            ],
+          buttonEnds: [
+            {
+              type: "default",
+              name: "Đặt lại",
+              onClick: handleResetAll,
+              icon: <ReloadOutlined />,
+              can: true,
+            },
+            {
+              type: "primary",
+              name: "Thêm đơn hàng",
+              onClick: handleCreateOrder,
+              icon: <PlusOutlined />,
+              can: can("sales.orders", "create"),
+            },
+            {
+              type: "default",
+              name: "Xuất Excel",
+              onClick: handleExportExcel,
+              icon: <DownloadOutlined />,
+              can: true,
+            },
+            {
+              type: "default",
+              name: "Nhập Excel",
+              onClick: handleImportExcel,
+              icon: <UploadOutlined />,
+              can: can("sales.orders", "create"),
+            },
+          ],
           columnSettings: {
             columns: columnsCheck,
             onChange: updateColumns,

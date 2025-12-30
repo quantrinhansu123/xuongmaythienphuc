@@ -182,7 +182,13 @@ export default function BankAccountsPage() {
   const { exportToXlsx } = useFileExport(exportColumns);
 
   const handleExportExcel = () => {
-    exportToXlsx(filteredAccounts, 'tai-khoan');
+    const dataToExport = filteredAccounts.map(acc => ({
+      ...acc,
+      accountType: acc.accountType === 'CASH' ? 'Tiền mặt' : 'Ngân hàng',
+      isActive: acc.isActive ? 'Hoạt động' : 'Ngừng',
+      bankName: acc.accountType === 'CASH' ? '-' : acc.bankName
+    }));
+    exportToXlsx(dataToExport, 'tai-khoan');
   };
 
   const filteredAccounts = applyFilter(accounts);

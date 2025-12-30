@@ -455,38 +455,32 @@ export default function DebtsPage() {
         isNotAccessible={!can("finance.debts", "view")}
         isLoading={loading}
         header={{
-          buttonEnds: can("finance.debts", "create")
-            ? [
-              {
-                type: "default",
-                name: "Đặt lại",
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
+          buttonEnds: [
+            {
+              type: "default",
+              name: "Đặt lại",
+              onClick: handleResetAll,
+              icon: <ReloadOutlined />,
+              can: true,
+            },
+            {
+              type: "primary",
+              name: "Thêm",
+              onClick: () => {
+                resetForm();
+                setShowModal(true);
               },
-              {
-                type: "primary",
-                name: "Thêm",
-                onClick: () => {
-                  resetForm();
-                  setShowModal(true);
-                },
-                icon: <PlusOutlined />,
-              },
-              {
-                type: "default",
-                name: "Xuất Excel",
-                onClick: handleExportExcel,
-                icon: <DownloadOutlined />,
-              },
-            ]
-            : [
-              {
-                type: "default",
-                name: "Đặt lại",
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
-            ],
+              icon: <PlusOutlined />,
+              can: can("finance.debts", "create"),
+            },
+            {
+              type: "default",
+              name: "Xuất Excel",
+              onClick: handleExportExcel,
+              icon: <DownloadOutlined />,
+              can: true, // or can("finance.debts", "view") but usually page access implies view
+            },
+          ],
           searchInput: {
             placeholder:
               activeTab === "customers"
