@@ -1,9 +1,10 @@
 'use client';
 
+import CommonTable from '@/components/CommonTable';
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Button, Descriptions, Drawer, Tag } from 'antd';
+import { Button, Descriptions, Drawer, TableColumnsType, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 interface SupplierGroup {
@@ -31,6 +32,7 @@ export default function SupplierGroupsPage() {
     const [detailGroup, setDetailGroup] = useState<SupplierGroup | null>(null);
     const [suppliersInGroup, setSuppliersInGroup] = useState<Supplier[]>([]);
     const [suppliersLoading, setSuppliersLoading] = useState(false);
+    const [pagination, setPagination] = useState({ current: 1, limit: 20 });
     const [formData, setFormData] = useState({
         groupCode: '',
         groupName: '',
@@ -144,6 +146,38 @@ export default function SupplierGroupsPage() {
         }
     };
 
+    const columns: TableColumnsType<SupplierGroup> = [
+        {
+            title: 'Mã nhóm',
+            dataIndex: 'groupCode',
+            key: 'groupCode',
+            width: 150,
+            render: (code: string) => <span className="font-mono">{code}</span>,
+        },
+        {
+            title: 'Tên nhóm',
+            dataIndex: 'groupName',
+            key: 'groupName',
+            width: 200,
+            render: (name: string) => <span className="font-medium">{name}</span>,
+        },
+        {
+            title: 'Mô tả',
+            dataIndex: 'description',
+            key: 'description',
+            width: 250,
+            render: (desc: string) => desc || '-',
+        },
+        {
+            title: 'Số NCC',
+            dataIndex: 'supplierCount',
+            key: 'supplierCount',
+            width: 120,
+            align: 'center' as const,
+            render: (count: number) => <Tag color="blue">{count || 0}</Tag>,
+        },
+    ];
+
     return (
         <>
             <WrapperContent<SupplierGroup>
@@ -173,41 +207,28 @@ export default function SupplierGroupsPage() {
                     },
                 }}
             >
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    {groups.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
-                            <div className="text-6xl mb-2">📊</div>
-                            <div>Chưa có nhóm nhà cung cấp</div>
-                        </div>
-                    ) : (
-                        <table className="w-full">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã nhóm</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên nhóm</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mô tả</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Số NCC</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {groups.map((group) => (
-                                    <tr
-                                        key={group.id}
-                                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                                        onClick={() => handleViewDetail(group)}
-                                    >
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{group.groupCode}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{group.groupName}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{group.description || '-'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                            <Tag color="blue">{group.supplierCount || 0}</Tag>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                {groups.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
+                        <div className="text-6xl mb-2">📊</div>
+                        <div>Chưa có nhóm nhà cung cấp</div>
+                    </div>
+                ) : (
+                    <CommonTable
+                        columns={columns}
+                        dataSource={groups}
+                        loading={loading}
+                        onRowClick={(record: SupplierGroup) => handleViewDetail(record)}
+                        paging={true}
+                        pagination={{
+                            current: pagination.current,
+                            limit: pagination.limit,
+                            onChange: (page, pageSize) => {
+                                setPagination({ current: page, limit: pageSize || 20 });
+                            },
+                        }}
+                        total={groups.length}
+                    />
+                )}
             </WrapperContent>
 
             {/* Detail Drawer */}

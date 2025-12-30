@@ -1,11 +1,12 @@
 "use client";
 
+import CommonTable from "@/components/CommonTable";
 import PartnerDebtSidePanel from "@/components/PartnerDebtSidePanel";
 import WrapperContent from "@/components/WrapperContent";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency } from "@/utils/format";
 import { CalendarOutlined, DownloadOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
-import { DatePicker, Select } from "antd";
+import { DatePicker, Select, TableColumnsType } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import * as XLSX from 'xlsx';
@@ -65,6 +66,7 @@ export default function SupplierDebtsPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [pagination, setPagination] = useState({ current: 1, limit: 20 });
 
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
 
@@ -163,6 +165,78 @@ export default function SupplierDebtsPage() {
     (sum, s) => sum + parseFloat(s.remainingAmount?.toString() || "0"),
     0
   );
+
+  const columns: TableColumnsType<SupplierSummary> = [
+    {
+      title: 'Mã NCC',
+      dataIndex: 'supplierCode',
+      key: 'supplierCode',
+      width: 120,
+      render: (code: string) => <span className="font-medium">{code}</span>,
+    },
+    {
+      title: 'Nhà cung cấp',
+      dataIndex: 'supplierName',
+      key: 'supplierName',
+      width: 200,
+      render: (name: string) => <div className="font-medium">{name}</div>,
+    },
+    {
+      title: 'Liên hệ',
+      key: 'contact',
+      width: 180,
+      render: (_: any, record: SupplierSummary) => (
+        <div className="text-gray-600">
+          <div>📞 {record.phone}</div>
+          {record.email && <div className="text-xs">✉️ {record.email}</div>}
+        </div>
+      ),
+    },
+    {
+      title: 'Số ĐM',
+      key: 'orders',
+      width: 120,
+      align: 'center' as const,
+      render: (_: any, record: SupplierSummary) => (
+        <div>
+          <div>{record.totalOrders} đơn</div>
+          {record.unpaidOrders > 0 && (
+            <div className="text-xs text-orange-600">
+              {record.unpaidOrders} chưa TT
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'Tổng tiền',
+      dataIndex: 'totalAmount',
+      key: 'totalAmount',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: 'Đã trả',
+      dataIndex: 'paidAmount',
+      key: 'paidAmount',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => (
+        <span className="text-green-600">{formatCurrency(amount)}</span>
+      ),
+    },
+    {
+      title: 'Còn nợ',
+      dataIndex: 'remainingAmount',
+      key: 'remainingAmount',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => (
+        <span className="font-medium text-orange-700">{formatCurrency(amount)}</span>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -301,93 +375,27 @@ export default function SupplierDebtsPage() {
               </div>
 
               {/* Supplier Summary Table */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Mã NCC
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Nhà cung cấp
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Liên hệ
-                      </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                        Số ĐM
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Tổng tiền
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Đã trả
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Còn nợ
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Thao tác
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredSupplierSummaries.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={8}
-                          className="px-6 py-8 text-center text-gray-500"
-                        >
-                          Không có nhà cung cấp nào có đơn mua
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredSupplierSummaries.map((supplier) => (
-                        <tr
-                          key={supplier.id}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => handleViewPartnerDetails(supplier)}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            {supplier.supplierCode}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="font-medium">
-                              {supplier.supplierName}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            <div>📞 {supplier.phone}</div>
-                            {supplier.email && (
-                              <div className="text-xs">✉️ {supplier.email}</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                            <div>{supplier.totalOrders} đơn</div>
-                            {supplier.unpaidOrders > 0 && (
-                              <div className="text-xs text-orange-600">
-                                {supplier.unpaidOrders} chưa TT
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            {formatCurrency(supplier.totalAmount)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                            {formatCurrency(supplier.paidAmount)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-orange-700">
-                            {formatCurrency(supplier.remainingAmount)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            {/* Removed button - click on row instead */}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {filteredSupplierSummaries.length === 0 ? (
+                <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+                  Không có nhà cung cấp nào có đơn mua
+                </div>
+              ) : (
+                <CommonTable
+                  columns={columns}
+                  dataSource={filteredSupplierSummaries}
+                  loading={loading}
+                  onRowClick={(record: SupplierSummary) => handleViewPartnerDetails(record)}
+                  paging={true}
+                  pagination={{
+                    current: pagination.current,
+                    limit: pagination.limit,
+                    onChange: (page, pageSize) => {
+                      setPagination({ current: page, limit: pageSize || 20 });
+                    },
+                  }}
+                  total={filteredSupplierSummaries.length}
+                />
+              )}
             </div>
           </div>
 

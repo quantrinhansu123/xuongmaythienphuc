@@ -1,12 +1,13 @@
 'use client';
 
 import CategorySidePanel from '@/components/CategorySidePanel';
+import CommonTable from '@/components/CommonTable';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
 import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Select } from 'antd';
+import { Select, TableColumnsType, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 interface FinancialCategory {
@@ -51,6 +52,7 @@ export default function FinancialCategoriesPage() {
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [pagination, setPagination] = useState({ current: 1, limit: 20 });
 
   const [formData, setFormData] = useState({
     categoryCode: '',
@@ -241,6 +243,83 @@ export default function FinancialCategoriesPage() {
     return matchSearch && matchType && matchStatus;
   });
 
+  const columns: TableColumnsType<FinancialCategory> = [
+    {
+      title: 'Mã',
+      dataIndex: 'categoryCode',
+      key: 'categoryCode',
+      width: 120,
+    },
+    {
+      title: 'Tên sổ quỹ',
+      key: 'categoryName',
+      width: 200,
+      render: (_, record) => (
+        <div>
+          <div>{record.categoryName}</div>
+          <div className="text-xs text-gray-500">{record.description}</div>
+        </div>
+      ),
+    },
+    {
+      title: 'TK Liên kết',
+      key: 'bankAccount',
+      width: 180,
+      render: (_, record) => {
+        if (record.bankName) {
+          return (
+            <div className="text-blue-600">
+              <div className="font-medium">{record.bankName}</div>
+              <div className="text-xs">{record.bankAccountNumber}</div>
+            </div>
+          );
+        }
+        return <span className="text-gray-400 text-xs">-</span>;
+      },
+    },
+    {
+      title: 'Tổng thu',
+      dataIndex: 'totalIn',
+      key: 'totalIn',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => (
+        <span className="text-green-600 font-medium">{formatCurrency(amount)}</span>
+      ),
+    },
+    {
+      title: 'Tổng chi',
+      dataIndex: 'totalOut',
+      key: 'totalOut',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => (
+        <span className="text-red-600 font-medium">{formatCurrency(amount)}</span>
+      ),
+    },
+    {
+      title: 'Số dư',
+      dataIndex: 'balance',
+      key: 'balance',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => (
+        <span className="font-bold text-blue-600">{formatCurrency(amount)}</span>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 120,
+      render: (isActive: boolean) => (
+        <Tag color={isActive ? 'green' : 'default'}>
+          {isActive ? 'Hoạt động' : 'Ngừng'}
+        </Tag>
+      ),
+    },
+  ];
+
   return (
     <>
       <WrapperContent<FinancialCategory>
@@ -336,61 +415,21 @@ export default function FinancialCategoriesPage() {
           ),
         }}
       >
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên sổ quỹ</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">TK Liên kết</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng thu</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng chi</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredCategories.map((category) => (
-                <tr
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category)}
-                  className="hover:bg-gray-50 cursor-pointer"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{category.categoryCode}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div>{category.categoryName}</div>
-                    <div className="text-xs text-gray-500">{category.description}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                    {category.bankName ? (
-                      <div>
-                        <div className="font-medium">{category.bankName}</div>
-                        <div className="text-xs">{category.bankAccountNumber}</div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-xs">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-medium">
-                    {formatCurrency(category.totalIn)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600 font-medium">
-                    {formatCurrency(category.totalOut)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
-                    {formatCurrency(category.balance)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded text-xs ${category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                      {category.isActive ? 'Hoạt động' : 'Ngừng'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CommonTable
+          columns={columns}
+          dataSource={filteredCategories}
+          loading={loading}
+          onRowClick={(record: FinancialCategory) => setSelectedCategory(record)}
+          paging={true}
+          pagination={{
+            current: pagination.current,
+            limit: pagination.limit,
+            onChange: (page, pageSize) => {
+              setPagination({ current: page, limit: pageSize || 20 });
+            },
+          }}
+          total={filteredCategories.length}
+        />
       </WrapperContent>
 
       {/* Modal */}

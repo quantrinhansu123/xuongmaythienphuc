@@ -1,9 +1,10 @@
 import { IPagination } from "@/hooks/useFilter";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PropRowDetails } from "@/types/table";
+import { DeleteOutlined } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
-import { Drawer, Pagination, Table } from "antd";
-import { useState } from "react";
+import { App, Button, Drawer, Pagination, Table } from "antd";
+import { useRef, useState } from "react";
 
 interface ICommonTableProps<T> {
   sortable?: boolean;
@@ -22,6 +23,11 @@ interface ICommonTableProps<T> {
     selectedRowKeys: React.Key[];
     onChange: (keys: React.Key[]) => void;
   };
+  onBulkDelete?: (ids: React.Key[]) => Promise<void>;
+  bulkDeleteConfig?: {
+    confirmTitle?: string;
+    confirmMessage?: string;
+  };
 }
 
 const CommonTable = <T extends object>({
@@ -36,23 +42,34 @@ const CommonTable = <T extends object>({
   pagination,
   onRowClick,
   rowSelection,
+  onBulkDelete,
+  bulkDeleteConfig,
 }: ICommonTableProps<T>) => {
   const isMobile = useIsMobile();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const { modal } = App.useApp();
 
   const dataLength = total || dataSource?.length || 0;
 
   const handlePageChange = (page: number, pageSize?: number) => {
     pagination?.onChange(page, pageSize);
+    // Cuộn lên đầu bảng khi chuyển trang
+    setTimeout(() => {
+      if (tableContainerRef.current) {
+        const tableTop = tableContainerRef.current.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top: tableTop, behavior: 'smooth' });
+      }
+    }, 50);
   };
 
   // Slice data for pagination when using client-side pagination
   const paginatedData =
     paging && pagination && dataSource
       ? dataSource.slice(
-          (pagination.current - 1) * pagination.limit,
-          pagination.current * pagination.limit
-        )
+        (pagination.current - 1) * pagination.limit,
+        pagination.current * pagination.limit
+      )
       : dataSource;
 
   const onClickRow = (record: T) => {
@@ -121,31 +138,56 @@ const CommonTable = <T extends object>({
   });
   const footerProps = {
     scroll: {
-      x: "horizontal",
-      y: "calc(100vh - 300px)", // Adjust based on your header/footer height
+      x: "100%",
     },
     footer: () => (
-      <div className="flex justify-end w-full sticky bottom-0 z-10">
-        {paging && pagination && (
-          <Pagination
-            onChange={handlePageChange}
-            pageSize={pagination.limit}
-            total={total ?? dataSource?.length ?? 0}
-            showSizeChanger
-            onShowSizeChange={(_, size) =>
-              pagination.onChange(pagination.current, size)
-            }
-            current={pagination.current}
-            showTotal={(total) => `Tổng ${total} bản ghi`}
-          />
-        )}
+      <div className="flex justify-between items-center w-full sticky bottom-0 z-10 bg-white py-2">
+        <div>
+          {onBulkDelete && rowSelection && rowSelection.selectedRowKeys.length > 0 && (
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => {
+                const count = rowSelection.selectedRowKeys.length;
+                modal.confirm({
+                  title: bulkDeleteConfig?.confirmTitle || 'Xác nhận xóa',
+                  content: (bulkDeleteConfig?.confirmMessage || 'Bạn có chắc muốn xóa {count} mục đã chọn?').replace('{count}', String(count)),
+                  okText: 'Xóa',
+                  okType: 'danger',
+                  cancelText: 'Hủy',
+                  onOk: async () => {
+                    await onBulkDelete(rowSelection.selectedRowKeys);
+                    rowSelection.onChange([]);
+                  },
+                });
+              }}
+            >
+              Xóa {rowSelection.selectedRowKeys.length} mục
+            </Button>
+          )}
+        </div>
+        <div>
+          {paging && pagination && (
+            <Pagination
+              onChange={handlePageChange}
+              pageSize={pagination.limit}
+              total={total ?? dataSource?.length ?? 0}
+              showSizeChanger
+              onShowSizeChange={(_, size) =>
+                pagination.onChange(pagination.current, size)
+              }
+              current={pagination.current}
+              showTotal={(total) => `Tổng ${total} bản ghi`}
+            />
+          )}
+        </div>
       </div>
     ),
   };
 
   return (
     <>
-      <div className="relative">
+      <div ref={tableContainerRef} className="relative">
         <Table<T>
           {...(paging ? footerProps : {})}
           rowKey="id"
@@ -160,6 +202,7 @@ const CommonTable = <T extends object>({
             selectedRowKeys: rowSelection.selectedRowKeys,
             onChange: rowSelection.onChange,
           } : undefined}
+          sticky={true}
         />
       </div>
 

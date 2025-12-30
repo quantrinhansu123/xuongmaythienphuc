@@ -462,11 +462,9 @@ export default function DashboardLayout({
 
         <Content
           style={{
-            margin: "10px",
-            padding: 20,
+            padding: "20px 16px 0 16px",
             background: token.colorBgContainer,
             minHeight: 280,
-            borderRadius: token.borderRadius,
           }}
         >
           <FastPageTransition>{children}</FastPageTransition>

@@ -1,12 +1,14 @@
 'use client';
 
 import CashbookSidePanel from '@/components/CashbookSidePanel';
+import CommonTable from '@/components/CommonTable';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
 import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatCurrency } from '@/utils/format';
 import { CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { DatePicker, Select } from 'antd';
+import { App, DatePicker, Select, TableColumnsType, Tag } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 
@@ -61,6 +63,7 @@ interface BankAccount {
 
 export default function CashBooksPage() {
   const { can } = usePermissions();
+  const { message } = App.useApp();
   const [cashbooks, setCashbooks] = useState<CashBook[]>([]);
   const [categories, setCategories] = useState<FinancialCategory[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -79,6 +82,7 @@ export default function CashBooksPage() {
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<'ALL' | 'CASH' | 'BANK' | 'TRANSFER'>('ALL');
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
   const [formData, setFormData] = useState({
     transactionCode: '',
@@ -266,6 +270,91 @@ export default function CashBooksPage() {
     return matchSearch && matchType && matchMethod && matchBankAccount;
   });
 
+  const handleBulkDelete = async (ids: React.Key[]) => {
+    try {
+      for (const id of ids) {
+        const res = await fetch(`/api/finance/cashbooks/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      }
+      message.success(`Đã xóa ${ids.length} phiếu thu/chi`);
+      fetchCashbooks();
+    } catch (error: any) {
+      message.error(error.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const columns: TableColumnsType<CashBook> = [
+    {
+      title: 'Mã GD',
+      dataIndex: 'transactionCode',
+      key: 'transactionCode',
+      width: 120,
+    },
+    {
+      title: 'Ngày',
+      dataIndex: 'transactionDate',
+      key: 'transactionDate',
+      width: 120,
+      render: (date: string) => new Date(date).toLocaleDateString('vi-VN'),
+    },
+    {
+      title: 'Sổ quỹ',
+      dataIndex: 'categoryName',
+      key: 'categoryName',
+      width: 150,
+    },
+    {
+      title: 'Loại',
+      dataIndex: 'transactionType',
+      key: 'transactionType',
+      width: 100,
+      render: (type: string) => (
+        <Tag color={type === 'THU' ? 'green' : 'red'}>{type}</Tag>
+      ),
+    },
+    {
+      title: 'Số tiền',
+      dataIndex: 'amount',
+      key: 'amount',
+      width: 150,
+      align: 'right' as const,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: 'Tài khoản',
+      key: 'account',
+      width: 150,
+      render: (_, record: CashBook) => {
+        if (record.paymentMethod === 'CASH') {
+          return <Tag>Tiền mặt</Tag>;
+        }
+        if (record.bankAccountNumber) {
+          return (
+            <div>
+              <div className="font-medium text-blue-600">{record.bankName}</div>
+              <div className="text-xs text-gray-500">...{record.bankAccountNumber.slice(-4)}</div>
+            </div>
+          );
+        }
+        return '-';
+      },
+    },
+    {
+      title: 'Chi nhánh',
+      dataIndex: 'branchName',
+      key: 'branchName',
+      width: 120,
+      render: (name: string) => name || '-',
+    },
+    {
+      title: 'Mô tả',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+    },
+  ];
+
   const totalThu = filteredCashbooks
     .filter(cb => cb.transactionType === 'THU')
     .reduce((sum, cb) => sum + parseFloat(cb.amount.toString()), 0);
@@ -428,60 +517,21 @@ export default function CashBooksPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã GD</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sổ quỹ</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tài khoản</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredCashbooks.map((cb) => (
-                  <tr
-                    key={cb.id}
-                    onClick={() => setSelectedCashbook(cb)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{cb.transactionCode}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(cb.transactionDate).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{cb.categoryName}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 py-1 rounded text-xs ${cb.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                        {cb.transactionType}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                      {parseFloat(cb.amount.toString()).toLocaleString('vi-VN')} đ
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {cb.paymentMethod === 'CASH' ? (
-                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">Tiền mặt</span>
-                      ) : cb.bankAccountNumber ? (
-                        <div>
-                          <div className="font-medium text-blue-600">{cb.bankName}</div>
-                          <div className="text-xs text-gray-500">...{cb.bankAccountNumber.slice(-4)}</div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{cb.branchName || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{cb.description}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CommonTable
+            columns={columns}
+            dataSource={filteredCashbooks}
+            loading={loading}
+            onRowClick={(record: CashBook) => setSelectedCashbook(record)}
+            rowSelection={{
+              selectedRowKeys: selectedIds,
+              onChange: setSelectedIds,
+            }}
+            onBulkDelete={handleBulkDelete}
+            bulkDeleteConfig={{
+              confirmTitle: 'Xác nhận xóa phiếu',
+              confirmMessage: 'Bạn có chắc muốn xóa {count} phiếu thu/chi đã chọn?'
+            }}
+          />
         </div>
       </WrapperContent>
 

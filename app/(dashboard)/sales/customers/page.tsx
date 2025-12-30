@@ -61,6 +61,7 @@ export default function CustomersPage() {
   // Modal and form state
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
   // File export hook
   const { exportToXlsx } = useFileExport([]);
@@ -93,6 +94,18 @@ export default function CustomersPage() {
         });
       },
     });
+  };
+
+  const handleBulkDelete = async (ids: React.Key[]) => {
+    for (const id of ids) {
+      await new Promise<void>((resolve, reject) => {
+        deleteMutation.mutate(Number(id), {
+          onSuccess: () => resolve(),
+          onError: (error: Error) => reject(error),
+        });
+      });
+    }
+    message.success(`Đã xóa ${ids.length} khách hàng`);
   };
 
   const handleSubmit = async (values: CustomerFormValues) => {
@@ -303,6 +316,15 @@ export default function CustomersPage() {
           paging={true}
           rank={true}
           onRowClick={(record: Customer) => router.push(`/sales/customers/${record.id}`)}
+          rowSelection={{
+            selectedRowKeys: selectedIds,
+            onChange: setSelectedIds,
+          }}
+          onBulkDelete={handleBulkDelete}
+          bulkDeleteConfig={{
+            confirmTitle: "Xác nhận xóa khách hàng",
+            confirmMessage: "Bạn có chắc muốn xóa {count} khách hàng đã chọn?"
+          }}
         />
       </WrapperContent>
 

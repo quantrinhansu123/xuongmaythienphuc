@@ -612,7 +612,7 @@ function WrapperContent<T extends object>({
   }, [searchTerm]);
 
   return (
-    <div className={`space-y-10 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       <div className="flex items-center justify-between">
         <LeftControls
           isMobile={isMobileView}

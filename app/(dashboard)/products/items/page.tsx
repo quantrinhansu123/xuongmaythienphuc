@@ -186,6 +186,31 @@ export default function ItemsPage() {
     },
   });
 
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: React.Key[]) => {
+      const results = await Promise.all(
+        ids.map(id =>
+          fetch(`/api/products/items/${id}`, { method: "DELETE" })
+            .then(res => res.json())
+        )
+      );
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) {
+        throw new Error(`Xóa thất bại ${failed.length}/${ids.length} mục`);
+      }
+      return results;
+    },
+    onSuccess: (_, ids) => {
+      message.success(`Đã xóa ${ids.length} hàng hoá`);
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message);
+    },
+  });
+
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
@@ -733,6 +758,13 @@ export default function ItemsPage() {
           rowSelection={{
             selectedRowKeys: selectedItemsForSync,
             onChange: (keys: React.Key[]) => setSelectedItemsForSync(keys as number[]),
+          }}
+          onBulkDelete={async (ids) => {
+            await bulkDeleteMutation.mutateAsync(ids);
+          }}
+          bulkDeleteConfig={{
+            confirmTitle: "Xác nhận xóa hàng hoá",
+            confirmMessage: "Bạn có chắc muốn xóa {count} hàng hoá đã chọn?"
           }}
           DrawerDetails={({ data, onClose }: PropRowDetails<Item>) => (
             <div className="space-y-4">

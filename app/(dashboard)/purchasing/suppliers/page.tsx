@@ -1,10 +1,12 @@
 'use client';
 
+import CommonTable from '@/components/CommonTable';
+import TableActions from '@/components/TableActions';
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
-import { DownloadOutlined, EditOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, Select, Tag } from 'antd';
+import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { App, Select, TableColumnsType, Tag } from 'antd';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -24,6 +26,7 @@ interface Supplier {
 export default function SuppliersPage() {
   const router = useRouter();
   const { can, loading: permLoading } = usePermissions();
+  const { message } = App.useApp();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +42,7 @@ export default function SuppliersPage() {
     supplierGroupId: '',
   });
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
+  const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
   useEffect(() => {
     if (!permLoading && can('purchasing.suppliers', 'view')) {
@@ -185,6 +189,87 @@ export default function SuppliersPage() {
     return matchSearch && matchStatus && matchGroup;
   });
 
+  const handleBulkDelete = async (ids: React.Key[]) => {
+    try {
+      for (const id of ids) {
+        const res = await fetch(`/api/purchasing/suppliers/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      }
+      message.success(`Đã xóa ${ids.length} nhà cung cấp`);
+      fetchSuppliers();
+    } catch (error: any) {
+      message.error(error.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const columns: TableColumnsType<Supplier> = [
+    {
+      title: 'Mã NCC',
+      dataIndex: 'supplierCode',
+      key: 'supplierCode',
+      width: 120,
+      fixed: 'left' as const,
+    },
+    {
+      title: 'Tên nhà cung cấp',
+      dataIndex: 'supplierName',
+      key: 'supplierName',
+      width: 200,
+    },
+    {
+      title: 'Điện thoại',
+      dataIndex: 'phone',
+      key: 'phone',
+      width: 130,
+      render: (phone: string) => phone || '-',
+    },
+    {
+      title: 'Nhóm',
+      dataIndex: 'groupName',
+      key: 'groupName',
+      width: 150,
+      render: (name: string) => name ? <Tag color="blue">{name}</Tag> : <span className="text-gray-400">-</span>,
+    },
+    {
+      title: 'Công nợ',
+      dataIndex: 'debtAmount',
+      key: 'debtAmount',
+      width: 130,
+      align: 'right' as const,
+      render: (amount: number) => (
+        <span className={amount > 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}>
+          {formatCurrency(amount)}
+        </span>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 120,
+      render: (active: boolean) => (
+        <Tag color={active ? 'success' : 'error'}>
+          {active ? 'Hoạt động' : 'Ngừng'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      width: 150,
+      fixed: 'right' as const,
+      render: (_, record) => (
+        <TableActions
+          onEdit={(e) => e && handleEdit(record, e)}
+          onDelete={(e) => e && handleDelete(record.id, e)}
+          canEdit={can('purchasing.suppliers', 'edit')}
+          canDelete={can('purchasing.suppliers', 'delete')}
+        />
+      ),
+    },
+  ];
+
   return (
     <>
       <WrapperContent<Supplier>
@@ -271,68 +356,21 @@ export default function SuppliersPage() {
           ),
         }}
       >
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {filteredSuppliers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="text-6xl mb-2">🏢</div>
-              <div>Chưa có nhà cung cấp</div>
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã NCC</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên nhà cung cấp</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điện thoại</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Công nợ</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredSuppliers.map((supplier) => (
-                  <tr
-                    key={supplier.id}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => handleViewDetail(supplier)}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{supplier.supplierCode}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{supplier.supplierName}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{supplier.phone || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {supplier.groupName ? (
-                        <Tag color="blue">{supplier.groupName}</Tag>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      <span className={supplier.debtAmount > 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}>
-                        {formatCurrency(supplier.debtAmount)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <Tag color={supplier.isActive ? 'success' : 'error'}>
-                        {supplier.isActive ? 'Hoạt động' : 'Ngừng'}
-                      </Tag>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {can('purchasing.suppliers', 'edit') && (
-                        <Button
-                          type="text"
-                          icon={<EditOutlined />}
-                          className="text-blue-600 hover:text-blue-900"
-                          onClick={(e) => handleEdit(supplier, e)}
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <CommonTable
+          columns={columns}
+          dataSource={filteredSuppliers}
+          loading={loading}
+          onRowClick={handleViewDetail}
+          rowSelection={{
+            selectedRowKeys: selectedIds,
+            onChange: setSelectedIds,
+          }}
+          onBulkDelete={handleBulkDelete}
+          bulkDeleteConfig={{
+            confirmTitle: 'Xác nhận xóa nhà cung cấp',
+            confirmMessage: 'Bạn có chắc muốn xóa {count} nhà cung cấp đã chọn?'
+          }}
+        />
       </WrapperContent>
 
       {/* Modal Supplier */}

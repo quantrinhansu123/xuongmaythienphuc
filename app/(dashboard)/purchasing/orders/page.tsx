@@ -1,10 +1,11 @@
 'use client';
 
+import CommonTable from '@/components/CommonTable';
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency, formatQuantity } from '@/utils/format';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { DatePicker, Select } from 'antd';
+import { DatePicker, Select, TableColumnsType, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 
@@ -67,6 +68,7 @@ export default function PurchaseOrdersPage() {
   });
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pagination, setPagination] = useState({ current: 1, limit: 20 });
 
   useEffect(() => {
     if (!permLoading && can('purchasing.orders', 'view')) {
@@ -561,6 +563,74 @@ export default function PurchaseOrdersPage() {
     }
   }, [filterQueries.fromDate, filterQueries.toDate]);
 
+  const getStatusTag = (status: string) => {
+    const statusConfig: Record<string, { color: string; text: string }> = {
+      'PENDING': { color: 'yellow', text: 'Chờ xác nhận' },
+      'CONFIRMED': { color: 'blue', text: 'Đã xác nhận' },
+      'DELIVERED': { color: 'green', text: 'Đã giao hàng' },
+      'CANCELLED': { color: 'red', text: 'Đã hủy' },
+    };
+    const config = statusConfig[status] || { color: 'default', text: status };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
+  const columns: TableColumnsType<PurchaseOrder> = [
+    {
+      title: 'Mã đơn',
+      dataIndex: 'poCode',
+      key: 'poCode',
+      width: 130,
+      render: (code: string) => <span className="font-mono">{code}</span>,
+    },
+    {
+      title: 'Nhà cung cấp',
+      dataIndex: 'supplierName',
+      key: 'supplierName',
+      width: 200,
+    },
+    {
+      title: 'Ngày đặt',
+      dataIndex: 'orderDate',
+      key: 'orderDate',
+      width: 120,
+      render: (date: string) => new Date(date).toLocaleDateString('vi-VN'),
+    },
+    {
+      title: 'Tổng tiền',
+      dataIndex: 'totalAmount',
+      key: 'totalAmount',
+      width: 140,
+      align: 'right' as const,
+      render: (amount: number) => <span className="font-semibold">{formatCurrency(amount)}</span>,
+    },
+    {
+      title: 'Đã TT',
+      dataIndex: 'paidAmount',
+      key: 'paidAmount',
+      width: 140,
+      align: 'right' as const,
+      render: (amount: number) => <span className="text-green-600">{formatCurrency(amount || 0)}</span>,
+    },
+    {
+      title: 'Còn nợ',
+      key: 'remainingAmount',
+      width: 140,
+      align: 'right' as const,
+      render: (_, record) => (
+        <span className="text-red-600">
+          {formatCurrency(record.totalAmount - (record.paidAmount || 0))}
+        </span>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 140,
+      render: (status: string) => getStatusTag(status),
+    },
+  ];
+
   return (
     <>
       <WrapperContent<PurchaseOrder>
@@ -614,6 +684,33 @@ export default function PurchaseOrdersPage() {
           },
           customToolbar: (
             <div className="flex gap-2 items-center">
+              <RangePicker
+                value={[
+                  filterQueries.fromDate ? dayjs(filterQueries.fromDate) : null,
+                  filterQueries.toDate ? dayjs(filterQueries.toDate) : null,
+                ]}
+                onChange={(dates) => {
+                  if (dates) {
+                    setFilterQueries({
+                      ...filterQueries,
+                      fromDate: dates[0]?.format('YYYY-MM-DD'),
+                      toDate: dates[1]?.format('YYYY-MM-DD'),
+                    });
+                  } else {
+                    const { fromDate, toDate, ...rest } = filterQueries;
+                    setFilterQueries(rest);
+                  }
+                }}
+                format="DD/MM/YYYY"
+                placeholder={['Từ ngày', 'Đến ngày']}
+                presets={[
+                  { label: 'Hôm nay', value: [dayjs(), dayjs()] },
+                  { label: 'Hôm qua', value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')] },
+                  { label: '7 ngày qua', value: [dayjs().add(-7, 'd'), dayjs()] },
+                  { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                  { label: 'Tháng trước', value: [dayjs().add(-1, 'month').startOf('month'), dayjs().add(-1, 'month').endOf('month')] },
+                ]}
+              />
               <Select
                 style={{ width: 140 }}
                 placeholder="Trạng thái"
@@ -657,88 +754,30 @@ export default function PurchaseOrdersPage() {
           ),
         }}
       >
-        <div className="mb-2 -mt-5 relative z-10 w-fit">
-          <RangePicker
-            value={[
-              filterQueries.fromDate ? dayjs(filterQueries.fromDate) : null,
-              filterQueries.toDate ? dayjs(filterQueries.toDate) : null,
-            ]}
-            onChange={(dates) => {
-              if (dates) {
-                setFilterQueries({
-                  ...filterQueries,
-                  fromDate: dates[0]?.format('YYYY-MM-DD'),
-                  toDate: dates[1]?.format('YYYY-MM-DD'),
-                });
-              } else {
-                const { fromDate, toDate, ...rest } = filterQueries;
-                setFilterQueries(rest);
-              }
-            }}
-            format="DD/MM/YYYY"
-            placeholder={['Từ ngày', 'Đến ngày']}
-            presets={[
-              { label: 'Hôm nay', value: [dayjs(), dayjs()] },
-              { label: 'Hôm qua', value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')] },
-              { label: '7 ngày qua', value: [dayjs().add(-7, 'd'), dayjs()] },
-              { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-              { label: 'Tháng trước', value: [dayjs().add(-1, 'month').startOf('month'), dayjs().add(-1, 'month').endOf('month')] },
-            ]}
-          />
-        </div>
-
         <div className="flex gap-4">
-          <div className={`space-y-4 transition-all duration-300 ${showDetail ? 'w-1/2' : 'w-full'}`}>
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              {filteredOrders.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <div className="text-6xl mb-2">📦</div>
-                  <div>Chưa có đơn đặt hàng</div>
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left w-32">Mã đơn</th>
-                      <th className="px-4 py-3 text-left w-48">Nhà cung cấp</th>
-                      <th className="px-4 py-3 text-left w-32">Ngày đặt</th>
-                      <th className="px-4 py-3 text-right w-36">Tổng tiền</th>
-                      <th className="px-4 py-3 text-right w-36">Đã TT</th>
-                      <th className="px-4 py-3 text-right w-36">Còn nợ</th>
-                      <th className="px-4 py-3 text-left w-40">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredOrders.map((order) => (
-                      <tr
-                        key={order.id}
-                        onClick={() => viewDetail(order.id)}
-                        className="hover:bg-gray-50 cursor-pointer"
-                      >
-                        <td className="px-4 py-3 font-mono">{order.poCode}</td>
-                        <td className="px-4 py-3">{order.supplierName}</td>
-                        <td className="px-4 py-3">{new Date(order.orderDate).toLocaleDateString('vi-VN')}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
-                        <td className="px-4 py-3 text-right text-green-600">{formatCurrency(order.paidAmount || 0)}</td>
-                        <td className="px-4 py-3 text-right text-red-600">{formatCurrency(order.totalAmount - (order.paidAmount || 0))}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded text-xs ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                            order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                              order.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                                'bg-red-100 text-red-800'
-                            }`}>
-                            {order.status === 'PENDING' ? 'Chờ xác nhận' :
-                              order.status === 'CONFIRMED' ? 'Đã xác nhận' :
-                                order.status === 'DELIVERED' ? 'Đã giao hàng' :
-                                  order.status === 'CANCELLED' ? 'Đã hủy' : order.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+          <div className="w-full">
+            {filteredOrders.length === 0 ? (
+              <div className="bg-white rounded-lg shadow text-center py-12 text-gray-500">
+                <div className="text-6xl mb-2">📦</div>
+                <div>Chưa có đơn đặt hàng</div>
+              </div>
+            ) : (
+              <CommonTable
+                columns={columns}
+                dataSource={filteredOrders}
+                loading={loading}
+                onRowClick={(record: PurchaseOrder) => viewDetail(record.id)}
+                paging={true}
+                pagination={{
+                  current: pagination.current,
+                  limit: pagination.limit,
+                  onChange: (page, pageSize) => {
+                    setPagination({ current: page, limit: pageSize || 20 });
+                  },
+                }}
+                total={filteredOrders.length}
+              />
+            )}
           </div>
 
           {showDetail && selectedOrder && (

@@ -1,12 +1,15 @@
 'use client';
 
 import BankAccountSidePanel from '@/components/BankAccountSidePanel';
+import CommonTable from '@/components/CommonTable';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
 import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatCurrency } from '@/utils/format';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Select } from 'antd';
+import type { TableColumnsType } from 'antd';
+import { App, Select, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 interface BankAccount {
@@ -38,6 +41,7 @@ interface User {
 
 export default function BankAccountsPage() {
   const { can } = usePermissions();
+  const { message } = App.useApp();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
@@ -47,6 +51,7 @@ export default function BankAccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
   const [formData, setFormData] = useState({
     accountNumber: '',
@@ -193,6 +198,79 @@ export default function BankAccountsPage() {
 
   const totalBalance = filteredAccounts.reduce((sum, acc) => sum + parseFloat(acc.balance.toString()), 0);
 
+  const handleBulkDelete = async (ids: React.Key[]) => {
+    try {
+      for (const id of ids) {
+        const res = await fetch(`/api/finance/bank-accounts/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      }
+      message.success(`Đã xóa ${ids.length} tài khoản`);
+      fetchAccounts();
+    } catch (error: any) {
+      message.error(error.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const columns: TableColumnsType<BankAccount> = [
+    {
+      title: 'Loại',
+      dataIndex: 'accountType',
+      key: 'accountType',
+      width: 120,
+      render: (type: string) => (
+        <Tag color={type === 'CASH' ? 'green' : 'blue'}>
+          {type === 'CASH' ? '💵 Tiền mặt' : '🏦 Ngân hàng'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Số TK / Tên quỹ',
+      dataIndex: 'accountNumber',
+      key: 'accountNumber',
+      width: 200,
+    },
+    {
+      title: 'Chủ TK',
+      dataIndex: 'accountHolder',
+      key: 'accountHolder',
+      width: 150,
+    },
+    {
+      title: 'Ngân hàng',
+      dataIndex: 'bankName',
+      key: 'bankName',
+      width: 150,
+      render: (name: string, record: BankAccount) =>
+        record.accountType === 'CASH' ? '-' : name,
+    },
+    {
+      title: 'Số dư',
+      dataIndex: 'balance',
+      key: 'balance',
+      width: 150,
+      align: 'right' as const,
+      render: (balance: number) => formatCurrency(balance),
+    },
+    {
+      title: 'Chi nhánh',
+      dataIndex: 'companyBranchName',
+      key: 'companyBranchName',
+      width: 150,
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 120,
+      render: (active: boolean) => (
+        <Tag color={active ? 'success' : 'error'}>
+          {active ? 'Hoạt động' : 'Ngừng'}
+        </Tag>
+      ),
+    },
+  ];
+
   return (
     <>
       <WrapperContent<BankAccount>
@@ -312,50 +390,21 @@ export default function BankAccountsPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số TK / Tên quỹ</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chủ TK</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngân hàng</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chi nhánh</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredAccounts.map((account) => (
-                  <tr
-                    key={account.id}
-                    onClick={() => setSelectedAccount(account)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 py-1 rounded text-xs ${account.accountType === 'CASH' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                        {account.accountType === 'CASH' ? '💵 Tiền mặt' : '🏦 Ngân hàng'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{account.accountNumber}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountHolder}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{account.accountType === 'CASH' ? '-' : account.bankName}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                      {parseFloat(account.balance.toString()).toLocaleString('vi-VN')} đ
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{account.companyBranchName}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 py-1 rounded text-xs ${account.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
-                        {account.isActive ? 'Hoạt động' : 'Ngừng'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CommonTable
+            columns={columns}
+            dataSource={filteredAccounts}
+            loading={loading}
+            onRowClick={(record: BankAccount) => setSelectedAccount(record)}
+            rowSelection={{
+              selectedRowKeys: selectedIds,
+              onChange: setSelectedIds,
+            }}
+            onBulkDelete={handleBulkDelete}
+            bulkDeleteConfig={{
+              confirmTitle: 'Xác nhận xóa tài khoản',
+              confirmMessage: 'Bạn có chắc muốn xóa {count} tài khoản đã chọn?'
+            }}
+          />
         </div>
       </WrapperContent>
 
