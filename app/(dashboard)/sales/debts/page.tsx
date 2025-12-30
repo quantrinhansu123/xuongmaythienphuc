@@ -283,7 +283,7 @@ export default function CustomerDebtsPage() {
               />
               {isAdmin && (
                 <Select
-                  style={{ width: 200 }}
+                  style={{ width: 170 }}
                   placeholder="Chọn chi nhánh"
                   value={selectedBranchId}
                   onChange={(value: number | "all") => setSelectedBranchId(value)}
@@ -296,6 +296,17 @@ export default function CustomerDebtsPage() {
                   ]}
                 />
               )}
+              <Select
+                placeholder="Công nợ"
+                allowClear
+                style={{ width: 150 }}
+                value={query.hasDebt}
+                onChange={(value) => updateQueries([{ key: "hasDebt", value: value || "" }])}
+                options={[
+                  { label: "Có công nợ", value: "true" },
+                  { label: "Đã thanh toán", value: "false" },
+                ]}
+              />
             </div>
           ),
           buttonEnds: [
@@ -316,17 +327,6 @@ export default function CustomerDebtsPage() {
             filterKeys: ["customerCode", "customerName", "phone"],
           },
           filters: {
-            fields: [
-              {
-                type: "select",
-                name: "hasDebt",
-                label: "Công nợ",
-                options: [
-                  { label: "Có công nợ", value: "true" },
-                  { label: "Đã thanh toán", value: "false" },
-                ],
-              },
-            ],
             query,
             onApplyFilter: updateQueries,
             onReset: reset,
@@ -394,7 +394,7 @@ export default function CustomerDebtsPage() {
             />
           )}
         </div>
-      </WrapperContent>
+      </WrapperContent >
     </>
   );
 }

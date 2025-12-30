@@ -28,7 +28,7 @@ import {
   UploadOutlined
 } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
-import { App, Tag } from "antd";
+import { App, Select, Tag } from "antd";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -256,7 +256,6 @@ export default function CustomersPage() {
         isRefetching={customersFetching}
         isEmpty={!customers?.length}
         header={{
-          buttonBackTo: "/dashboard",
           refetchDataWithKeys: CUSTOMER_KEYS.all,
           buttonEnds: [
             {
@@ -291,27 +290,33 @@ export default function CustomersPage() {
               descriptionKey: "phone",
             },
           },
-          filters: {
-            fields: [
-              {
-                type: "select",
-                name: "customerGroupId",
-                label: "Nhóm khách hàng",
-                options: groups.map((g) => ({
+          customToolbar: (
+            <div className="flex gap-2 items-center flex-wrap">
+              <Select
+                placeholder="Nhóm khách hàng"
+                allowClear
+                style={{ width: 200 }}
+                value={query.customerGroupId?.toString()}
+                onChange={(value) => updateQueries([{ key: "customerGroupId", value: value || "" }])}
+                options={groups.map((g) => ({
                   label: g.groupName,
                   value: g.id.toString(),
-                })),
-              },
-              {
-                type: "select",
-                name: "isActive",
-                label: "Trạng thái",
-                options: [
+                }))}
+              />
+              <Select
+                placeholder="Trạng thái"
+                allowClear
+                style={{ width: 150 }}
+                value={query.isActive}
+                onChange={(value) => updateQueries([{ key: "isActive", value: value || "" }])}
+                options={[
                   { label: "Hoạt động", value: "true" },
                   { label: "Ngừng", value: "false" },
-                ],
-              },
-            ],
+                ]}
+              />
+            </div>
+          ),
+          filters: {
             query,
             onApplyFilter: updateQueries,
             onReset: reset,

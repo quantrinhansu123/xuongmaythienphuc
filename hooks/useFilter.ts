@@ -153,7 +153,14 @@ const useFilter = (initQuery: IParams = {}) => {
                     );
                 }
 
-                return String(get(item, key) ?? '')
+                const isIDField = key === 'id' || key.endsWith('Id');
+                const fieldVal = get(item, key);
+
+                if (isIDField && !isSearchKey && !Array.isArray(value)) {
+                    return String(fieldVal ?? '') === String(value);
+                }
+
+                return String(fieldVal ?? '')
                     .toLowerCase()
                     .includes(String(value).toLowerCase());
             });

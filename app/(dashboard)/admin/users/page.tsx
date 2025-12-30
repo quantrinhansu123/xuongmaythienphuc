@@ -14,10 +14,9 @@ import { usePermissions } from "@/hooks/usePermissions";
 import {
   useCreateUser,
   useDeleteUser,
-  USER_KEYS,
   useResetPassword,
   useUpdateUser,
-  useUsers,
+  useUsers
 } from "@/hooks/useUserQuery";
 import { branchService, departmentService, roleService } from "@/services/commonService";
 import type { User } from "@/services/userService";
@@ -33,12 +32,12 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { App, Button, Dropdown, Tag } from "antd";
+import { App, Button, Dropdown, Select, Tag } from "antd";
 import { useState } from "react";
 
 export default function UsersPage() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { reset, applyFilter, updateQueries, query, pagination, handlePageChange } = useFilter();
 
   // React Query hooks
   const { data: users = [], isLoading, isFetching } = useUsers();
@@ -139,12 +138,16 @@ export default function UsersPage() {
 
   // Export logic
   const exportColumns = [
-    { title: "Mã", dataIndex: "userCode", key: "userCode" },
+    { title: "Mã nhân viên", dataIndex: "userCode", key: "userCode" },
     { title: "Họ tên", dataIndex: "fullName", key: "fullName" },
     { title: "Tên đăng nhập", dataIndex: "username", key: "username" },
+    { title: "Mật khẩu", dataIndex: "password", key: "password" },
+    { title: "Email", dataIndex: "email", key: "email" },
+    { title: "Số điện thoại", dataIndex: "phone", key: "phone" },
     { title: "Phòng ban", dataIndex: "departmentName", key: "departmentName" },
     { title: "Vai trò", dataIndex: "roleName", key: "roleName" },
-    { title: "Trạng thái", dataIndex: "isActive", key: "isActive" },
+    { title: "Chi nhánh", dataIndex: "branchNames", key: "branchNames" },
+    { title: "Trạng thái", dataIndex: "statusLabel", key: "statusLabel" },
   ];
 
   const { exportToXlsx } = useFileExport(exportColumns);
@@ -153,17 +156,54 @@ export default function UsersPage() {
   const handleExportExcel = () => {
     const dataToExport = filteredUsers.map(item => ({
       ...item,
-      isActive: item.isActive ? "Hoạt động" : "Khóa",
-      branches: item.branches?.map((b: any) => b.branchName).join(", ") || item.branchName || "-",
+      password: "", // Empty for security
+      statusLabel: item.isActive ? "Hoạt động" : "Khóa",
+      branchNames: item.branches?.map((b: any) => b.branchName).join(", ") || item.branchName || "-",
     }));
     exportToXlsx(dataToExport, "danh-sach-nhan-vien");
   };
 
   const handleImportExcel = () => {
+    if (branches.length === 0 || roles.length === 0) {
+      modal.warning({ title: "Thông báo", content: "Dữ liệu chi nhánh hoặc vai trò đang được tải, vui lòng thử lại sau giây lát." });
+      return;
+    }
     openFileDialog(
-      (data) => {
-        console.log("Imported:", data);
-        alert("Tính năng đang phát triển");
+      async (data) => {
+        try {
+          let count = 0;
+          for (const row of data) {
+            // Find departmentId
+            const dept = departments.find(d => d.departmentName === row["Phòng ban"]);
+            // Find roleId
+            const role = roles.find(r => r.roleName === row["Vai trò"]);
+            // Map branches
+            const branchNamesStr = row["Chi nhánh"] || "";
+            const branchNames = branchNamesStr.split(",").map((s: string) => s.trim());
+            const bIds = branches
+              .filter(b => branchNames.includes(b.branchName))
+              .map(b => b.id);
+
+            const payload = {
+              userCode: row["Mã nhân viên"],
+              username: row["Tên đăng nhập"],
+              password: row["Mật khẩu"] || "123456",
+              fullName: row["Họ tên"],
+              email: row["Email"],
+              phone: row["Số điện thoại"],
+              branchIds: bIds.length > 0 ? bIds : (branches.length > 0 ? [branches[0].id] : []),
+              departmentId: dept?.id,
+              roleId: role?.id || (roles.length > 0 ? roles[0].id : 0),
+              isActive: row["Trạng thái"] !== "Khóa",
+            };
+
+            await createMutation.mutateAsync(payload as any);
+            count++;
+          }
+          modal.success({ title: "Thành công", content: `Đã nhập thành công ${count} người dùng` });
+        } catch (err: any) {
+          modal.error({ title: "Lỗi", content: "Có lỗi khi nhập dữ liệu: " + (err.message || "Lỗi không xác định") });
+        }
       },
       (err) => console.error(err)
     );
@@ -282,7 +322,43 @@ export default function UsersPage() {
         isNotAccessible={!can("admin.users", "view")}
         isLoading={isLoading}
         header={{
-          refetchDataWithKeys: USER_KEYS.all,
+          customToolbar: (
+            <div className="flex gap-2 items-center flex-wrap">
+              <Select
+                placeholder="Chi nhánh"
+                allowClear
+                style={{ width: 170 }}
+                value={query.branchId}
+                onChange={(val: any) => updateQueries([{ key: "branchId", value: val || "" }])}
+                options={branches.map((b: any) => ({
+                  label: b.branchName,
+                  value: b.id.toString(),
+                }))}
+              />
+              <Select
+                placeholder="Vai trò"
+                allowClear
+                style={{ width: 170 }}
+                value={query.roleId}
+                onChange={(val: any) => updateQueries([{ key: "roleId", value: val || "" }])}
+                options={roles.map((r: any) => ({
+                  label: r.roleName,
+                  value: r.id.toString(),
+                }))}
+              />
+              <Select
+                placeholder="Phòng ban"
+                allowClear
+                style={{ width: 150 }}
+                value={query.departmentId}
+                onChange={(val: any) => updateQueries([{ key: "departmentId", value: val || "" }])}
+                options={departments.map((d) => ({
+                  label: d.departmentName,
+                  value: d.id.toString(),
+                }))}
+              />
+            </div>
+          ),
           buttonEnds: can("admin.users", "create")
             ? [
               {
@@ -316,33 +392,6 @@ export default function UsersPage() {
             },
           },
           filters: {
-            fields: [
-              {
-                type: "select",
-                name: "roleCode",
-                label: "Vai trò",
-                options: [
-                  { label: "Quản trị hệ thống", value: "ADMIN" },
-                  { label: "Quản lý chi nhánh", value: "STAFF" },
-                  { label: "Nhân viên", value: "MANAGER" },
-                ],
-              },
-              {
-                type: "select",
-                name: "departmentId",
-                label: "Phòng ban",
-                options: departments.map(d => ({ label: d.departmentName, value: d.id })),
-              },
-              {
-                type: "select",
-                name: "isActive",
-                label: "Trạng thái",
-                options: [
-                  { label: "Hoạt động", value: true },
-                  { label: "Khóa", value: false },
-                ],
-              },
-            ],
             onApplyFilter: (arr) => updateQueries(arr),
             onReset: () => reset(),
             query,
@@ -355,6 +404,7 @@ export default function UsersPage() {
         }}
       >
         <CommonTable
+          pagination={{ ...pagination, onChange: handlePageChange }}
           columns={getVisibleColumns()}
           dataSource={filteredUsers}
           loading={isLoading || deleteMutation.isPending || isFetching}

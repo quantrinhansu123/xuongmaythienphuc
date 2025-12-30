@@ -169,11 +169,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     let { userCode, username, password, fullName, email, phone, branchIds, departmentId, roleId } = body;
 
+    // Default password
+    if (!password) password = "123456";
+
     // Validation
-    if (!username || !password || !fullName || !roleId) {
+    if (!username || !fullName || !roleId) {
       return NextResponse.json<ApiResponse>({
         success: false,
-        error: 'Vui lòng điền đầy đủ thông tin'
+        error: 'Vui lòng điền đầy đủ thông tin (Tên đăng nhập, Họ tên, Vai trò)'
       }, { status: 400 });
     }
 
@@ -190,8 +193,15 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Tự sinh mã nhân viên nếu không có
-    if (!userCode) {
+    // Kiểm tra mã nhân viên đã tồn tại chưa (nếu có cung cấp)
+    let isCodeExists = false;
+    if (userCode) {
+      const checkCode = await query('SELECT id FROM users WHERE user_code = $1', [userCode]);
+      if (checkCode.rows.length > 0) isCodeExists = true;
+    }
+
+    // Tự sinh mã nhân viên nếu không có hoặc bị trùng
+    if (!userCode || isCodeExists) {
       const codeResult = await query(
         `SELECT 'NV' || LPAD((COALESCE(MAX(CASE 
            WHEN user_code ~ '^NV[0-9]+$' 
@@ -232,11 +242,11 @@ export async function POST(request: NextRequest) {
       message: 'Tạo người dùng thành công'
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create user error:', error);
     return NextResponse.json<ApiResponse>({
       success: false,
-      error: 'Lỗi server'
+      error: error.message || 'Lỗi server'
     }, { status: 500 });
   }
 }

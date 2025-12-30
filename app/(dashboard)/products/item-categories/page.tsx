@@ -40,6 +40,7 @@ export default function ItemCategoriesPage() {
     );
     const [form] = Form.useForm();
     const [expandedKeys, setExpandedKeys] = useState<Set<number>>(new Set());
+    const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
     const {
         query,
@@ -153,6 +154,27 @@ export default function ItemCategoriesPage() {
             saveMutation.mutate(values);
         } catch {
             // validation error
+        }
+    };
+
+    const handleBulkDelete = async (ids: React.Key[]) => {
+        try {
+            const res = await fetch('/api/products/item-categories/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids.map(id => Number(id)) }),
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Có lỗi xảy ra');
+            }
+
+            message.success(data.message || 'Xử lý thành công');
+            setSelectedIds([]);
+            queryClient.invalidateQueries({ queryKey: ["item-categories"] });
+        } catch (error: any) {
+            message.error(error.message || 'Có lỗi xảy ra');
         }
     };
 
@@ -549,6 +571,15 @@ export default function ItemCategoriesPage() {
                     dataSource={displayData as ItemCategory[]}
                     loading={permLoading || categoriesLoading || categoriesFetching}
                     pagination={{ ...pagination, onChange: handlePageChange }}
+                    rowSelection={{
+                        selectedRowKeys: selectedIds,
+                        onChange: setSelectedIds,
+                    }}
+                    onBulkDelete={handleBulkDelete}
+                    bulkDeleteConfig={{
+                        confirmTitle: "Xác nhận xóa danh mục",
+                        confirmMessage: "Bạn có chắc muốn xóa {count} danh mục đã chọn? Nếu không thể xóa, hệ thống sẽ tự động chuyển sang trạng thái ngưng."
+                    }}
                 />
             </WrapperContent>
 
