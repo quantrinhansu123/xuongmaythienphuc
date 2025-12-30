@@ -9,7 +9,6 @@ import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { BRANCH_KEYS, useBranches } from "@/hooks/useCommonQuery";
 import { useFileExport } from "@/hooks/useFileExport";
-import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Branch } from "@/services/commonService";
@@ -20,7 +19,6 @@ import {
     EyeOutlined,
     MoreOutlined,
     PlusOutlined,
-    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -119,7 +117,6 @@ export default function BranchesPage() {
     ];
 
     const { exportToXlsx } = useFileExport(exportColumns);
-    const { openFileDialog } = useFileImport();
 
     const handleExportExcel = () => {
         const dataToExport = filtered.map((item: any) => ({
@@ -130,15 +127,7 @@ export default function BranchesPage() {
         exportToXlsx(dataToExport, "danh-sach-chi-nhanh");
     };
 
-    const handleImportExcel = () => {
-        openFileDialog(
-            (data) => {
-                console.log("Imported:", data);
-                alert("Tính năng đang phát triển");
-            },
-            (err) => console.error(err)
-        );
-    };
+
 
     const columnsAll: TableColumnsType<Branch> = [
         {
@@ -238,12 +227,6 @@ export default function BranchesPage() {
                                 name: "Xuất Excel",
                                 onClick: handleExportExcel,
                                 icon: <DownloadOutlined />,
-                            },
-                            {
-                                type: "default",
-                                name: "Nhập Excel",
-                                onClick: handleImportExcel,
-                                icon: <UploadOutlined />,
                             },
                         ]
                         : undefined,

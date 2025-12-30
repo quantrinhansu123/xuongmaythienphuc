@@ -5,7 +5,7 @@ import PartnerDebtSidePanel from "@/components/PartnerDebtSidePanel";
 import WrapperContent from "@/components/WrapperContent";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency } from "@/utils/format";
-import { CalendarOutlined, DownloadOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { CalendarOutlined, DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 import { DatePicker, Select, TableColumnsType } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
@@ -299,12 +299,6 @@ export default function SupplierDebtsPage() {
                             name: "Đặt lại",
                             onClick: handleResetAll,
                             icon: <ReloadOutlined />,
-                        },
-                        {
-                            type: "default",
-                            name: "Nhập Excel",
-                            onClick: () => alert("Chức năng nhập Excel đang được phát triển"),
-                            icon: <UploadOutlined />,
                         },
                         {
                             type: "default",

@@ -21,8 +21,7 @@ import {
     EditOutlined,
     EyeOutlined,
     MoreOutlined,
-    PlusOutlined,
-    UploadOutlined,
+    PlusOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -280,12 +279,6 @@ export default function WarehousesPage() {
                                 name: "Xuất Excel",
                                 onClick: handleExportExcel,
                                 icon: <DownloadOutlined />,
-                            },
-                            {
-                                type: "default",
-                                name: "Nhập Excel",
-                                onClick: handleImportExcel,
-                                icon: <UploadOutlined />,
                             },
                         ]
                         : undefined,

@@ -10,7 +10,6 @@ import {
     DownloadOutlined,
     PlusOutlined,
     SettingOutlined,
-    UploadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -244,18 +243,10 @@ export default function RolesPage() {
                         },
                         {
                             can: can("admin.roles", "create"),
-
                             type: "default",
                             name: "Xuất Excel",
                             onClick: () => { },
                             icon: <DownloadOutlined />,
-                        },
-                        {
-                            can: can("admin.roles", "create"),
-                            type: "default",
-                            name: "Nhập Excel",
-                            onClick: () => { },
-                            icon: <UploadOutlined />,
                         },
                     ],
                     searchInput: {

@@ -23,8 +23,7 @@ import {
     DownloadOutlined,
     EditOutlined,
     PlusOutlined,
-    UploadOutlined,
-    UserOutlined,
+    UserOutlined
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -367,13 +366,6 @@ export default function CustomerGroupsPage() {
                             name: "Xuất Excel",
                             onClick: handleExportExcel,
                             icon: <DownloadOutlined />,
-                        },
-                        {
-                            can: can("sales.customers", "create"),
-                            type: "default",
-                            name: "Nhập Excel",
-                            onClick: handleImportExcel,
-                            icon: <UploadOutlined />,
                         },
                     ],
                     searchInput: {
