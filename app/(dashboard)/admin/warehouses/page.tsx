@@ -12,8 +12,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { WarehouseType } from "@/types/enum";
 import {
     Warehouse,
-    WarehouseFormValues,
-    WarehouseOptions,
+    WarehouseFormValues
 } from "@/types/warehouse";
 import {
     DeleteOutlined,
@@ -291,37 +290,6 @@ export default function WarehousesPage() {
                             "address",
                             "warehouseType",
                         ],
-                    },
-                    filters: {
-                        fields: [
-                            {
-                                type: "select",
-                                name: "isActive",
-                                label: "Trạng thái",
-                                options: [
-                                    { label: "Hoạt động", value: true },
-                                    { label: "Khóa", value: false },
-                                ],
-                            },
-                            {
-                                type: "select",
-                                name: "warehouseType",
-                                label: "Loại kho",
-                                options: WarehouseOptions,
-                            },
-                            {
-                                type: "select",
-                                name: "branchId",
-                                label: "Chi nhánh",
-                                options: branches.map((b) => ({
-                                    label: b.branchName,
-                                    value: b.id,
-                                })),
-                            },
-                        ],
-                        onApplyFilter: (arr) => updateQueries(arr),
-                        onReset: () => reset(),
-                        query,
                     },
                     columnSettings: {
                         columns: columnsCheck,

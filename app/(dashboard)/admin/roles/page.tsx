@@ -253,12 +253,6 @@ export default function RolesPage() {
                         placeholder: "Tìm kiếm vai trò",
                         filterKeys: ["roleName", "roleCode", "description"],
                     },
-                    filters: {
-                        fields: [],
-                        onApplyFilter: (arr) => updateQueries(arr),
-                        onReset: () => reset(),
-                        query,
-                    },
                     columnSettings: {
                         columns: columnsCheck,
                         onChange: (c) => updateColumns(c),
