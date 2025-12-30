@@ -835,19 +835,28 @@ function OrderDetailDrawer({
           }}
         />
         <div className="mt-4 space-y-2 text-right">
-          <div>
-            <Typography.Text>Tổng tiền:</Typography.Text>{" "}
-            <Typography.Text strong>
-              {formatCurrency(data.totalAmount)}
-            </Typography.Text>
-          </div>
-          {data.discountAmount > 0 && (
-            <div className="text-red-600">
-              <Typography.Text>
-                Giảm giá: -{formatCurrency(data.discountAmount)}
-              </Typography.Text>
-            </div>
-          )}
+          {(() => {
+            const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(item.costPrice || item.unitPrice) * parseFloat(item.quantity)), 0);
+            const totalReduction = totalOriginal - parseFloat(data.finalAmount);
+
+            return (
+              <>
+                <div>
+                  <Typography.Text>Tổng tiền:</Typography.Text>{" "}
+                  <Typography.Text strong>
+                    {formatCurrency(totalOriginal)}
+                  </Typography.Text>
+                </div>
+                {totalReduction > 0 && (
+                  <div className="text-red-600">
+                    <Typography.Text>
+                      Giảm giá (Tổng cộng): -{formatCurrency(totalReduction)}
+                    </Typography.Text>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <div className="text-lg font-bold text-blue-600">
             <Typography.Text>
               Thành tiền: {formatCurrency(data.finalAmount)}
@@ -3134,54 +3143,10 @@ export default function OrdersPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2 border-t border-gray-300 pt-3">
-                      <span className="text-gray-600 text-sm">💰 Nhập tiền cọc (nếu có):</span>
-                      <Form.Item name="depositAmount" initialValue={0} noStyle>
-                        <InputNumber
-                          min={0}
-                          max={calculateTotal() - discountAmount}
-                          style={{ width: '100%' }}
-                          placeholder="0"
-                          value={depositAmount}
-                          formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                          parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                          onChange={(val) => setDepositAmount(val || 0)}
-                        />
-                      </Form.Item>
-                    </div>
-
-                    {depositAmount > 0 && (
-                      <div className="space-y-2">
-                        <span className="text-gray-600 text-sm">Tài khoản nhận cọc:</span>
-                        <Form.Item
-                          name="depositAccountId"
-                          rules={[{ required: true, message: 'Vui lòng chọn tài khoản' }]}
-                          noStyle
-                        >
-                          <Select
-                            placeholder="Chọn tài khoản..."
-                            style={{ width: '100%' }}
-                            value={depositAccountId}
-                            onChange={(val) => {
-                              setDepositAccountId(val);
-                              const acc = bankAccounts.find((a: any) => a.id === val);
-                              setDepositMethod(acc?.accountType === 'CASH' ? 'CASH' : 'BANK');
-                            }}
-                          >
-                            {bankAccounts.map((acc: any) => (
-                              <Select.Option key={acc.id} value={acc.id}>
-                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber} - {acc.bankName}
-                              </Select.Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
-                      </div>
-                    )}
-
                     <div className="flex justify-between items-center text-lg border-t border-gray-300 pt-3">
-                      <span className="font-bold text-gray-900">Còn lại phải thu:</span>
-                      <span className="font-bold text-red-600 text-xl">
-                        {formatCurrency(calculateTotal() - discountAmount - depositAmount)}
+                      <span className="font-bold text-gray-900">Khách phải trả:</span>
+                      <span className="font-bold text-blue-600 text-xl">
+                        {formatCurrency(calculateTotal() - discountAmount)}
                       </span>
                     </div>
 

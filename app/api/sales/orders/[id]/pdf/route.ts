@@ -69,6 +69,7 @@ export async function GET(
         COALESCE(i.unit, p.unit) as unit,
         od.quantity,
         od.unit_price as "unitPrice",
+        od.cost_price as "costPrice",
         od.total_amount as "totalAmount",
         od.notes
        FROM order_details od
@@ -222,20 +223,26 @@ export async function GET(
   </table>
 
   <div class="total-section">
-    ${order.discountAmount > 0 ? `
-    <div class="total-row">
-      <span>Tổng tiền:</span>
-      <span>${formatNumber(order.totalAmount)} đ</span>
-    </div>` : ''}
-    ${order.discountAmount > 0 ? `
-    <div class="total-row" style="color: #dc2626;">
-      <span>Giảm giá:</span>
-      <span>-${formatNumber(order.discountAmount)} đ</span>
-    </div>` : ''}
-    <div class="total-row final">
-      <span>THÀNH TIỀN:</span>
-      <span>${formatNumber(order.finalAmount)} đ</span>
-    </div>
+    ${(() => {
+        const totalOriginal = details.reduce((sum: number, item: any) => sum + (parseFloat(item.costPrice || item.unitPrice) * parseFloat(item.quantity)), 0);
+        const totalReduction = totalOriginal - parseFloat(order.finalAmount);
+
+        return `
+        <div class="total-row">
+          <span>Tổng tiền:</span>
+          <span>${formatNumber(totalOriginal)} đ</span>
+        </div>
+        ${totalReduction > 0 ? `
+        <div class="total-row" style="color: #dc2626;">
+          <span>Giảm giá:</span>
+          <span>-${formatNumber(totalReduction)} đ</span>
+        </div>` : ''}
+        <div class="total-row final">
+          <span>THÀNH TIỀN:</span>
+          <span>${formatNumber(order.finalAmount)} đ</span>
+        </div>
+        `;
+      })()}
     
     ${(() => {
         const deposit = parseFloat(order.depositAmount) || 0;

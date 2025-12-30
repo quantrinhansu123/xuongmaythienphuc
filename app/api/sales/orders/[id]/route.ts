@@ -65,6 +65,7 @@ export async function GET(
         COALESCE(i.item_name, p.product_name) as "itemName",
         od.quantity,
         od.unit_price as "unitPrice",
+        od.cost_price as "costPrice",
         od.total_amount as "totalAmount",
         od.notes
        FROM order_details od
@@ -192,9 +193,9 @@ export async function PUT(
     if (items && items.length > 0) {
       for (const item of items) {
         await query(
-          `INSERT INTO order_details (order_id, item_id, product_id, quantity, unit_price, total_amount, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [orderId, item.itemId || null, item.productId || null, item.quantity, item.unitPrice, item.quantity * item.unitPrice, item.notes || null]
+          `INSERT INTO order_details (order_id, item_id, product_id, quantity, unit_price, cost_price, total_amount, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [orderId, item.itemId || null, item.productId || null, item.quantity, item.unitPrice, item.costPrice || 0, item.quantity * item.unitPrice, item.notes || null]
         );
       }
     }
