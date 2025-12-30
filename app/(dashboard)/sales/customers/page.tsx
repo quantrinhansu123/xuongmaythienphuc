@@ -251,7 +251,6 @@ export default function CustomersPage() {
       dataIndex: "customerCode",
       key: "customerCode",
       width: 120,
-      fixed: "left",
     },
     {
       title: "Tên khách hàng",
@@ -307,7 +306,6 @@ export default function CustomersPage() {
       title: "Thao tác",
       key: "actions",
       width: 150,
-      fixed: "right",
       render: (_, record) => (
         <TableActions
           onEdit={() => handleEdit(record)}

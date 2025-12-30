@@ -140,14 +140,15 @@ const CommonTable = <T extends object>({
   });
   const footerProps = {
     scroll: {
-      x: "100%",
+      x: isMobile ? 800 : "100%",
     },
     footer: () => (
-      <div className="flex justify-between items-center w-full sticky bottom-0 z-10 bg-white py-2">
+      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row justify-between'} items-center w-full sticky bottom-0 z-10 bg-white py-2 px-1`}>
         <div>
           {onBulkDelete && rowSelection && rowSelection.selectedRowKeys.length > 0 && (
             <Button
               danger
+              size={isMobile ? "small" : "middle"}
               icon={<DeleteOutlined />}
               onClick={() => {
                 const count = rowSelection.selectedRowKeys.length;
@@ -168,18 +169,20 @@ const CommonTable = <T extends object>({
             </Button>
           )}
         </div>
-        <div>
+        <div className={isMobile ? "w-full flex justify-center" : ""}>
           {paging && pagination && (
             <Pagination
               onChange={handlePageChange}
               pageSize={pagination.limit}
               total={total ?? dataSource?.length ?? 0}
-              showSizeChanger
+              showSizeChanger={!isMobile}
               onShowSizeChange={(_, size) =>
                 pagination.onChange(pagination.current, size)
               }
               current={pagination.current}
-              showTotal={(total) => `Tổng ${total} bản ghi`}
+              showTotal={isMobile ? undefined : (total) => `Tổng ${total} bản ghi`}
+              size={isMobile ? "small" : "default"}
+              simple={isMobile}
             />
           )}
         </div>
@@ -189,7 +192,7 @@ const CommonTable = <T extends object>({
 
   return (
     <>
-      <div ref={tableContainerRef} className="relative">
+      <div ref={tableContainerRef} className="relative overflow-x-auto">
         <Table<T>
           {...(paging ? footerProps : {})}
           rowKey="id"
@@ -199,12 +202,13 @@ const CommonTable = <T extends object>({
           dataSource={paginatedData}
           pagination={false}
           onRow={onClickRow}
+          size={isMobile ? "small" : "middle"}
           rowSelection={rowSelection ? {
             type: 'checkbox',
             selectedRowKeys: rowSelection.selectedRowKeys,
             onChange: rowSelection.onChange,
           } : undefined}
-          sticky={true}
+          sticky={!isMobile}
         />
       </div>
 

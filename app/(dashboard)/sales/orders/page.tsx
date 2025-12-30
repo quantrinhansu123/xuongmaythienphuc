@@ -1371,7 +1371,6 @@ export default function OrdersPage() {
       dataIndex: "orderCode",
       key: "orderCode",
       width: 120,
-      fixed: "left" as const,
       render: (value: string) => <span className="font-mono">{value}</span>,
     },
     {
@@ -1446,7 +1445,6 @@ export default function OrdersPage() {
       title: "Thao tác",
       key: "actions",
       width: 150,
-      fixed: "right",
       render: (_, record: Order) => (
         <TableActions
           extraActions={[

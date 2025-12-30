@@ -288,7 +288,6 @@ export default function CustomerGroupsPage() {
             dataIndex: "groupCode",
             key: "groupCode",
             width: 150,
-            fixed: "left",
         },
         {
             title: "Tên nhóm",
@@ -327,7 +326,6 @@ export default function CustomerGroupsPage() {
             title: "Thao tác",
             key: "actions",
             width: 150,
-            fixed: "right",
             render: (_, record) => (
                 <TableActions
                     onEdit={() => handleEdit(record)}

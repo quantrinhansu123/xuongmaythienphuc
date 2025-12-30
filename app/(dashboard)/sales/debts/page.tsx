@@ -50,14 +50,12 @@ export default function CustomerDebtsPage() {
       dataIndex: "customerCode",
       key: "customerCode",
       width: 120,
-      fixed: "left" as const,
     },
     {
       title: "Khách hàng",
       dataIndex: "customerName",
       key: "customerName",
       width: 200,
-      fixed: "left" as const,
     },
     {
       title: "Liên hệ",

@@ -8,7 +8,7 @@ import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatQuantity } from "@/utils/format";
-import { ReloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import { Descriptions, Drawer, Select, Spin, Table, Tag } from "antd";
@@ -269,6 +269,12 @@ export default function Page() {
                 queryClient.invalidateQueries({ queryKey: ['inventory', 'balance'] });
               },
               icon: <ReloadOutlined spin={isFetching} />,
+            },
+            {
+              type: 'default',
+              name: 'Xuất Excel',
+              onClick: handleExportExcel,
+              icon: <DownloadOutlined />,
             },
           ],
           filters: {

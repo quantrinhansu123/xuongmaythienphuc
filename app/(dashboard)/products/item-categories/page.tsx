@@ -287,7 +287,6 @@ export default function ItemCategoriesPage() {
             dataIndex: "categoryCode",
             key: "categoryCode",
             width: 100,
-            fixed: "left" as const,
             render: (text: string, record: ItemCategory & { level?: number }) => {
                 const level = record.level || 0;
                 return (
@@ -396,7 +395,6 @@ export default function ItemCategoriesPage() {
             title: "Thao tác",
             key: "actions",
             width: 130,
-            fixed: "right" as const,
             render: (_: unknown, record: ItemCategory) => (
                 <TableActions
                     canView={false}

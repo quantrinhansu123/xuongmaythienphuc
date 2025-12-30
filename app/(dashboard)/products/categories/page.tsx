@@ -167,7 +167,6 @@ export default function CategoriesPage() {
       dataIndex: "categoryCode",
       key: "categoryCode",
       width: 140,
-      fixed: "left" as const,
     },
     {
       title: "Tên danh mục",
@@ -193,7 +192,6 @@ export default function CategoriesPage() {
       title: "Thao tác",
       key: "actions",
       width: 150,
-      fixed: "right" as const,
       render: (_: unknown, record: Category) => (
         <TableActions
           canView={false}

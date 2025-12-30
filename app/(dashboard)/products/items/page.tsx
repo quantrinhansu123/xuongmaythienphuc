@@ -444,7 +444,6 @@ export default function ItemsPage() {
       dataIndex: "itemCode",
       key: "itemCode",
       width: 120,
-      fixed: "left" as const,
     },
     {
       title: "Danh mục",
@@ -503,7 +502,6 @@ export default function ItemsPage() {
       title: "Thao tác",
       key: "actions",
       width: 180,
-      fixed: "right" as const,
       render: (_: unknown, record: Item) => (
         <TableActions
           canView={false}
