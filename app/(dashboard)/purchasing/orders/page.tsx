@@ -2,10 +2,15 @@
 
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
-import { formatCurrency } from '@/utils/format';
+import { formatCurrency, formatQuantity } from '@/utils/format';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { Select } from 'antd';
+import { DatePicker, Select } from 'antd';
+import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
+
+const { RangePicker } = DatePicker;
+
+// ... imports
 
 interface PurchaseOrder {
   id: number;
@@ -46,7 +51,10 @@ export default function PurchaseOrdersPage() {
   const [orderItems, setOrderItems] = useState<any[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
+  const [filterQueries, setFilterQueries] = useState<Record<string, any>>({
+    fromDate: dayjs().startOf('month').format('YYYY-MM-DD'),
+    toDate: dayjs().endOf('month').format('YYYY-MM-DD'),
+  });
 
   // Payment States
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -75,7 +83,11 @@ export default function PurchaseOrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/purchasing/orders');
+      const params = new URLSearchParams();
+      if (filterQueries.fromDate) params.append('fromDate', filterQueries.fromDate);
+      if (filterQueries.toDate) params.append('toDate', filterQueries.toDate);
+
+      const res = await fetch(`/api/purchasing/orders?${params.toString()}`);
       const data = await res.json();
       if (data.success) setOrders(data.data);
     } catch (error) {
@@ -542,6 +554,13 @@ export default function PurchaseOrdersPage() {
     return matchSearch && matchStatus && matchSupplier;
   });
 
+  // Trigger fetch when date range changes
+  useEffect(() => {
+    if (!permLoading && can('purchasing.orders', 'view')) {
+      fetchOrders();
+    }
+  }, [filterQueries.fromDate, filterQueries.toDate]);
+
   return (
     <>
       <WrapperContent<PurchaseOrder>
@@ -617,7 +636,7 @@ export default function PurchaseOrdersPage() {
                 ]}
               />
               <Select
-                style={{ width: 160 }}
+                style={{ width: 200 }}
                 placeholder="Nhà cung cấp"
                 allowClear
                 size="middle"
@@ -638,6 +657,36 @@ export default function PurchaseOrdersPage() {
           ),
         }}
       >
+        <div className="mb-2 -mt-5 relative z-10 w-fit">
+          <RangePicker
+            value={[
+              filterQueries.fromDate ? dayjs(filterQueries.fromDate) : null,
+              filterQueries.toDate ? dayjs(filterQueries.toDate) : null,
+            ]}
+            onChange={(dates) => {
+              if (dates) {
+                setFilterQueries({
+                  ...filterQueries,
+                  fromDate: dates[0]?.format('YYYY-MM-DD'),
+                  toDate: dates[1]?.format('YYYY-MM-DD'),
+                });
+              } else {
+                const { fromDate, toDate, ...rest } = filterQueries;
+                setFilterQueries(rest);
+              }
+            }}
+            format="DD/MM/YYYY"
+            placeholder={['Từ ngày', 'Đến ngày']}
+            presets={[
+              { label: 'Hôm nay', value: [dayjs(), dayjs()] },
+              { label: 'Hôm qua', value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')] },
+              { label: '7 ngày qua', value: [dayjs().add(-7, 'd'), dayjs()] },
+              { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+              { label: 'Tháng trước', value: [dayjs().add(-1, 'month').startOf('month'), dayjs().add(-1, 'month').endOf('month')] },
+            ]}
+          />
+        </div>
+
         <div className="flex gap-4">
           <div className={`space-y-4 transition-all duration-300 ${showDetail ? 'w-1/2' : 'w-full'}`}>
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -759,7 +808,7 @@ export default function PurchaseOrdersPage() {
                         <tr key={idx}>
                           <td className="px-3 py-2">{idx + 1}</td>
                           <td className="px-3 py-2">{item.materialName}</td>
-                          <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
+                          <td className="px-3 py-2 text-right">{formatQuantity(item.quantity)} {item.unit}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
                           <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.totalAmount)}</td>
                         </tr>

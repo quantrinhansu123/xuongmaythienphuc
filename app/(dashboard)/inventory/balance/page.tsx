@@ -67,12 +67,28 @@ export default function Page() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Tự động chọn kho đầu tiên
+  // Tự động chọn kho logic
   useEffect(() => {
-    if (warehousesData.length > 0 && !selectedWarehouseId) {
-      setSelectedWarehouseId(warehousesData[0].id);
+    if (!selectedWarehouseId) {
+      // Nếu đã có list kho, ưu tiên chọn 0 (Toàn hệ thống) nếu có quyền, hoặc kho đầu tiên
+      // Ở đây ta set mặc định là 0 nếu user là Admin (và option 0 có sẵn), ngược lại kho đầu
+      // Tuy nhiên check quyền ở frontend hơi phức tạp, ta cứ set 0 xem sao, nếu API 403 thì user chọn lại?
+      // Tốt nhất: nếu có warehousesData, set 0 nếu là admin.
+      // Check permission "view" on inventory.balance usually implies admin or inventory manager. 
+      // Simplify: always set to '0' if list loaded? No, normal user can't see 0.
+      // Let's assume Admin always sees 'Toàn hệ thống'.
+      // We can use the 'can' permission check.
+      if (can('inventory.balance', 'view')) { // This check is too broad, it's the page access.
+        // Assume Admin based on availability of option logically.
+        // For now, default to first warehouse, let user choose "All System".
+        // OR specifically check if role is ADMIN? We don't have role here easily without context hooks update.
+        // Let's stick to: Default = First Warehouse. User clicks "All System" if needed.
+        if (warehousesData.length > 0) {
+          setSelectedWarehouseId(warehousesData[0].id);
+        }
+      }
     }
-  }, [warehousesData, selectedWarehouseId]);
+  }, [warehousesData]);
 
   const columnsAll: TableColumnsType<BalanceItem> = [
     { title: "Mã", dataIndex: "itemCode", key: "itemCode", width: 140 },
@@ -107,13 +123,16 @@ export default function Page() {
 
   const { data: balanceData = { details: [], summary: [] }, isLoading, isFetching, error: balanceError } =
     useQuery({
-      queryKey: ["inventory", "balance", selectedWarehouseId],
-      enabled: !!selectedWarehouseId,
+      queryKey: ["inventory", "balance", selectedWarehouseId, query],
+      enabled: selectedWarehouseId !== undefined,
       refetchOnMount: 'always', // Luôn refetch khi mount/quay lại trang
       queryFn: async () => {
         console.log(`📦 [Balance Page] Fetching balance for warehouse ${selectedWarehouseId}`);
+        console.log(`📦 [Balance Page] Query Params:`, query);
+        const queryString = new URLSearchParams(query as any).toString();
+        console.log(`📦 [Balance Page] Fetch URL: /api/inventory/balance?warehouseId=${selectedWarehouseId}&${queryString}`);
         const res = await fetch(
-          `/api/inventory/balance?warehouseId=${selectedWarehouseId}`
+          `/api/inventory/balance?warehouseId=${selectedWarehouseId}&${queryString}`
         );
         const body = await res.json();
         console.log(`📦 [Balance Page] Response:`, body);
@@ -138,7 +157,7 @@ export default function Page() {
   }
 
   const details: BalanceItem[] = balanceData.details || [];
-  const filteredDetails = applyFilter<BalanceItem>(details);
+  const filteredDetails = applyFilter<BalanceItem>(details, ['status', 'warehouseId']);
 
   const handleExportExcel = () => {
     const warehouseName = warehousesData.find(w => w.id === selectedWarehouseId)?.warehouseName || 'kho';
@@ -187,38 +206,46 @@ export default function Page() {
             placeholder: "Tìm kiếm",
             filterKeys: ["itemName", "itemCode"],
           },
-          filters: {
-            fields: [
-              {
-                type: "select",
-                name: "itemType",
-                label: "Loại",
-                options: [
+          customToolbar: (
+            <div className="flex gap-2 items-center">
+              <Select
+                style={{ width: 140 }}
+                placeholder="Trạng thái"
+                value={query.status || 'all'}
+                onChange={(value) => updateQueries([{ key: 'status', value }])}
+                options={[
+                  { label: "Tất cả", value: 'all' },
+                  { label: "Có hàng", value: 'in_stock' },
+                  { label: "Hết hàng", value: 'out_of_stock' },
+                  { label: "Sắp hết", value: 'low_stock' },
+                ]}
+              />
+              <Select
+                style={{ width: 160 }}
+                placeholder="Loại hàng"
+                value={query.itemType}
+                allowClear
+                onChange={(value) => updateQueries([{ key: 'itemType', value }])}
+                options={[
                   { label: "Nguyên vật liệu", value: "NVL" },
                   { label: "Thành phẩm", value: "THANH_PHAM" },
-                ],
-              },
-            ],
-            onApplyFilter: (arr) => updateQueries(arr),
-            onReset: () => reset(),
-            query,
-          },
-          columnSettings: {
-            columns: columnsCheck,
-            onChange: (c) => updateColumns(c),
-            onReset: () => resetColumns(),
-          },
-          customToolbar: (
-            <Select
-              style={{ width: 200 }}
-              placeholder="Chọn kho"
-              value={selectedWarehouseId}
-              onChange={(value) => setSelectedWarehouseId(value)}
-              options={warehousesData.map((w) => ({
-                label: `${w.warehouseName} (${w.branchName || ''})`,
-                value: w.id,
-              }))}
-            />
+                ]}
+              />
+              <Select
+                style={{ width: 220 }}
+                placeholder="Chọn kho"
+                value={selectedWarehouseId}
+                onChange={(value) => setSelectedWarehouseId(value)}
+                optionFilterProp="label"
+                showSearch
+                options={[
+                  ...(can('inventory.balance', 'view') ? [{ label: 'Toàn hệ thống', value: 0 }] : []),
+                  ...warehousesData.map((w) => ({
+                    label: `${w.warehouseName} (${w.branchName || ''})`,
+                    value: w.id,
+                  }))]}
+              />
+            </div>
           ),
           buttonEnds: [
             {

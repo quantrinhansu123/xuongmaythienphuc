@@ -63,6 +63,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/sales/customers": "Khách hàng",
   "/sales/orders": "Đơn hàng",
   "/sales/reports": "Báo cáo bán hàng",
+  "/purchasing/supplier-groups": "Nhóm nhà cung cấp",
   "/purchasing/suppliers": "Nhà cung cấp",
   "/purchasing/orders": "Đơn đặt hàng",
   "/finance/categories": "Danh mục tài chính",

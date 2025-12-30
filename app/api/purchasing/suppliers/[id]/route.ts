@@ -1,7 +1,63 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { hasPermission, error } = await requirePermission('purchasing.suppliers', 'view');
+    if (!hasPermission) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: error || 'Không có quyền xem nhà cung cấp'
+      }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const supplierId = parseInt(id);
+
+    const result = await query(
+      `SELECT s.*, sg.group_name 
+       FROM suppliers s 
+       LEFT JOIN supplier_groups sg ON s.supplier_group_id = sg.id 
+       WHERE s.id = $1`,
+      [supplierId]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy nhà cung cấp'
+      }, { status: 404 });
+    }
+
+    return NextResponse.json<ApiResponse>({
+      success: true,
+      data: {
+        id: result.rows[0].id,
+        supplierCode: result.rows[0].supplier_code,
+        supplierName: result.rows[0].supplier_name,
+        phone: result.rows[0].phone,
+        email: result.rows[0].email,
+        address: result.rows[0].address,
+        groupName: result.rows[0].group_name,
+        debtAmount: result.rows[0].debt_amount || 0,
+        isActive: result.rows[0].is_active,
+        supplierGroupId: result.rows[0].supplier_group_id
+      }
+    });
+
+  } catch (error) {
+    console.error('Get supplier error:', error);
+    return NextResponse.json<ApiResponse>({
+      success: false,
+      error: 'Lỗi server'
+    }, { status: 500 });
+  }
+}
 
 export async function PUT(
   request: NextRequest,

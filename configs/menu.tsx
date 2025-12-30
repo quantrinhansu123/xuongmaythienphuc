@@ -123,6 +123,12 @@ export const allMenuItems: Array<{
       icon: <ShoppingOutlined />,
       children: [
         {
+          icon: <UsergroupAddOutlined />,
+          title: "Nhóm NCC",
+          href: "/purchasing/supplier-groups",
+          permission: "purchasing.suppliers",
+        },
+        {
           icon: <ShopOutlined />,
           title: "Nhà cung cấp",
           href: "/purchasing/suppliers",

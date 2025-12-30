@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const supplierId = searchParams.get('supplierId');
     const unpaidOnly = searchParams.get('unpaidOnly') === 'true';
+    const fromDate = searchParams.get('fromDate');
+    const toDate = searchParams.get('toDate');
 
     let sql = `SELECT 
         po.id,
@@ -34,13 +36,25 @@ export async function GET(request: NextRequest) {
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN users u ON u.id = po.created_by
        WHERE po.branch_id = $1`;
-    
+
     const params: (string | number)[] = [currentUser.branchId];
     let paramIndex = 2;
 
     if (supplierId) {
       sql += ` AND po.supplier_id = $${paramIndex}`;
       params.push(parseInt(supplierId));
+      paramIndex++;
+    }
+
+    if (fromDate) {
+      sql += ` AND po.order_date >= $${paramIndex}`;
+      params.push(fromDate);
+      paramIndex++;
+    }
+
+    if (toDate) {
+      sql += ` AND po.order_date <= $${paramIndex}`;
+      params.push(toDate);
       paramIndex++;
     }
 
@@ -86,7 +100,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const totalAmount = items.reduce((sum: number, item: any) => 
+    const totalAmount = items.reduce((sum: number, item: any) =>
       sum + (item.quantity * item.unitPrice), 0
     );
 
