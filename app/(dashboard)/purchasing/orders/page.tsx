@@ -4,7 +4,7 @@ import CommonTable from '@/components/CommonTable';
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency, formatQuantity } from '@/utils/format';
-import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { CarOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, CreditCardOutlined, DownloadOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { DatePicker, Select, TableColumnsType, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -564,14 +564,14 @@ export default function PurchaseOrdersPage() {
   }, [filterQueries.fromDate, filterQueries.toDate]);
 
   const getStatusTag = (status: string) => {
-    const statusConfig: Record<string, { color: string; text: string }> = {
-      'PENDING': { color: 'yellow', text: 'Chờ xác nhận' },
-      'CONFIRMED': { color: 'blue', text: 'Đã xác nhận' },
-      'DELIVERED': { color: 'green', text: 'Đã giao hàng' },
-      'CANCELLED': { color: 'red', text: 'Đã hủy' },
+    const statusConfig: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
+      'PENDING': { color: 'yellow', text: 'Chờ xác nhận', icon: <ClockCircleOutlined /> },
+      'CONFIRMED': { color: 'blue', text: 'Đã xác nhận', icon: <CheckOutlined /> },
+      'DELIVERED': { color: 'green', text: 'Đã giao hàng', icon: <CarOutlined /> },
+      'CANCELLED': { color: 'red', text: 'Đã hủy', icon: <CloseOutlined /> },
     };
-    const config = statusConfig[status] || { color: 'default', text: status };
-    return <Tag color={config.color}>{config.text}</Tag>;
+    const config = statusConfig[status] || { color: 'default', text: status, icon: null };
+    return <Tag color={config.color} icon={config.icon}>{config.text}</Tag>;
   };
 
   const columns: TableColumnsType<PurchaseOrder> = [
@@ -803,16 +803,7 @@ export default function PurchaseOrdersPage() {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div><span className="text-gray-600">Mã đơn:</span> <span className="font-mono font-medium">{selectedOrder.poCode}</span></div>
-                    <div><span className="text-gray-600">Trạng thái:</span> <span className={`px-2 py-1 rounded text-xs ${selectedOrder.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                      selectedOrder.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                        selectedOrder.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                      }`}>
-                      {selectedOrder.status === 'PENDING' ? 'Chờ xác nhận' :
-                        selectedOrder.status === 'CONFIRMED' ? 'Đã xác nhận' :
-                          selectedOrder.status === 'DELIVERED' ? 'Đã giao hàng' :
-                            selectedOrder.status === 'CANCELLED' ? 'Đã hủy' : selectedOrder.status}
-                    </span></div>
+                    <div><span className="text-gray-600">Trạng thái:</span> {getStatusTag(selectedOrder.status)}</div>
                     <div><span className="text-gray-600">Nhà cung cấp:</span> {selectedOrder.supplierName}</div>
                     <div><span className="text-gray-600">Ngày đặt:</span> {new Date(selectedOrder.orderDate).toLocaleDateString('vi-VN')}</div>
                     {selectedOrder.expectedDate && (
@@ -902,9 +893,9 @@ export default function PurchaseOrdersPage() {
                 <div className="flex gap-2 justify-end border-t pt-4">
                   <button
                     onClick={() => window.open(`/api/purchasing/orders/${selectedOrder.id}/pdf`, '_blank', 'noopener,noreferrer')}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                   >
-                    🖨️ In PDF
+                    <PrinterOutlined /> In PDF
                   </button>
 
                   {/* Payment Button */}
@@ -919,9 +910,9 @@ export default function PurchaseOrdersPage() {
                           });
                           setShowPaymentModal(true);
                         }}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                       >
-                        💳 Thanh toán
+                        <CreditCardOutlined /> Thanh toán
                       </button>
                     )}
 
@@ -929,24 +920,24 @@ export default function PurchaseOrdersPage() {
                     <>
                       <button
                         onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                       >
-                        ✗ Hủy đơn
+                        <CloseOutlined /> Hủy đơn
                       </button>
                       <button
                         onClick={() => updateStatus(selectedOrder.id, 'CONFIRMED')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                       >
-                        ✓ Xác nhận
+                        <CheckOutlined /> Xác nhận
                       </button>
                     </>
                   )}
                   {selectedOrder.status === 'CONFIRMED' && can('purchasing.orders', 'edit') && (
                     <button
                       onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                     >
-                      ✓ Đã giao hàng
+                      <CheckOutlined /> Đã giao hàng
                     </button>
                   )}
                 </div>

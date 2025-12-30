@@ -1,4 +1,6 @@
 
+import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons';
+
 interface CashBook {
   id: number;
   transactionCode: string;
@@ -79,7 +81,7 @@ export default function CashbookSidePanel({
             <span className="text-sm text-gray-600">Loại:</span>
             <span className={`px-2 py-1 rounded text-xs ${cashbook.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
               }`}>
-              {cashbook.transactionType}
+              {cashbook.transactionType === 'THU' ? <ArrowDownOutlined /> : <ArrowUpOutlined />} {cashbook.transactionType}
             </span>
           </div>
 

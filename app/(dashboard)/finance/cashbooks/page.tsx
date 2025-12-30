@@ -7,8 +7,8 @@ import WrapperContent from '@/components/WrapperContent';
 import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
-import { CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { App, DatePicker, Select, TableColumnsType, Tag } from 'antd';
+import { ArrowDownOutlined, ArrowUpOutlined, CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { App, DatePicker, Segmented, Select, TableColumnsType, Tag } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 
@@ -310,7 +310,9 @@ export default function CashBooksPage() {
       key: 'transactionType',
       width: 100,
       render: (type: string) => (
-        <Tag color={type === 'THU' ? 'green' : 'red'}>{type}</Tag>
+        <Tag color={type === 'THU' ? 'green' : 'red'}>
+          {type === 'THU' ? <ArrowDownOutlined /> : <ArrowUpOutlined />} {type}
+        </Tag>
       ),
     },
     {
@@ -409,24 +411,21 @@ export default function CashBooksPage() {
                   ]}
                 />
               )}
-              <Select
-                style={{ width: 90 }}
-                placeholder="Loại"
-                allowClear
-                size="middle"
-                value={filterQueries['transactionType']}
-                onChange={(value: string | undefined) => {
-                  if (value !== undefined) {
-                    setFilterQueries({ ...filterQueries, transactionType: value });
-                  } else {
+              <Segmented
+                options={[
+                  { label: 'Tất cả', value: 'ALL' },
+                  { label: (<span><ArrowDownOutlined className="text-green-600" /> Thu</span>), value: 'THU' },
+                  { label: (<span><ArrowUpOutlined className="text-red-600" /> Chi</span>), value: 'CHI' },
+                ]}
+                value={filterQueries['transactionType'] || 'ALL'}
+                onChange={(value: any) => {
+                  if (value === 'ALL') {
                     const { transactionType, ...rest } = filterQueries;
                     setFilterQueries(rest);
+                  } else {
+                    setFilterQueries({ ...filterQueries, transactionType: value });
                   }
                 }}
-                options={[
-                  { label: 'Thu', value: 'THU' },
-                  { label: 'Chi', value: 'CHI' },
-                ]}
               />
               <Select
                 style={{ width: 140 }}
@@ -570,15 +569,15 @@ export default function CashBooksPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Loại *</label>
-            <select
+            <Segmented
+              options={[
+                { label: (<span><ArrowDownOutlined className="text-green-600" /> Thu</span>), value: 'THU' },
+                { label: (<span><ArrowUpOutlined className="text-red-600" /> Chi</span>), value: 'CHI' },
+              ]}
               value={formData.transactionType}
-              onChange={(e) => setFormData({ ...formData, transactionType: e.target.value as 'THU' | 'CHI', financialCategoryId: '' })}
-              className="w-full px-3 py-2 border rounded"
-              required
-            >
-              <option value="THU">Thu</option>
-              <option value="CHI">Chi</option>
-            </select>
+              onChange={(value) => setFormData({ ...formData, transactionType: value as 'THU' | 'CHI', financialCategoryId: '' })}
+              block
+            />
           </div>
 
           <div>
