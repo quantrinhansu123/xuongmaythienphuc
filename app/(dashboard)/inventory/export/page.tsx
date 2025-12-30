@@ -171,12 +171,12 @@ export default function Page() {
           COMPLETED: "Hoàn thành",
         };
         return (
-          <div className="flex items-center gap-2">
+          <div>
             <Tag color={colors[status as keyof typeof colors]}>
               {labels[status as keyof typeof labels]}
             </Tag>
             {status === "PENDING" && record.hasInsufficientStock && (
-              <Tag color="red">⚠️ Thiếu tồn</Tag>
+              <div className="text-xs text-red-600 mt-1">⚠️ Thiếu tồn kho</div>
             )}
           </div>
         );
