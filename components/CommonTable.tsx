@@ -28,6 +28,7 @@ interface ICommonTableProps<T> {
     confirmTitle?: string;
     confirmMessage?: string;
   };
+  drawerWidth?: number | string;
 }
 
 const CommonTable = <T extends object>({
@@ -44,6 +45,7 @@ const CommonTable = <T extends object>({
   rowSelection,
   onBulkDelete,
   bulkDeleteConfig,
+  drawerWidth,
 }: ICommonTableProps<T>) => {
   const isMobile = useIsMobile();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
@@ -210,7 +212,7 @@ const CommonTable = <T extends object>({
         <Drawer
           open={!!selectedRow}
           title="Chi tiết"
-          size={isMobile ? "default" : 600}
+          width={isMobile ? "100%" : (drawerWidth || 600)}
           onClose={() => setSelectedRow(null)}
           destroyOnHidden
         >

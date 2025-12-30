@@ -27,6 +27,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Col,
   Collapse,
   DatePicker,
   Descriptions,
@@ -34,6 +35,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Row,
   Select,
   Space,
   Spin,
@@ -119,6 +121,9 @@ interface Order {
   orderCode: string;
   customerId: number;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: string;
   orderDate: string;
   totalAmount: number;
   discountAmount: number;
@@ -303,110 +308,140 @@ function OrderDetailDrawer({
 
   return (
     <Space vertical size="large" style={{ width: "100%" }}>
-      {/* Thông tin đơn hàng */}
-      <Card title="Thông tin đơn hàng" size="small">
-        <Descriptions column={2} size="small">
-          <Descriptions.Item label="Mã đơn">
-            <Typography.Text code>{data.orderCode}</Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Trạng thái">
-            <Tag
-              color={
-                data.status === "PENDING"
-                  ? "orange"
-                  : data.status === "CONFIRMED"
-                    ? "blue"
-                    : data.status === "WAITING_MATERIAL"
+      {/* Thông tin chi tiết đơn hàng */}
+      <Row gutter={[16, 16]}>
+        <Col span={14}>
+          <Card title="Thông tin khách hàng & Đơn hàng" size="small" className="h-full">
+            <Descriptions column={2} size="small">
+              <Descriptions.Item label="Mã đơn" span={1}>
+                <Typography.Text code>{data.orderCode}</Typography.Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái" span={1}>
+                <Tag
+                  color={
+                    data.status === "PENDING"
                       ? "orange"
-                      : data.status === "IN_PRODUCTION"
-                        ? "purple"
-                        : data.status === "READY_TO_EXPORT"
-                          ? "cyan"
-                          : data.status === "EXPORTED"
-                            ? "blue"
-                            : data.status === "COMPLETED"
-                              ? "green"
-                              : "red"
-              }
-            >
-              {getStatusText(data.status)}
-            </Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Khách hàng">
-            {data.customerName}
-          </Descriptions.Item>
-          <Descriptions.Item label="Chi nhánh">
-            {data.branchName || 'Chưa xác định'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Ngày đặt">
-            {new Date(data.orderDate).toLocaleDateString("vi-VN")}
-          </Descriptions.Item>
-          <Descriptions.Item label="Người tạo">
-            {data.createdBy}
-          </Descriptions.Item>
-          <Descriptions.Item label="Tổng tiền (gốc)">
-            <Typography.Text strong style={{ color: '#1890ff' }}>
-              {(() => {
-                const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(String(item.costPrice || item.unitPrice)) * parseFloat(String(item.quantity))), 0);
-                return formatCurrency(totalOriginal);
-              })()}
-            </Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Giảm giá (Tổng cộng)">
-            <Typography.Text type="danger">
+                      : data.status === "CONFIRMED"
+                        ? "blue"
+                        : data.status === "WAITING_MATERIAL"
+                          ? "orange"
+                          : data.status === "IN_PRODUCTION"
+                            ? "purple"
+                            : data.status === "READY_TO_EXPORT"
+                              ? "cyan"
+                              : data.status === "EXPORTED"
+                                ? "blue"
+                                : data.status === "COMPLETED"
+                                  ? "green"
+                                  : "red"
+                  }
+                >
+                  {getStatusText(data.status)}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Khách hàng" span={2}>
+                <Typography.Text strong>{data.customerName}</Typography.Text>
+              </Descriptions.Item>
+              {data.customerPhone && (
+                <Descriptions.Item label="Điện thoại" span={1}>
+                  {data.customerPhone}
+                </Descriptions.Item>
+              )}
+              {data.customerEmail && (
+                <Descriptions.Item label="Email" span={1}>
+                  {data.customerEmail}
+                </Descriptions.Item>
+              )}
+              {data.customerAddress && (
+                <Descriptions.Item label="Địa chỉ" span={2}>
+                  {data.customerAddress}
+                </Descriptions.Item>
+              )}
+              <Descriptions.Item label="Chi nhánh" span={1}>
+                {data.branchName || 'Chưa xác định'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày đặt" span={1}>
+                {new Date(data.orderDate).toLocaleDateString("vi-VN")}
+              </Descriptions.Item>
+              <Descriptions.Item label="Người tạo" span={1}>
+                {data.createdBy}
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái TT" span={1}>
+                <Tag color={
+                  data.paymentStatus === 'PAID' ? 'green' :
+                    data.paymentStatus === 'PARTIAL' ? 'orange' : 'red'
+                }>
+                  {(() => {
+                    const deposit = data.depositAmount || 0;
+                    const paid = data.paidAmount || 0;
+                    if (data.paymentStatus === 'PAID') return 'Đã hoàn thành TT';
+                    if (deposit > 0 && paid > 0) return 'Đã TT một phần';
+                    if (deposit > 0) return 'Đã cọc';
+                    if (paid > 0) return 'Đã TT một phần';
+                    return 'Chưa TT';
+                  })()}
+                </Tag>
+              </Descriptions.Item>
+            </Descriptions>
+            {data.notes && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
+                <Typography.Text strong>Ghi chú:</Typography.Text> {data.notes}
+              </div>
+            )}
+          </Card>
+        </Col>
+        <Col span={10}>
+          <Card title="Tổng quan chi phí" size="small" className="h-full bg-blue-50/30">
+            <div className="space-y-3">
               {(() => {
                 const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(String(item.costPrice || item.unitPrice)) * parseFloat(String(item.quantity))), 0);
                 const totalReduction = totalOriginal - (parseFloat(String(data.finalAmount)) - (data.otherCosts || 0));
-                return `-${formatCurrency(totalReduction)}`;
-              })()}
-            </Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Chi phí phát sinh">
-            <Typography.Text style={{ color: (data.otherCosts || 0) > 0 ? '#fa8c16' : '#999' }}>
-              +{formatCurrency(data.otherCosts || 0)}
-            </Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Tiền đặt cọc">
-            <Typography.Text style={{ color: (data.depositAmount || 0) > 0 ? '#52c41a' : '#999' }}>
-              {formatCurrency(data.depositAmount || 0)}
-            </Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Đã thanh toán">
-            <Typography.Text style={{ color: '#52c41a' }}>
-              {formatCurrency(data.paidAmount || 0)}
-            </Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Còn lại">
-            <Typography.Text strong style={{
-              color: (data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0)) > 0 ? '#ff4d4f' : '#52c41a'
-            }}>
-              {formatCurrency(data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0))}
-            </Typography.Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Trạng thái TT">
-            <Tag color={
-              data.paymentStatus === 'PAID' ? 'green' :
-                data.paymentStatus === 'PARTIAL' ? 'orange' : 'red'
-            }>
-              {(() => {
-                const deposit = data.depositAmount || 0;
-                const paid = data.paidAmount || 0;
-                if (data.paymentStatus === 'PAID') return 'Đã hoàn thành TT';
-                if (deposit > 0 && paid > 0) return 'Đã TT một phần';
-                if (deposit > 0) return 'Đã cọc';
-                if (paid > 0) return 'Đã TT một phần';
-                return 'Chưa TT';
-              })()}
-            </Tag>
-          </Descriptions.Item>
-        </Descriptions>
-        {data.notes && (
-          <div style={{ marginTop: 16 }}>
-            <Typography.Text strong>Ghi chú:</Typography.Text> {data.notes}
-          </div>
-        )}
+                const remaining = data.finalAmount - (data.depositAmount || 0) - (data.paidAmount || 0);
 
-      </Card>
+                return (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <Typography.Text type="secondary">Tổng tiền hàng (gốc):</Typography.Text>
+                      <Typography.Text>{formatCurrency(totalOriginal)}</Typography.Text>
+                    </div>
+                    {totalReduction > 0 && (
+                      <div className="flex justify-between items-center text-red-500">
+                        <Typography.Text type="danger">Giảm giá:</Typography.Text>
+                        <Typography.Text type="danger">-{formatCurrency(totalReduction)}</Typography.Text>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-orange-500">
+                      <Typography.Text style={{ color: '#fa8c16' }}>Chi phí phát sinh:</Typography.Text>
+                      <Typography.Text style={{ color: '#fa8c16' }}>+{formatCurrency(data.otherCosts || 0)}</Typography.Text>
+                    </div>
+                    <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between items-center">
+                      <Typography.Text strong className="text-lg">Thành tiền:</Typography.Text>
+                      <Typography.Text strong className="text-xl text-blue-600">{formatCurrency(data.finalAmount)}</Typography.Text>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-md border border-blue-100 mt-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Typography.Text type="secondary">Tiền đặt cọc:</Typography.Text>
+                        <Typography.Text style={{ color: '#52c41a' }}>{formatCurrency(data.depositAmount || 0)}</Typography.Text>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <Typography.Text type="secondary">Đã thanh toán:</Typography.Text>
+                        <Typography.Text style={{ color: '#52c41a' }}>{formatCurrency(data.paidAmount || 0)}</Typography.Text>
+                      </div>
+                      <div className="border-t border-gray-100 pt-2 mt-1 flex justify-between items-center">
+                        <Typography.Text strong>Còn lại:</Typography.Text>
+                        <Typography.Text strong style={{ color: remaining > 0 ? '#ff4d4f' : '#52c41a', fontSize: '1.1rem' }}>
+                          {formatCurrency(remaining)}
+                        </Typography.Text>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </Card>
+        </Col>
+      </Row>
 
       {/* Tiến trình đơn hàng */}
       {
@@ -2595,6 +2630,7 @@ export default function OrdersPage() {
         <div className="flex gap-4">
           <div className={`space-y-4 transition-all duration-300`}>
             <CommonTable
+              drawerWidth={1000}
               DrawerDetails={({ data }: PropRowDetails<Order>) => (
                 <OrderDetailDrawer
                   orderId={data?.id || null}
