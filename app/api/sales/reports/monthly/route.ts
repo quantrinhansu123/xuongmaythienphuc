@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const { hasPermission, user, error } = await requirePermission('sales.orders', 'view');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
@@ -14,17 +14,27 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
     const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
     const branchIdParam = searchParams.get('branchId');
+    const salesEmployeeId = searchParams.get('salesEmployeeId');
 
     const params: any[] = [startDate, endDate];
     let branchFilter = '';
+    let paramIndex = 3;
 
     // Xử lý filter chi nhánh
     if (user.roleCode !== 'ADMIN') {
-      branchFilter = ' AND branch_id = $3';
+      branchFilter = ` AND branch_id = $${paramIndex}`;
       params.push(user.branchId);
+      paramIndex++;
     } else if (branchIdParam && branchIdParam !== 'all') {
-      branchFilter = ' AND branch_id = $3';
+      branchFilter = ` AND branch_id = $${paramIndex}`;
       params.push(parseInt(branchIdParam));
+      paramIndex++;
+    }
+
+    if (salesEmployeeId && salesEmployeeId !== 'all') {
+      branchFilter += ` AND pic_staff_id = $${paramIndex}`;
+      params.push(parseInt(salesEmployeeId));
+      paramIndex++;
     }
 
     const result = await query(`

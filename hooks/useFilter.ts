@@ -20,7 +20,7 @@ export type IPagination = {
 
 const searchKey = 'search';
 
-const useFilter =(initQuery: IParams = {}) => {
+const useFilter = (initQuery: IParams = {}) => {
     const [query, setQuery] = useState<IParams>(initQuery);
     const [pagination, setPagination] = useState({ current: 1, limit: 10 });
 
@@ -58,16 +58,16 @@ const useFilter =(initQuery: IParams = {}) => {
 
     const handlePageChange = (page: number, pageSize?: number) => {
         const newPageSize = pageSize || pagination.limit;
-        setPagination({ current: page,  limit: newPageSize });
+        setPagination({ current: page, limit: newPageSize });
         updateQuery('page', page);
         updateQuery('limit', newPageSize);
     };
 
-    const applyFilter = <T extends object>(data: T[]) => {
-        if(!data) return [];
+    const applyFilter = <T extends object>(data: T[], excludeKeys: string[] = []) => {
+        if (!data) return [];
         return data.filter(item => {
             return Object.entries(query).every(([key, value]) => {
-                if(key === 'page' || key === 'limit' || key === 'sort') return true;
+                if (key === 'page' || key === 'limit' || key === 'sort' || excludeKeys.includes(key)) return true;
                 const isSearchKey = key.includes(searchKey);
 
 

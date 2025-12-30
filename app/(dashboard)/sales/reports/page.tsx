@@ -78,6 +78,7 @@ interface Branch {
 interface User {
   id: number;
   username: string;
+  fullName: string;
   roleCode: string;
   branchId: number | null;
 }
@@ -86,7 +87,9 @@ export default function SalesReportsPage() {
   const { can } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [salesEmployees, setSalesEmployees] = useState<User[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
+  const [selectedSalesEmployeeId, setSelectedSalesEmployeeId] = useState<number | 'all'>('all');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [summary, setSummary] = useState<SalesSummary>({
     totalOrders: 0,
@@ -112,6 +115,7 @@ export default function SalesReportsPage() {
   useEffect(() => {
     fetchCurrentUser();
     fetchBranches();
+    fetchSalesEmployees();
   }, []);
 
   useEffect(() => {
@@ -122,7 +126,7 @@ export default function SalesReportsPage() {
     if (currentUser) {
       fetchReportData();
     }
-  }, [dateRange, selectedBranchId, currentUser]);
+  }, [dateRange, selectedBranchId, selectedSalesEmployeeId, currentUser]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -148,32 +152,50 @@ export default function SalesReportsPage() {
     }
   };
 
+  const fetchSalesEmployees = async () => {
+    try {
+      // Fetch all users for now, ideally filter by role SALES/MANAGER
+      const res = await fetch('/api/admin/users?limit=100'); // Fetch more users
+      const data = await res.json();
+      if (data.success) {
+        setSalesEmployees(data.data.users || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   const isAdmin = currentUser?.roleCode === 'ADMIN';
 
   const fetchReportData = async () => {
     setLoading(true);
     try {
-      const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
-      
-      const startDate = dateRange[0].format('YYYY-MM-DD');
-      const endDate = dateRange[1].format('YYYY-MM-DD');
-      
+      let queryParams = `startDate=${dateRange[0].format('YYYY-MM-DD')}&endDate=${dateRange[1].format('YYYY-MM-DD')}`;
+
+      if (selectedBranchId !== 'all') {
+        queryParams += `&branchId=${selectedBranchId}`;
+      }
+
+      if (selectedSalesEmployeeId !== 'all') {
+        queryParams += `&salesEmployeeId=${selectedSalesEmployeeId}`;
+      }
+
       // Fetch summary
-      const summaryRes = await fetch(`/api/sales/reports/summary?startDate=${startDate}&endDate=${endDate}${branchParam}`);
+      const summaryRes = await fetch(`/api/sales/reports/summary?${queryParams}`);
       const summaryData = await summaryRes.json();
       if (summaryData.success) {
         setSummary(summaryData.data);
       }
 
       // Fetch monthly trend
-      const monthlyRes = await fetch(`/api/sales/reports/monthly?startDate=${startDate}&endDate=${endDate}${branchParam}`);
+      const monthlyRes = await fetch(`/api/sales/reports/monthly?${queryParams}`);
       const monthlyDataRes = await monthlyRes.json();
       if (monthlyDataRes.success) {
         setMonthlyData(monthlyDataRes.data);
       }
 
       // Fetch daily trend
-      const dailyRes = await fetch(`/api/sales/reports/daily?startDate=${startDate}&endDate=${endDate}${branchParam}`);
+      const dailyRes = await fetch(`/api/sales/reports/daily?${queryParams}`);
       const dailyDataRes = await dailyRes.json();
       if (dailyDataRes.success) {
         setDailyData(dailyDataRes.data);
@@ -247,6 +269,21 @@ export default function SalesReportsPage() {
                   ]}
                 />
               )}
+              <Select
+                style={{ width: 200 }}
+                placeholder="Chọn nhân viên"
+                value={selectedSalesEmployeeId}
+                onChange={(value: number | 'all') => setSelectedSalesEmployeeId(value)}
+                showSearch
+                optionFilterProp="label"
+                options={[
+                  { label: 'Tất cả nhân viên', value: 'all' },
+                  ...salesEmployees.map((e) => ({
+                    label: e.fullName,
+                    value: e.id,
+                  })),
+                ]}
+              />
             </div>
           ),
           buttonEnds: [
