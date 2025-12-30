@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const branchId = searchParams.get('branchId');
+    const categoryId = searchParams.get('categoryId');
 
     let sql = `
       SELECT 
@@ -81,6 +82,12 @@ export async function GET(request: NextRequest) {
     if (endDate) {
       sql += ` AND cb.transaction_date <= $${paramCount}`;
       params.push(endDate);
+      paramCount++;
+    }
+
+    if (categoryId) {
+      sql += ` AND cb.financial_category_id = $${paramCount}`;
+      params.push(categoryId);
       paramCount++;
     }
 

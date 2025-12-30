@@ -379,13 +379,39 @@ export async function POST(request: NextRequest) {
         );
         const transactionCode = txCodeResult.rows[0].code;
 
-        // Lấy danh mục tài chính phù hợp (THU)
+        // Lấy danh mục tài chính "Bán hàng" (THU)
+        let categoryId: number | null = null;
+
+        // 1. Tìm theo tên
         const categoryResult = await query(
           `SELECT id FROM financial_categories 
-           WHERE type = 'THU' AND is_active = true 
-           ORDER BY id LIMIT 1`
+           WHERE category_name = 'Bán hàng' AND type = 'THU' AND is_active = true 
+           LIMIT 1`
         );
-        const categoryId = categoryResult.rows.length > 0 ? categoryResult.rows[0].id : null;
+
+        if (categoryResult.rows.length > 0) {
+          categoryId = categoryResult.rows[0].id;
+        } else {
+          // 2. Tìm theo mã
+          const categoryCodeResult = await query(
+            `SELECT id FROM financial_categories 
+             WHERE category_code = 'BAN_HANG' AND type = 'THU' AND is_active = true 
+             LIMIT 1`
+          );
+
+          if (categoryCodeResult.rows.length > 0) {
+            categoryId = categoryCodeResult.rows[0].id;
+          } else {
+            // 3. Tạo mới nếu chưa có
+            const newCategoryResult = await query(
+              `INSERT INTO financial_categories 
+               (category_code, category_name, type, is_active, description, created_at) 
+               VALUES ('BAN_HANG', 'Bán hàng', 'THU', true, 'Doanh thu bán hàng', NOW()) 
+               RETURNING id`
+            );
+            categoryId = newCategoryResult.rows[0].id;
+          }
+        }
 
         // Ghi vào sổ quỹ
         await query(

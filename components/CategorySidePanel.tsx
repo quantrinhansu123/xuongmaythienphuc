@@ -38,9 +38,7 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     setLoadingTransactions(true);
     try {
       // Fetch relevant transactions based on category type
-      const endpoint = category.type === 'THU'
-        ? `/api/finance/receipts?categoryId=${category.id}`
-        : `/api/finance/payment-vouchers?categoryId=${category.id}`;
+      const endpoint = `/api/finance/cashbooks?categoryId=${category.id}&transactionType=${category.type}`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -79,7 +77,7 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
   };
 
   const handleDelete = async () => {
-    if (!confirm('Bạn có chắc muốn xóa danh mục này?')) return;
+    if (!confirm('Bạn có chắc muốn xóa sổ quỹ này?')) return;
     try {
       const res = await fetch(`/api/finance/categories/${category.id}`, {
         method: 'DELETE',
@@ -101,7 +99,7 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     <div className="fixed right-0 top-0 h-full w-[600px] bg-white shadow-2xl border-l border-gray-200 overflow-y-auto z-40">
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
         <div>
-          <h2 className="text-xl font-bold">Chi tiết danh mục</h2>
+          <h2 className="text-xl font-bold">Chi tiết sổ quỹ</h2>
           <p className="text-sm text-gray-600">{category.categoryCode}</p>
         </div>
         <button
@@ -117,11 +115,11 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
           <>
             <div className="bg-gray-50 p-4 rounded-lg space-y-3">
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Mã danh mục:</span>
+                <span className="text-sm text-gray-600">Mã sổ quỹ:</span>
                 <span className="font-medium">{category.categoryCode}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Tên danh mục:</span>
+                <span className="text-sm text-gray-600">Tên sổ quỹ:</span>
                 <span className="font-medium">{category.categoryName}</span>
               </div>
               <div className="flex justify-between">
@@ -171,15 +169,15 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
                     <div key={t.id} className="flex justify-between items-center text-sm border-b pb-2">
                       <div>
                         <div className="font-medium">
-                          {new Date(t.date || t.voucherDate).toLocaleDateString('vi-VN')} - {t.code || t.voucherCode}
+                          {new Date(t.transactionDate).toLocaleDateString('vi-VN')} - {t.transactionCode}
                         </div>
                         <div className="text-gray-500 text-xs truncate max-w-[200px]">
-                          {t.description || t.reason}
+                          {t.description}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className={`font-bold ${category.type === 'THU' ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(t.amount || t.totalAmount)}
+                          {formatCurrency(t.amount)}
                         </div>
                       </div>
                     </div>
@@ -210,7 +208,7 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Mã danh mục</label>
+              <label className="block text-sm font-medium mb-1">Mã sổ quỹ</label>
               <input
                 type="text"
                 value={formData.categoryCode}
@@ -220,7 +218,7 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Tên danh mục</label>
+              <label className="block text-sm font-medium mb-1">Tên sổ quỹ</label>
               <input
                 type="text"
                 value={formData.categoryName}

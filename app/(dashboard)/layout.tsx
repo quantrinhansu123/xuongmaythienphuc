@@ -66,9 +66,9 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/purchasing/supplier-groups": "Nhóm nhà cung cấp",
   "/purchasing/suppliers": "Nhà cung cấp",
   "/purchasing/orders": "Đơn đặt hàng",
-  "/finance/categories": "Danh mục tài chính",
+  "/finance/categories": "Sổ quỹ",
   "/finance/bank-accounts": "Tài khoản",
-  "/finance/cashbooks": "Sổ quỹ",
+  "/finance/cashbooks": "Thu chi",
   "/finance/debts": "Công nợ",
   "/finance/reports": "Báo cáo tài chính",
 };

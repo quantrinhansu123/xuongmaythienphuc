@@ -74,7 +74,7 @@ export default function FinancialCategoriesPage() {
       const data = await res.json();
 
       if (data.success) {
-        alert(editingCategory ? 'Cập nhật thành công!' : 'Tạo danh mục thành công!');
+        alert(editingCategory ? 'Cập nhật thành công!' : 'Tạo sổ quỹ thành công!');
         setShowModal(false);
         resetForm();
         fetchCategories();
@@ -99,7 +99,7 @@ export default function FinancialCategoriesPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Bạn có chắc muốn xóa danh mục này?')) return;
+    if (!confirm('Bạn có chắc muốn xóa sổ quỹ này?')) return;
 
     try {
       const res = await fetch(`/api/finance/categories/${id}`, {
@@ -137,8 +137,8 @@ export default function FinancialCategoriesPage() {
   };
 
   const exportColumns = [
-    { title: 'Mã danh mục', dataIndex: 'categoryCode', key: 'categoryCode' },
-    { title: 'Tên danh mục', dataIndex: 'categoryName', key: 'categoryName' },
+    { title: 'Mã sổ quỹ', dataIndex: 'categoryCode', key: 'categoryCode' },
+    { title: 'Tên sổ quỹ', dataIndex: 'categoryName', key: 'categoryName' },
     { title: 'Loại', dataIndex: 'type', key: 'type' },
     { title: 'Trạng thái', dataIndex: 'isActive', key: 'isActive' },
     { title: 'Mô tả', dataIndex: 'description', key: 'description' },
@@ -168,7 +168,7 @@ export default function FinancialCategoriesPage() {
   return (
     <>
       <WrapperContent<FinancialCategory>
-        title="Danh mục tài chính"
+        title="Sổ quỹ"
         isNotAccessible={!can('finance.categories', 'view')}
         isLoading={loading}
         header={{
@@ -205,7 +205,7 @@ export default function FinancialCategoriesPage() {
               },
             ],
           searchInput: {
-            placeholder: 'Tìm theo mã, tên danh mục...',
+            placeholder: 'Tìm theo mã, tên sổ quỹ...',
             filterKeys: ['categoryCode', 'categoryName'],
           },
           customToolbar: (
@@ -257,7 +257,7 @@ export default function FinancialCategoriesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên danh mục</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên sổ quỹ</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
@@ -299,12 +299,12 @@ export default function FinancialCategoriesPage() {
           setShowModal(false);
           resetForm();
         }}
-        title={editingCategory ? 'Sửa danh mục' : 'Thêm danh mục'}
+        title={editingCategory ? 'Sửa sổ quỹ' : 'Thêm sổ quỹ'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {editingCategory ? (
             <div>
-              <label className="block text-sm font-medium mb-1">Mã danh mục</label>
+              <label className="block text-sm font-medium mb-1">Mã sổ quỹ</label>
               <input
                 type="text"
                 value={formData.categoryCode}
@@ -314,7 +314,7 @@ export default function FinancialCategoriesPage() {
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-medium mb-1">Mã danh mục <span className="text-gray-400 font-normal">(để trống sẽ tự động tạo)</span></label>
+              <label className="block text-sm font-medium mb-1">Mã sổ quỹ <span className="text-gray-400 font-normal">(để trống sẽ tự động tạo)</span></label>
               <input
                 type="text"
                 value={formData.categoryCode}
@@ -326,7 +326,7 @@ export default function FinancialCategoriesPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">Tên danh mục *</label>
+            <label className="block text-sm font-medium mb-1">Tên sổ quỹ *</label>
             <input
               type="text"
               value={formData.categoryName}

@@ -233,7 +233,7 @@ export default function CashBooksPage() {
     { title: 'Loại', dataIndex: 'transactionType', key: 'transactionType' },
     { title: 'Số tiền', dataIndex: 'amount', key: 'amount' },
     { title: 'PT thanh toán', dataIndex: 'paymentMethod', key: 'paymentMethod' },
-    { title: 'Danh mục', dataIndex: 'categoryName', key: 'categoryName' },
+    { title: 'Sổ quỹ', dataIndex: 'categoryName', key: 'categoryName' },
     { title: 'Mô tả', dataIndex: 'description', key: 'description' },
     { title: 'Tài khoản', dataIndex: 'bankAccountNumber', key: 'bankAccountNumber' },
     { title: 'Ngân hàng', dataIndex: 'bankName', key: 'bankName' },
@@ -279,7 +279,7 @@ export default function CashBooksPage() {
   return (
     <>
       <WrapperContent<CashBook>
-        title="Sổ quỹ"
+        title="Thu chi"
         isNotAccessible={!can('finance.cashbooks', 'view')}
         isLoading={loading}
         header={{
@@ -393,7 +393,7 @@ export default function CashBooksPage() {
               },
             ],
           searchInput: {
-            placeholder: 'Tìm theo mã GD, danh mục, mô tả...',
+            placeholder: 'Tìm theo mã GD, sổ quỹ, mô tả...',
             filterKeys: ['transactionCode', 'categoryName', 'description'],
             suggestions: {
               apiEndpoint: '/api/finance/cashbooks',
@@ -434,7 +434,7 @@ export default function CashBooksPage() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã GD</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Danh mục</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sổ quỹ</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tài khoản</th>
@@ -520,14 +520,14 @@ export default function CashBooksPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Danh mục *</label>
+            <label className="block text-sm font-medium mb-1">Sổ quỹ *</label>
             <select
               value={formData.financialCategoryId}
               onChange={(e) => setFormData({ ...formData, financialCategoryId: e.target.value })}
               className="w-full px-3 py-2 border rounded"
               required
             >
-              <option value="">-- Chọn danh mục --</option>
+              <option value="">-- Chọn sổ quỹ --</option>
               {filteredCategories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.categoryName}

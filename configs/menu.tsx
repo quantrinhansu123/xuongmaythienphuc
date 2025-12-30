@@ -185,7 +185,7 @@ export const allMenuItems: Array<{
       children: [
         {
           icon: <TagsOutlined />,
-          title: "Danh mục tài chính",
+          title: "Sổ quỹ",
           href: "/finance/categories",
           permission: "finance.categories",
         },
@@ -197,7 +197,7 @@ export const allMenuItems: Array<{
         },
         {
           icon: <BookOutlined />,
-          title: "Sổ quỹ",
+          title: "Thu chi",
           href: "/finance/cashbooks",
           permission: "finance.cashbooks",
         },

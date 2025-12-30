@@ -242,14 +242,80 @@ export async function POST(
       const transactionCode = txCodeResult.rows[0].code;
 
       // Lấy danh mục tài chính phù hợp (Thu công nợ hoặc Chi công nợ)
-      const categoryType = transactionType;
-      const categoryResult = await query(
-        `SELECT id FROM financial_categories 
-         WHERE type = $1 AND is_active = true 
-         ORDER BY id LIMIT 1`,
-        [categoryType]
-      );
-      const categoryId = categoryResult.rows.length > 0 ? categoryResult.rows[0].id : null;
+      let categoryId: number | null = null;
+
+      if (transactionType === 'THU' && partnerType === 'customer') {
+        // 1. Tìm theo tên
+        const categoryResult = await query(
+          `SELECT id FROM financial_categories 
+             WHERE category_name = 'Bán hàng' AND type = 'THU' AND is_active = true 
+             LIMIT 1`
+        );
+
+        if (categoryResult.rows.length > 0) {
+          categoryId = categoryResult.rows[0].id;
+        } else {
+          // 2. Tìm theo mã
+          const categoryCodeResult = await query(
+            `SELECT id FROM financial_categories 
+               WHERE category_code = 'BAN_HANG' AND type = 'THU' AND is_active = true 
+               LIMIT 1`
+          );
+
+          if (categoryCodeResult.rows.length > 0) {
+            categoryId = categoryCodeResult.rows[0].id;
+          } else {
+            // 3. Tạo mới nếu chưa có
+            const newCategoryResult = await query(
+              `INSERT INTO financial_categories 
+                 (category_code, category_name, type, is_active, description, created_at) 
+                 VALUES ('BAN_HANG', 'Bán hàng', 'THU', true, 'Doanh thu bán hàng', NOW()) 
+                 RETURNING id`
+            );
+            categoryId = newCategoryResult.rows[0].id;
+          }
+        }
+      } else if (transactionType === 'CHI' && partnerType === 'supplier') {
+        // 1. Tìm theo tên
+        const categoryResult = await query(
+          `SELECT id FROM financial_categories 
+             WHERE category_name = 'Mua hàng' AND type = 'CHI' AND is_active = true 
+             LIMIT 1`
+        );
+
+        if (categoryResult.rows.length > 0) {
+          categoryId = categoryResult.rows[0].id;
+        } else {
+          // 2. Tìm theo mã
+          const categoryCodeResult = await query(
+            `SELECT id FROM financial_categories 
+               WHERE category_code = 'MUA_HANG' AND type = 'CHI' AND is_active = true 
+               LIMIT 1`
+          );
+
+          if (categoryCodeResult.rows.length > 0) {
+            categoryId = categoryCodeResult.rows[0].id;
+          } else {
+            // 3. Tạo mới nếu chưa có
+            const newCategoryResult = await query(
+              `INSERT INTO financial_categories 
+                 (category_code, category_name, type, is_active, description, created_at) 
+                 VALUES ('MUA_HANG', 'Mua hàng', 'CHI', true, 'Chi thanh toán tiền mua hàng', NOW()) 
+                 RETURNING id`
+            );
+            categoryId = newCategoryResult.rows[0].id;
+          }
+        }
+      } else {
+        // Các loại khác (CHI cho NCC), dùng logic cũ hoặc tìm mục phù hợp
+        const categoryResult = await query(
+          `SELECT id FROM financial_categories 
+             WHERE type = $1 AND is_active = true 
+             ORDER BY id LIMIT 1`,
+          [transactionType]
+        );
+        categoryId = categoryResult.rows.length > 0 ? categoryResult.rows[0].id : null;
+      }
 
       // Ghi vào sổ quỹ
       const description = partnerType === 'customer'

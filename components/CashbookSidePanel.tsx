@@ -84,7 +84,7 @@ export default function CashbookSidePanel({
           </div>
 
           <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Danh mục:</span>
+            <span className="text-sm text-gray-600">Sổ quỹ:</span>
             <span className="font-medium">{cashbook.categoryName}</span>
           </div>
 
