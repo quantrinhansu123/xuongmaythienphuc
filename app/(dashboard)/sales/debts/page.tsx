@@ -7,11 +7,11 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-    CalendarOutlined,
-    DownloadOutlined,
-    MailOutlined,
-    PhoneOutlined,
-    ReloadOutlined
+  CalendarOutlined,
+  DownloadOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  ReloadOutlined
 } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, DatePicker, Select, Statistic } from "antd";
@@ -43,90 +43,6 @@ export default function CustomerDebtsPage() {
   const { can, isAdmin } = usePermissions();
   const queryClient = useQueryClient();
   const { query, updateQueries, reset } = useFilter();
-  const { exportToXlsx } = useFileExport([]);
-
-  const [selectedPartner, setSelectedPartner] = useState<{
-    id: number;
-    name: string;
-    code: string;
-    type: "customer";
-    totalAmount: number;
-    paidAmount: number;
-    remainingAmount: number;
-    totalOrders: number;
-    unpaidOrders: number;
-  } | null>(null);
-  const [showSidePanel, setShowSidePanel] = useState(false);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
-    dayjs().startOf("month"),
-    dayjs(),
-  ]);
-
-  const { data: branches = [], isLoading: branchesLoading } = useQuery({
-    queryKey: ["branches"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/branches");
-      const data = await res.json();
-      return data.success ? data.data : [];
-    },
-    staleTime: 10 * 60 * 1000, // Cache
-  });
-
-  const { data: bankAccounts = [], isLoading: bankLoading } = useQuery({
-    queryKey: ["bank-accounts"],
-    queryFn: async () => {
-      const res = await fetch("/api/finance/bank-accounts?isActive=true");
-      const data = await res.json();
-      return data.success ? data.data : [];
-    },
-    staleTime: 10 * 60 * 1000, // Cache
-  });
-
-  const {
-    data: customerSummaries = [],
-    isLoading,
-    isFetching,
-  } = useQuery({
-    queryKey: ["debts-summary", selectedBranchId, dateRange],
-    queryFn: async () => {
-      const branchParam =
-        selectedBranchId !== "all" ? `&branchId=${selectedBranchId}` : "";
-      const startDate = dateRange[0].format("YYYY-MM-DD");
-      const endDate = dateRange[1].format("YYYY-MM-DD");
-      const res = await fetch(
-        `/api/finance/debts/summary?type=customers${branchParam}&startDate=${startDate}&endDate=${endDate}`
-      );
-      const data = await res.json();
-      return data.success ? data.data || [] : [];
-    },
-    staleTime: 2 * 60 * 1000, // Cache
-  });
-
-  const handleExportExcel = () => {
-    exportToXlsx(filteredCustomerSummaries, "debts-customers");
-  };
-
-  const handleResetAll = () => {
-    setDateRange([dayjs().startOf("month"), dayjs()]);
-    setSelectedBranchId("all");
-    reset();
-  };
-
-  const handleViewPartnerDetails = (customer: CustomerSummary) => {
-    setSelectedPartner({
-      id: customer.id,
-      name: customer.customerName,
-      code: customer.customerCode,
-      type: "customer",
-      totalAmount: parseFloat(customer.totalAmount.toString()),
-      paidAmount: parseFloat(customer.paidAmount.toString()),
-      remainingAmount: parseFloat(customer.remainingAmount.toString()),
-      totalOrders: customer.totalOrders,
-      unpaidOrders: customer.unpaidOrders,
-    });
-    setShowSidePanel(true);
-  };
 
   const columns = [
     {
@@ -211,8 +127,92 @@ export default function CustomerDebtsPage() {
         </span>
       ),
     },
-
   ];
+
+  const { exportToXlsx } = useFileExport(columns);
+
+  const [selectedPartner, setSelectedPartner] = useState<{
+    id: number;
+    name: string;
+    code: string;
+    type: "customer";
+    totalAmount: number;
+    paidAmount: number;
+    remainingAmount: number;
+    totalOrders: number;
+    unpaidOrders: number;
+  } | null>(null);
+  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | "all">("all");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf("month"),
+    dayjs(),
+  ]);
+
+  const { data: branches = [], isLoading: branchesLoading } = useQuery({
+    queryKey: ["branches"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/branches");
+      const data = await res.json();
+      return data.success ? data.data : [];
+    },
+    staleTime: 10 * 60 * 1000, // Cache
+  });
+
+  const { data: bankAccounts = [], isLoading: bankLoading } = useQuery({
+    queryKey: ["bank-accounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/finance/bank-accounts?isActive=true");
+      const data = await res.json();
+      return data.success ? data.data : [];
+    },
+    staleTime: 10 * 60 * 1000, // Cache
+  });
+
+  const {
+    data: customerSummaries = [],
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ["debts-summary", selectedBranchId, dateRange],
+    queryFn: async () => {
+      const branchParam =
+        selectedBranchId !== "all" ? `&branchId=${selectedBranchId}` : "";
+      const startDate = dateRange[0].format("YYYY-MM-DD");
+      const endDate = dateRange[1].format("YYYY-MM-DD");
+      const res = await fetch(
+        `/api/finance/debts/summary?type=customers${branchParam}&startDate=${startDate}&endDate=${endDate}`
+      );
+      const data = await res.json();
+      return data.success ? data.data || [] : [];
+    },
+    staleTime: 2 * 60 * 1000, // Cache
+  });
+
+  const handleExportExcel = () => {
+    exportToXlsx(filteredCustomerSummaries, "debts-customers");
+  };
+
+  const handleResetAll = () => {
+    setDateRange([dayjs().startOf("month"), dayjs()]);
+    setSelectedBranchId("all");
+    reset();
+  };
+
+  const handleViewPartnerDetails = (customer: CustomerSummary) => {
+    setSelectedPartner({
+      id: customer.id,
+      name: customer.customerName,
+      code: customer.customerCode,
+      type: "customer",
+      totalAmount: parseFloat(customer.totalAmount.toString()),
+      paidAmount: parseFloat(customer.paidAmount.toString()),
+      remainingAmount: parseFloat(customer.remainingAmount.toString()),
+      totalOrders: customer.totalOrders,
+      unpaidOrders: customer.unpaidOrders,
+    });
+    setShowSidePanel(true);
+  };
 
   const filteredCustomerSummaries = customerSummaries.filter(
     (c: CustomerSummary) => {

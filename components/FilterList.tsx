@@ -25,7 +25,7 @@ export const FilterList: React.FC<FilterListProps> = ({
   fields,
   onApplyFilter,
   onReset,
-  onCancel = () => {},
+  onCancel = () => { },
   isMobile,
   form,
 }) => {

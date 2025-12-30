@@ -160,7 +160,6 @@ export default function ProductionPage() {
             isNotAccessible={!can("production.orders", "view")}
             isEmpty={!data?.data?.length}
             header={{
-                buttonBackTo: "/dashboard",
                 refetchDataWithKeys: ["production-orders"],
                 buttonEnds: [
                     {

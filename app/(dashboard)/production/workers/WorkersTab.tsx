@@ -1,11 +1,12 @@
 "use client";
 
+import CommonTable from "@/components/CommonTable";
 import { useBranches } from "@/hooks/useCommonQuery";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, PlusOutlined, UserOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, DatePicker, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Switch, Table, Tag } from "antd";
+import { Button, Checkbox, DatePicker, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Switch, Tag, type TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
 
@@ -24,6 +25,9 @@ interface Worker {
     hourly_rate: number;
     notes: string;
     is_active: boolean;
+    userId?: number;
+    username?: string;
+    systemFullName?: string;
 }
 
 interface Category {
@@ -39,10 +43,35 @@ export default function WorkersTab() {
     const [form] = Form.useForm();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
+    const [selectedDept, setSelectedDept] = useState<number | undefined>();
+    const [showInactive, setShowInactive] = useState(false);
+    const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+    const [page, setPage] = useState(1);
 
     const { data: branches = [] } = useBranches();
+
+    const { data: departments = [] } = useQuery<any[]>({
+        queryKey: ["admin-departments"],
+        queryFn: async () => {
+            const res = await fetch("/api/admin/departments");
+            const data = await res.json();
+            return data.data || [];
+        },
+    });
+
+    const { data: systemUsers = [] } = useQuery<any[]>({
+        queryKey: ["admin-users-dept", selectedDept],
+        queryFn: async () => {
+            if (!selectedDept) return [];
+            const res = await fetch(`/api/admin/users?departmentId=${selectedDept}&limit=100`);
+            const data = await res.json();
+            return data.data?.users || [];
+        },
+        enabled: !!selectedDept,
+    });
 
     const { data: categories = [] } = useQuery<Category[]>({
         queryKey: ["worker-categories"],
@@ -54,16 +83,19 @@ export default function WorkersTab() {
     });
 
     const { data, isLoading } = useQuery({
-        queryKey: ["production-workers", search, categoryFilter],
+        queryKey: ["production-workers", search, categoryFilter, showInactive, page],
         queryFn: async () => {
             const params = new URLSearchParams();
             if (search) params.append("search", search);
             if (categoryFilter) params.append("categoryId", categoryFilter);
+            params.append("isActive", showInactive ? "all" : "true");
+            params.append("page", String(page));
+            params.append("pageSize", "20");
             const res = await fetch(`/api/production/workers?${params.toString()}`);
             const data = await res.json();
             return data;
         },
-        staleTime: 5 * 60 * 1000, // Cache
+        staleTime: 5 * 60 * 1000,
     });
 
     const createMutation = useMutation({
@@ -113,16 +145,19 @@ export default function WorkersTab() {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: async (id: number) => {
-            const res = await fetch(`/api/production/workers/${id}`, {
+        mutationFn: async (ids: React.Key[]) => {
+            const res = await fetch(`/api/production/workers`, {
                 method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids }),
             });
             return res.json();
         },
         onSuccess: (data) => {
             if (data.success) {
-                message.success("Xóa thành công");
+                message.success(data.message || "Xóa thành công");
                 queryClient.invalidateQueries({ queryKey: ["production-workers"] });
+                setSelectedRowKeys([]);
             } else {
                 message.error(data.error);
             }
@@ -143,9 +178,11 @@ export default function WorkersTab() {
                 hourlyRate: record.hourly_rate,
                 notes: record.notes,
                 isActive: record.is_active,
+                userId: record.userId,
             });
         } else {
             setEditingId(null);
+            setSelectedDept(undefined);
             form.resetFields();
         }
         setIsModalOpen(true);
@@ -165,15 +202,30 @@ export default function WorkersTab() {
         }
     };
 
-    // Xử lý khi thay đổi danh mục - tự động cập nhật lương
+    const handleUserChange = (userId: number) => {
+        const user = systemUsers.find((u: any) => u.id === userId);
+        if (user) {
+            form.setFieldsValue({
+                fullName: user.fullName,
+                phone: user.phone,
+                email: user.email,
+                branchId: user.branchId,
+            });
+        }
+    };
+
     const handleCategoryChange = (categoryId: number) => {
-        const category = categories.find((c) => c.id === categoryId);
+        const category = categories.find((c: any) => c.id === categoryId);
         if (category && category.hourly_rate) {
             form.setFieldsValue({ hourlyRate: category.hourly_rate });
         }
     };
 
-    const columns = [
+    const handleBulkDelete = async (ids: React.Key[]) => {
+        await deleteMutation.mutateAsync(ids);
+    };
+
+    const columns: TableColumnsType<Worker> = [
         {
             title: "Mã NV",
             dataIndex: "worker_code",
@@ -184,6 +236,15 @@ export default function WorkersTab() {
             title: "Họ tên",
             dataIndex: "full_name",
             key: "full_name",
+            render: (value: string, record: Worker) => (
+                <Space direction="vertical" size={0}>
+                    <span className="font-medium">
+                        {record.userId && <UserOutlined className="mr-1 text-blue-500" title="Đã liên kết tài khoản" />}
+                        {value}
+                    </span>
+                    {record.username && <span className="text-xs text-gray-400">@{record.username}</span>}
+                </Space>
+            ),
         },
         {
             title: "SĐT",
@@ -242,7 +303,7 @@ export default function WorkersTab() {
                     {can("production.workers", "delete") && (
                         <Popconfirm
                             title="Xác nhận xóa?"
-                            onConfirm={() => deleteMutation.mutate(record.id)}
+                            onConfirm={() => deleteMutation.mutate([record.id])}
                         >
                             <Button type="text" danger icon={<DeleteOutlined />} />
                         </Popconfirm>
@@ -254,8 +315,8 @@ export default function WorkersTab() {
 
     return (
         <div>
-            <div className="mb-4 flex justify-between gap-4">
-                <Space>
+            <div className="mb-4 flex justify-between gap-4 items-center">
+                <Space wrap>
                     <Input.Search
                         placeholder="Tìm theo tên, mã, SĐT..."
                         allowClear
@@ -267,29 +328,47 @@ export default function WorkersTab() {
                         allowClear
                         style={{ width: 180 }}
                         onChange={setCategoryFilter}
-                        options={categories.map((c) => ({
+                        options={categories.map((c: any) => ({
                             label: c.category_name,
                             value: String(c.id),
                         }))}
                     />
+                    <span className="ml-2">
+                        <Checkbox
+                            checked={showInactive}
+                            onChange={(e) => setShowInactive(e.target.checked)}
+                        >
+                            Hiện nhân viên nghỉ
+                        </Checkbox>
+                    </span>
                 </Space>
                 {can("production.workers", "create") && (
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
-                        Thêm nhân viên
-                    </Button>
+                    <Space>
+                        <Button type="default" icon={<PlusOutlined />} onClick={() => setIsBulkModalOpen(true)}>
+                            Thêm từ phòng ban
+                        </Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
+                            Thêm nhân viên
+                        </Button>
+                    </Space>
                 )}
             </div>
 
-            <Table
+            <CommonTable
                 columns={columns}
                 dataSource={data?.data || []}
-                rowKey="id"
                 loading={isLoading}
                 pagination={{
                     total: data?.total || 0,
-                    pageSize: 20,
-                    showSizeChanger: false,
+                    current: page,
+                    limit: 20,
+                    onChange: (p) => setPage(p),
                 }}
+                rowSelection={can("production.workers", "delete") ? {
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                } : undefined}
+                onBulkDelete={handleBulkDelete}
             />
 
             <Modal
@@ -300,6 +379,36 @@ export default function WorkersTab() {
                 width={600}
             >
                 <Form form={form} layout="vertical" onFinish={handleSubmit}>
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 flex gap-4">
+                        <Form.Item label="Chọn từ phòng ban" className="mb-0 flex-1">
+                            <Select
+                                placeholder="Chọn phòng ban"
+                                allowClear
+                                value={selectedDept}
+                                onChange={(val) => {
+                                    setSelectedDept(val);
+                                    form.setFieldsValue({ userId: undefined });
+                                }}
+                                options={departments.map((d: any) => ({
+                                    label: d.departmentName,
+                                    value: d.id,
+                                }))}
+                            />
+                        </Form.Item>
+                        <Form.Item name="userId" label="Tài khoản hệ thống" className="mb-0 flex-1">
+                            <Select
+                                placeholder="Chọn nhân viên"
+                                allowClear
+                                disabled={!selectedDept}
+                                onChange={handleUserChange}
+                                options={systemUsers.map((u: any) => ({
+                                    label: `${u.fullName} (${u.username})`,
+                                    value: u.id,
+                                }))}
+                            />
+                        </Form.Item>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         {editingId && (
                             <Form.Item label="Mã nhân viên">
@@ -377,6 +486,123 @@ export default function WorkersTab() {
                     </Form.Item>
                 </Form>
             </Modal>
+
+            <BulkAddModal
+                open={isBulkModalOpen}
+                onCancel={() => setIsBulkModalOpen(false)}
+                onSuccess={() => {
+                    setIsBulkModalOpen(false);
+                    queryClient.invalidateQueries({ queryKey: ["production-workers"] });
+                }}
+                departments={departments}
+                categories={categories}
+            />
         </div>
+    );
+}
+
+function BulkAddModal({ open, onCancel, onSuccess, departments, categories }: any) {
+    const [form] = Form.useForm();
+    const [loading, setLoading] = useState(false);
+    const selectedDeptId = Form.useWatch('departmentId', form);
+
+    const { data: usersData = [], isLoading: loadingUsers } = useQuery<any[]>({
+        queryKey: ["admin-users-bulk", selectedDeptId],
+        queryFn: async () => {
+            if (!selectedDeptId) return [];
+            const res = await fetch(`/api/admin/users?departmentId=${selectedDeptId}&limit=100`);
+            const data = await res.json();
+            return data.data?.users || [];
+        },
+        enabled: open && !!selectedDeptId,
+    });
+
+    const handleBulkAdd = async (values: any) => {
+        try {
+            setLoading(true);
+            const workersToCreate = usersData.map(user => ({
+                fullName: user.fullName,
+                phone: user.phone,
+                email: user.email,
+                branchId: user.branchId,
+                userId: user.id,
+                categoryId: values.categoryId,
+                isActive: true
+            }));
+
+            if (workersToCreate.length === 0) {
+                message.warning("Không có nhân viên nào để thêm");
+                return;
+            }
+
+            const res = await fetch("/api/production/workers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(workersToCreate),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                message.success(`Đã thêm thành công ${data.count} nhân viên`);
+                onSuccess();
+            } else {
+                message.error(data.error);
+            }
+        } catch (error) {
+            message.error("Lỗi khi thêm nhân viên hàng loạt");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal
+            title="Thêm nhân viên từ phòng ban"
+            open={open}
+            onCancel={onCancel}
+            onOk={() => form.submit()}
+            confirmLoading={loading}
+            okText="Xác nhận thêm tất cả"
+            cancelText="Hủy"
+            width={500}
+        >
+            <Form form={form} layout="vertical" onFinish={handleBulkAdd}>
+                <Form.Item
+                    name="departmentId"
+                    label="Chọn phòng ban nguồn"
+                    rules={[{ required: true, message: 'Vui lòng chọn phòng ban' }]}
+                >
+                    <Select
+                        placeholder="Chọn phòng ban"
+                        options={departments.map((d: any) => ({
+                            label: d.departmentName,
+                            value: d.id,
+                        }))}
+                    />
+                </Form.Item>
+
+                <Form.Item
+                    name="categoryId"
+                    label="Gán danh mục công việc (Mặc định)"
+                    rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
+                >
+                    <Select
+                        placeholder="Chọn danh mục"
+                        options={categories.map((c: any) => ({
+                            label: c.category_name,
+                            value: c.id,
+                        }))}
+                    />
+                </Form.Item>
+
+                {selectedDeptId && !loadingUsers && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded border text-sm text-gray-600">
+                        Phát hiện <strong>{usersData.length}</strong> nhân viên trong phòng ban này.
+                        Hệ thống sẽ chỉ thêm những người chưa có trong danh sách nhân viên sản xuất.
+                    </div>
+                )}
+                {loadingUsers && <div className="text-center py-4 text-gray-400">Đang kiểm tra nhân viên...</div>}
+            </Form>
+        </Modal>
     );
 }

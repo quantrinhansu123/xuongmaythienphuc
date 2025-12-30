@@ -11,12 +11,16 @@ export async function GET(
         const result = await query(
             `SELECT 
                 w.*,
+                w.user_id as "userId",
                 c.category_name,
                 c.category_code,
-                b.branch_name
+                b.branch_name,
+                u.username,
+                u.full_name as "systemFullName"
             FROM production_workers w
             LEFT JOIN production_worker_categories c ON w.category_id = c.id
             LEFT JOIN branches b ON w.branch_id = b.id
+            LEFT JOIN users u ON w.user_id = u.id
             WHERE w.id = $1`,
             [id]
         );
@@ -49,7 +53,7 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { workerCode, fullName, phone, email, address, categoryId, branchId, hireDate, hourlyRate, notes, isActive } = body;
+        const { workerCode, fullName, phone, email, address, categoryId, branchId, hireDate, hourlyRate, notes, isActive, userId } = body;
 
         const result = await query(
             `UPDATE production_workers 
@@ -64,10 +68,11 @@ export async function PUT(
                 hourly_rate = COALESCE($9, hourly_rate),
                 notes = $10,
                 is_active = COALESCE($11, is_active),
+                user_id = $12,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $12
+            WHERE id = $13
             RETURNING *`,
-            [workerCode, fullName, phone, email, address, categoryId, branchId, hireDate, hourlyRate, notes, isActive, id]
+            [workerCode, fullName, phone, email, address, categoryId, branchId, hireDate, hourlyRate, notes, isActive, userId, id]
         );
 
         if (result.rows.length === 0) {
@@ -111,10 +116,16 @@ export async function DELETE(
         );
 
         if (parseInt(checkResult.rows[0].count) > 0) {
-            return NextResponse.json(
-                { success: false, error: "Không thể xóa nhân viên đang được phân công" },
-                { status: 400 }
+            // Nếu có phân công, chuyển sang trạng thái Ngừng hoạt động thay vì xóa
+            await query(
+                "UPDATE production_workers SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+                [id]
             );
+            return NextResponse.json({
+                success: true,
+                message: "Nhân viên đã có lịch sử phân công nên đã được chuyển sang trạng thái 'Ngừng hoạt động' thay vì xóa",
+                deactivated: true
+            });
         }
 
         const result = await query(

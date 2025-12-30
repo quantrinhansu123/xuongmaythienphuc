@@ -4,7 +4,7 @@ import { App } from "antd";
 import * as XLSX from "xlsx";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const useFileExport = <T extends Record<string, any> = Record<string, any>>(columns?: TableColumnsType<T>) => {
+export const useFileExport = <T extends Record<string, any> = Record<string, any>>(defaultColumns?: TableColumnsType<T>) => {
   const { message } = App.useApp();
 
   const downloadFile = (blob: Blob, fileName: string) => {
@@ -18,9 +18,16 @@ export const useFileExport = <T extends Record<string, any> = Record<string, any
     URL.revokeObjectURL(url);
   };
 
-  const buildHeadersFromColumns = (cols?: TableColumnsType<T>): Record<string, string> => {
+  const buildHeaders = (cols?: TableColumnsType<T>): Record<string, string> => {
     const headers: Record<string, string> = {};
-    if (!cols || !Array.isArray(cols)) return headers;
+    if (!cols || !Array.isArray(cols) || cols.length === 0) {
+      // defaults only when NO columns specified
+      return {
+        id: "ID",
+        createdAt: "Ngày tạo",
+        updatedAt: "Ngày cập nhật"
+      };
+    }
 
     const walk = (arr: TableColumnsType<T>) => {
       arr.forEach((col) => {
@@ -40,79 +47,71 @@ export const useFileExport = <T extends Record<string, any> = Record<string, any
     };
 
     walk(cols);
-
-    // defaults
-    if (!Object.prototype.hasOwnProperty.call(headers, "createdAt")) {
-      headers.createdAt = "Ngày tạo";
-    }
-    if (!Object.prototype.hasOwnProperty.call(headers, "updatedAt")) {
-      headers.updatedAt = "Ngày cập nhật";
-    }
-    if (!Object.prototype.hasOwnProperty.call(headers, "id")) {
-      headers.id = "ID";
-    }
-
     return headers;
   };
 
-  const mapDataWithHeaders = (data: T[]): T[] => {
-    if (!columns || !Array.isArray(columns) || columns.length === 0) return data;
+  const mapData = (data: T[], cols?: TableColumnsType<T>): any[] => {
+    const activeCols = cols || defaultColumns;
+    const headersFinal = buildHeaders(activeCols);
 
-    const headersFinal = buildHeadersFromColumns(columns);
-    if (Object.keys(headersFinal).length === 0) return data;
-     if (!Object.prototype.hasOwnProperty.call(headersFinal, "createdAt")) {
-      headersFinal.createdAt = "Ngày tạo";
-    }
-    if (!Object.prototype.hasOwnProperty.call(headersFinal, "updatedAt")) {
-      headersFinal.updatedAt = "Ngày cập nhật";
-    }
-    if (Object.prototype.hasOwnProperty.call(headersFinal, "actions")) {
-       delete headersFinal.actions;
-    }
-    if (Object.prototype.hasOwnProperty.call(headersFinal, "#")) {
-       delete headersFinal["#"];
-    }
-    if (Object.prototype.hasOwnProperty.call(headersFinal, "actions")) {
-       delete headersFinal.actions;
-    }
+    // Clean up unwanted headers
+    const unwanted = ["actions", "#"];
+    unwanted.forEach(key => {
+      if (Object.prototype.hasOwnProperty.call(headersFinal, key)) {
+        delete headersFinal[key];
+      }
+    });
 
     return data.map((item) => {
       const mappedItem: Record<string, unknown> = {};
-      Object.keys(item).forEach((key) => {
-        if (!Object.prototype.hasOwnProperty.call(item, key)) return;
-        const label = headersFinal[key] ?? key;
-        mappedItem[label] = (item as Record<string, unknown>)[key];
+
+      // We iterate over headersFinal to maintain order and selection
+      Object.keys(headersFinal).forEach((key) => {
+        const label = headersFinal[key];
+
+        // Handle nested properties (e.g., "customer.name")
+        let value: any;
+        if (key.includes(".")) {
+          value = key.split(".").reduce((obj, part) => obj?.[part], item);
+        } else {
+          value = (item as Record<string, any>)[key];
+        }
+
+        // Format boolean values
+        if (typeof value === "boolean") {
+          value = value ? "Có" : "Không";
+        }
+
+        mappedItem[label] = value;
       });
-      return mappedItem as T;
+      return mappedItem;
     });
   };
 
-  const exportToJson = (data: T[], fileName: string = "data.json") => {
+  const exportToJson = (data: T[], fileName: string = "data.json", cols?: TableColumnsType<T>) => {
     try {
-      const jsonData = JSON.stringify(mapDataWithHeaders(data), null, 2);
+      const jsonData = JSON.stringify(mapData(data, cols), null, 2);
       const blob = new Blob([jsonData], { type: "application/json;charset=utf-8" });
       downloadFile(blob, fileName);
     } catch (err) {
-        console.error(err)
+      console.error(err);
       message.error("Lỗi xuất file JSON");
     }
   };
 
-  const exportToCsv = (data: T[], fileName: string = "data.csv") => {
+  const exportToCsv = (data: T[], fileName: string = "data.csv", cols?: TableColumnsType<T>) => {
     try {
-
-      const ws = XLSX.utils.json_to_sheet(mapDataWithHeaders(data) || []);
+      const ws = XLSX.utils.json_to_sheet(mapData(data, cols) || []);
       const csvOutput = "\uFEFF" + XLSX.utils.sheet_to_csv(ws);
       const blob = new Blob([csvOutput], { type: "text/csv;charset=utf-8;" });
       downloadFile(blob, fileName);
     } catch (err) {
-        console.error(err)
-
-      message.error("Lỗi xuất file JSON");
+      console.error(err);
+      message.error("Lỗi xuất file CSV");
     }
   };
 
-  const exportToXlsx = (data: T[], prefix: string) => {
+  const exportToXlsx = (data: T[], prefix: string, cols?: TableColumnsType<T>) => {
     try {
       const today = new Date();
       const dd = String(today.getDate()).padStart(2, '0');
@@ -121,15 +120,14 @@ export const useFileExport = <T extends Record<string, any> = Record<string, any
       const fileName = prefix ? `data_${prefix}_${dd}_${mm}_${yyyy}.xlsx` : `data_${dd}_${mm}_${yyyy}.xlsx`;
 
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(mapDataWithHeaders(data) || []);
+      const ws = XLSX.utils.json_to_sheet(mapData(data, cols) || []);
       XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       downloadFile(blob, fileName);
     } catch (err) {
-        console.error(err)
-
-      message.error("Lỗi xuất file JSON");
+      console.error(err);
+      message.error("Lỗi xuất file XLSX");
     }
   };
 
