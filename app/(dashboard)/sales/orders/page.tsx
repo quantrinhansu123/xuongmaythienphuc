@@ -6,6 +6,7 @@ import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PropRowDetails } from "@/types/table";
 import { formatCurrency, formatQuantity } from "@/utils/format";
@@ -178,6 +179,7 @@ function OrderDetailDrawer({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
+  const isMobile = useIsMobile();
   const [stockByWarehouse, setStockByWarehouse] = useState<any[]>([]);
   const [needsProduction, setNeedsProduction] = useState<boolean | null>(null);
 
@@ -306,12 +308,12 @@ function OrderDetailDrawer({
   const data = orderData;
 
   return (
-    <Space vertical size="large" style={{ width: "100%" }}>
+    <Space direction="vertical" size={isMobile ? "middle" : "large"} style={{ width: "100%" }}>
       {/* Thông tin chi tiết đơn hàng */}
       <Row gutter={[16, 16]}>
-        <Col span={14}>
+        <Col xs={24} md={14}>
           <Card title="Thông tin khách hàng & Đơn hàng" size="small" className="h-full">
-            <Descriptions column={2} size="small">
+            <Descriptions column={isMobile ? 1 : 2} size="small">
               <Descriptions.Item label="Mã đơn" span={1}>
                 <Typography.Text code>{data.orderCode}</Typography.Text>
               </Descriptions.Item>
@@ -338,7 +340,7 @@ function OrderDetailDrawer({
                   {getStatusText(data.status)}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Khách hàng" span={2}>
+              <Descriptions.Item label="Khách hàng" span={isMobile ? 1 : 2}>
                 <Typography.Text strong>{data.customerName}</Typography.Text>
               </Descriptions.Item>
               {data.customerPhone && (
@@ -352,7 +354,7 @@ function OrderDetailDrawer({
                 </Descriptions.Item>
               )}
               {data.customerAddress && (
-                <Descriptions.Item label="Địa chỉ" span={2}>
+                <Descriptions.Item label="Địa chỉ" span={isMobile ? 1 : 2}>
                   {data.customerAddress}
                 </Descriptions.Item>
               )}
@@ -389,7 +391,7 @@ function OrderDetailDrawer({
             )}
           </Card>
         </Col>
-        <Col span={10}>
+        <Col xs={24} md={10}>
           <Card title="Tổng quan chi phí" size="small" className="h-full bg-blue-50/30">
             <div className="space-y-3">
               {(() => {
@@ -400,36 +402,36 @@ function OrderDetailDrawer({
                 return (
                   <>
                     <div className="flex justify-between items-center">
-                      <Typography.Text type="secondary">Tổng tiền hàng (gốc):</Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>Tổng tiền hàng (gốc):</Typography.Text>
                       <Typography.Text>{formatCurrency(totalOriginal)}</Typography.Text>
                     </div>
                     {totalReduction > 0 && (
                       <div className="flex justify-between items-center text-red-500">
-                        <Typography.Text type="danger">Giảm giá:</Typography.Text>
+                        <Typography.Text type="danger" style={{ fontSize: isMobile ? 12 : 14 }}>Giảm giá:</Typography.Text>
                         <Typography.Text type="danger">-{formatCurrency(totalReduction)}</Typography.Text>
                       </div>
                     )}
                     <div className="flex justify-between items-center text-orange-500">
-                      <Typography.Text style={{ color: '#fa8c16' }}>Chi phí phát sinh:</Typography.Text>
+                      <Typography.Text style={{ color: '#fa8c16', fontSize: isMobile ? 12 : 14 }}>Chi phí phát sinh:</Typography.Text>
                       <Typography.Text style={{ color: '#fa8c16' }}>+{formatCurrency(data.otherCosts || 0)}</Typography.Text>
                     </div>
                     <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between items-center">
-                      <Typography.Text strong className="text-lg">Thành tiền:</Typography.Text>
-                      <Typography.Text strong className="text-xl text-blue-600">{formatCurrency(data.finalAmount)}</Typography.Text>
+                      <Typography.Text strong className={isMobile ? "text-base" : "text-lg"}>Thành tiền:</Typography.Text>
+                      <Typography.Text strong className={isMobile ? "text-lg text-blue-600" : "text-xl text-blue-600"}>{formatCurrency(data.finalAmount)}</Typography.Text>
                     </div>
 
-                    <div className="bg-white p-3 rounded-md border border-blue-100 mt-4 space-y-2">
+                    <div className={`bg-white ${isMobile ? 'p-2' : 'p-3'} rounded-md border border-blue-100 mt-4 space-y-2`}>
                       <div className="flex justify-between items-center">
-                        <Typography.Text type="secondary">Tiền đặt cọc:</Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>Tiền đặt cọc:</Typography.Text>
                         <Typography.Text style={{ color: '#52c41a' }}>{formatCurrency(data.depositAmount || 0)}</Typography.Text>
                       </div>
                       <div className="flex justify-between items-center">
-                        <Typography.Text type="secondary">Đã thanh toán:</Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>Đã thanh toán:</Typography.Text>
                         <Typography.Text style={{ color: '#52c41a' }}>{formatCurrency(data.paidAmount || 0)}</Typography.Text>
                       </div>
                       <div className="border-t border-gray-100 pt-2 mt-1 flex justify-between items-center">
                         <Typography.Text strong>Còn lại:</Typography.Text>
-                        <Typography.Text strong style={{ color: remaining > 0 ? '#ff4d4f' : '#52c41a', fontSize: '1.1rem' }}>
+                        <Typography.Text strong style={{ color: remaining > 0 ? '#ff4d4f' : '#52c41a', fontSize: isMobile ? '1rem' : '1.1rem' }}>
                           {formatCurrency(remaining)}
                         </Typography.Text>
                       </div>

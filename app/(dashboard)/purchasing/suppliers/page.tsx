@@ -303,7 +303,6 @@ export default function SuppliersPage() {
       dataIndex: 'supplierCode',
       key: 'supplierCode',
       width: 120,
-      fixed: 'left' as const,
     },
     {
       title: 'Tên nhà cung cấp',
@@ -352,7 +351,6 @@ export default function SuppliersPage() {
       title: 'Thao tác',
       key: 'actions',
       width: 150,
-      fixed: 'right' as const,
       render: (_, record) => (
         <TableActions
           onEdit={(e) => e && handleEdit(record, e)}
