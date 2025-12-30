@@ -39,10 +39,16 @@ export default function BankAccountSidePanel({ account, onClose, onUpdate }: Pro
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
+      const payload = {
+        ...values,
+        bankName: isCash ? 'Tiền mặt' : values.bankName,
+        accountType: account.accountType,
+      };
+
       const res = await fetch(`/api/finance/bank-accounts/${account.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {

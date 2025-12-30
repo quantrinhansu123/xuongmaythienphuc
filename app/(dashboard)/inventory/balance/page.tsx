@@ -271,6 +271,11 @@ export default function Page() {
               icon: <DownloadOutlined />,
             },
           ],
+          filters: {
+            query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
+          },
         }}
       >
         <CommonTable

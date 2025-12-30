@@ -682,6 +682,18 @@ export default function PurchaseOrdersPage() {
               descriptionKey: 'supplierName',
             },
           },
+          filters: {
+            query: filterQueries,
+            onApplyFilter: (arr) => {
+              const newQueries: Record<string, any> = { ...filterQueries };
+              arr.forEach(({ key, value }) => {
+                if (value) newQueries[key] = value;
+                else delete newQueries[key];
+              });
+              setFilterQueries(newQueries);
+            },
+            onReset: () => setFilterQueries({}),
+          },
           customToolbar: (
             <div className="flex gap-2 items-center">
               <RangePicker

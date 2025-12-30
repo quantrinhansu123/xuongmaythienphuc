@@ -4,10 +4,12 @@ import BankAccountSidePanel from '@/components/BankAccountSidePanel';
 import CommonTable from '@/components/CommonTable';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
+import useColumn from '@/hooks/useColumn';
 import { useFileExport } from '@/hooks/useFileExport';
+import useFilter from '@/hooks/useFilter';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
-import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 import { App, Select, Tag } from 'antd';
 import { useEffect, useState } from 'react';
@@ -42,15 +44,21 @@ interface User {
 export default function BankAccountsPage() {
   const { can } = usePermissions();
   const { message } = App.useApp();
+  const {
+    query,
+    pagination,
+    updateQueries,
+    reset,
+    applyFilter,
+    handlePageChange,
+  } = useFilter();
+
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
-  const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
 
   const [formData, setFormData] = useState({
@@ -72,7 +80,7 @@ export default function BankAccountsPage() {
     if (currentUser) {
       fetchAccounts();
     }
-  }, [selectedBranchId, currentUser]);
+  }, [JSON.stringify(query), currentUser]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -103,7 +111,8 @@ export default function BankAccountsPage() {
   const fetchAccounts = async () => {
     setLoading(true);
     try {
-      const branchParam = selectedBranchId !== 'all' ? `?branchId=${selectedBranchId}` : '';
+      const branchId = query.branchId || 'all';
+      const branchParam = branchId !== 'all' ? `?branchId=${branchId}` : '';
       const res = await fetch(`/api/finance/bank-accounts${branchParam}`);
       const data = await res.json();
       if (data.success) {
@@ -159,10 +168,7 @@ export default function BankAccountsPage() {
     });
   };
 
-  const handleResetAll = () => {
-    setFilterQueries({});
-    setSearchTerm('');
-  };
+
 
   const exportColumns = [
     { title: 'Số tài khoản', dataIndex: 'accountNumber', key: 'accountNumber' },
@@ -179,22 +185,7 @@ export default function BankAccountsPage() {
     exportToXlsx(filteredAccounts, 'tai-khoan');
   };
 
-  const filteredAccounts = accounts.filter(acc => {
-    const searchKey = 'search,accountNumber,accountHolder,bankName';
-    const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue ||
-      acc.accountNumber.toLowerCase().includes(searchValue.toLowerCase()) ||
-      acc.accountHolder.toLowerCase().includes(searchValue.toLowerCase()) ||
-      acc.bankName.toLowerCase().includes(searchValue.toLowerCase());
-
-    const statusValue = filterQueries['isActive'];
-    const matchStatus = statusValue === undefined || acc.isActive === (statusValue === 'true');
-
-    const typeValue = filterQueries['accountType'];
-    const matchType = !typeValue || acc.accountType === typeValue;
-
-    return matchSearch && matchStatus && matchType;
-  });
+  const filteredAccounts = applyFilter(accounts);
 
   const totalBalance = filteredAccounts.reduce((sum, acc) => sum + parseFloat(acc.balance.toString()), 0);
 
@@ -271,6 +262,9 @@ export default function BankAccountsPage() {
     },
   ];
 
+  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
+    useColumn({ defaultColumns: columns });
+
   return (
     <>
       <WrapperContent<BankAccount>
@@ -285,8 +279,8 @@ export default function BankAccountsPage() {
                   style={{ width: 160 }}
                   placeholder="Chi nhánh"
                   size="middle"
-                  value={selectedBranchId}
-                  onChange={(value: number | 'all') => setSelectedBranchId(value)}
+                  value={query.branchId ? Number(query.branchId) : undefined}
+                  onChange={(value) => updateQueries([{ key: 'branchId', value }])}
                   options={[
                     { label: 'Tất cả CN', value: 'all' },
                     ...branches.map((b) => ({
@@ -301,15 +295,8 @@ export default function BankAccountsPage() {
                 placeholder="Trạng thái"
                 allowClear
                 size="middle"
-                value={filterQueries['isActive']}
-                onChange={(value: string | undefined) => {
-                  if (value !== undefined) {
-                    setFilterQueries({ ...filterQueries, isActive: value });
-                  } else {
-                    const { isActive, ...rest } = filterQueries;
-                    setFilterQueries(rest);
-                  }
-                }}
+                value={query.isActive}
+                onChange={(value) => updateQueries([{ key: 'isActive', value }])}
                 options={[
                   { label: 'Hoạt động', value: 'true' },
                   { label: 'Ngừng', value: 'false' },
@@ -320,15 +307,8 @@ export default function BankAccountsPage() {
                 placeholder="Loại TK"
                 allowClear
                 size="middle"
-                value={filterQueries['accountType']}
-                onChange={(value: string | undefined) => {
-                  if (value !== undefined) {
-                    setFilterQueries({ ...filterQueries, accountType: value });
-                  } else {
-                    const { accountType, ...rest } = filterQueries;
-                    setFilterQueries(rest);
-                  }
-                }}
+                value={query.accountType}
+                onChange={(value) => updateQueries([{ key: 'accountType', value }])}
                 options={[
                   { label: 'Ngân hàng', value: 'BANK' },
                   { label: 'Tiền mặt', value: 'CASH' },
@@ -338,12 +318,6 @@ export default function BankAccountsPage() {
           ),
           buttonEnds: can('finance.cashbooks', 'create')
             ? [
-              {
-                type: 'default',
-                name: 'Đặt lại',
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
               {
                 type: 'primary',
                 name: 'Thêm',
@@ -360,14 +334,7 @@ export default function BankAccountsPage() {
                 icon: <DownloadOutlined />,
               },
             ]
-            : [
-              {
-                type: 'default',
-                name: 'Đặt lại',
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
-            ],
+            : undefined,
           searchInput: {
             placeholder: 'Tìm theo số TK, chủ TK, ngân hàng...',
             filterKeys: ['accountNumber', 'accountHolder', 'bankName'],
@@ -376,6 +343,16 @@ export default function BankAccountsPage() {
               labelKey: 'accountNumber',
               descriptionKey: 'bankName',
             },
+          },
+          filters: {
+            query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
+          },
+          columnSettings: {
+            columns: columnsCheck,
+            onChange: updateColumns,
+            onReset: resetColumns,
           },
         }}
       >
@@ -391,8 +368,8 @@ export default function BankAccountsPage() {
 
           {/* Table */}
           <CommonTable
-            columns={columns}
-            dataSource={filteredAccounts}
+            columns={getVisibleColumns()}
+            dataSource={filteredAccounts as BankAccount[]}
             loading={loading}
             onRowClick={(record: BankAccount) => setSelectedAccount(record)}
             rowSelection={{
@@ -403,6 +380,10 @@ export default function BankAccountsPage() {
             bulkDeleteConfig={{
               confirmTitle: 'Xác nhận xóa tài khoản',
               confirmMessage: 'Bạn có chắc muốn xóa {count} tài khoản đã chọn?'
+            }}
+            pagination={{
+              ...pagination,
+              onChange: handlePageChange,
             }}
           />
         </div>

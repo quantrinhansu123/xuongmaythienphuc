@@ -478,6 +478,11 @@ export default function ItemCategoriesPage() {
                         onChange: updateColumns,
                         onReset: resetColumns,
                     },
+                    filters: {
+                        query,
+                        onApplyFilter: (arr) => updateQueries(arr),
+                        onReset: reset,
+                    },
                 }}
             >
 

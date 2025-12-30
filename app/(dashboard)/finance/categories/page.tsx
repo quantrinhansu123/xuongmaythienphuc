@@ -4,7 +4,9 @@ import CategorySidePanel from '@/components/CategorySidePanel';
 import CommonTable from '@/components/CommonTable';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
+import useColumn from '@/hooks/useColumn';
 import { useFileExport } from '@/hooks/useFileExport';
+import useFilter from '@/hooks/useFilter';
 import { usePermissions } from '@/hooks/usePermissions';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Select, TableColumnsType, Tag } from 'antd';
@@ -49,10 +51,14 @@ export default function FinancialCategoriesPage() {
     date: new Date().toISOString().split('T')[0],
     description: ''
   });
-  const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
-  const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [pagination, setPagination] = useState({ current: 1, limit: 20 });
+  const {
+    query,
+    pagination,
+    updateQueries,
+    reset,
+    applyFilter,
+    handlePageChange,
+  } = useFilter();
 
   const [formData, setFormData] = useState({
     categoryCode: '',
@@ -204,11 +210,7 @@ export default function FinancialCategoriesPage() {
     }
   };
 
-  const handleResetAll = () => {
-    setFilterQueries({});
-    setSearchTerm('');
-    setFilterType('ALL');
-  };
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -227,23 +229,9 @@ export default function FinancialCategoriesPage() {
     exportToXlsx(filteredCategories, 'danh-muc-tai-chinh');
   };
 
-  const filteredCategories = categories.filter(cat => {
-    const searchKey = 'search,categoryCode,categoryName';
-    const searchValue = filterQueries[searchKey] || '';
-    const matchSearch = !searchValue ||
-      cat.categoryCode.toLowerCase().includes(searchValue.toLowerCase()) ||
-      cat.categoryName.toLowerCase().includes(searchValue.toLowerCase());
+  const filteredCategories = applyFilter(categories);
 
-    const typeValue = filterQueries['type'];
-    const matchType = !typeValue || cat.type === typeValue;
-
-    const statusValue = filterQueries['isActive'];
-    const matchStatus = statusValue === undefined || cat.isActive === (statusValue === 'true');
-
-    return matchSearch && matchType && matchStatus;
-  });
-
-  const columns: TableColumnsType<FinancialCategory> = [
+  const defaultColumns: TableColumnsType<FinancialCategory> = [
     {
       title: 'Mã',
       dataIndex: 'categoryCode',
@@ -320,6 +308,9 @@ export default function FinancialCategoriesPage() {
     },
   ];
 
+  const { columnsCheck, updateColumns, resetColumns, getVisibleColumns } =
+    useColumn({ defaultColumns });
+
   return (
     <>
       <WrapperContent<FinancialCategory>
@@ -329,12 +320,6 @@ export default function FinancialCategoriesPage() {
         header={{
           buttonEnds: can('finance.categories', 'create')
             ? [
-              {
-                type: 'default',
-                name: 'Đặt lại',
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
               {
                 type: 'primary',
                 name: 'Thêm',
@@ -348,8 +333,8 @@ export default function FinancialCategoriesPage() {
                 type: 'primary',
                 name: 'Luân chuyển',
                 onClick: () => setShowTransferModal(true),
-                icon: <ReloadOutlined />, // Using Reload icon for transfer
-                className: 'bg-orange-500 hover:bg-orange-600 border-orange-500' // Custom color
+                icon: <ReloadOutlined />,
+                className: 'bg-orange-500 hover:bg-orange-600 border-orange-500'
               },
               {
                 type: 'default',
@@ -358,17 +343,15 @@ export default function FinancialCategoriesPage() {
                 icon: <DownloadOutlined />,
               },
             ]
-            : [
-              {
-                type: 'default',
-                name: 'Đặt lại',
-                onClick: handleResetAll,
-                icon: <ReloadOutlined />,
-              },
-            ],
+            : undefined,
           searchInput: {
             placeholder: 'Tìm theo mã, tên sổ quỹ...',
             filterKeys: ['categoryCode', 'categoryName'],
+          },
+          filters: {
+            query,
+            onApplyFilter: updateQueries,
+            onReset: reset,
           },
           customToolbar: (
             <div className="flex gap-2 items-center">
@@ -377,15 +360,8 @@ export default function FinancialCategoriesPage() {
                 placeholder="Loại"
                 allowClear
                 size="middle"
-                value={filterQueries['type']}
-                onChange={(value: string | undefined) => {
-                  if (value !== undefined) {
-                    setFilterQueries({ ...filterQueries, type: value });
-                  } else {
-                    const { type, ...rest } = filterQueries;
-                    setFilterQueries(rest);
-                  }
-                }}
+                value={query['type']}
+                onChange={(value) => updateQueries([{ key: 'type', value }])}
                 options={[
                   { label: 'Tất cả', value: 'ALL' },
                   { label: 'Thu', value: 'THU' },
@@ -397,15 +373,8 @@ export default function FinancialCategoriesPage() {
                 placeholder="Trạng thái"
                 allowClear
                 size="middle"
-                value={filterQueries['isActive']}
-                onChange={(value: string | undefined) => {
-                  if (value !== undefined) {
-                    setFilterQueries({ ...filterQueries, isActive: value });
-                  } else {
-                    const { isActive, ...rest } = filterQueries;
-                    setFilterQueries(rest);
-                  }
-                }}
+                value={query['isActive']}
+                onChange={(value) => updateQueries([{ key: 'isActive', value }])}
                 options={[
                   { label: 'Hoạt động', value: 'true' },
                   { label: 'Ngừng', value: 'false' },
@@ -413,20 +382,22 @@ export default function FinancialCategoriesPage() {
               />
             </div>
           ),
+          columnSettings: {
+            columns: columnsCheck,
+            onChange: updateColumns,
+            onReset: resetColumns,
+          },
         }}
       >
         <CommonTable
-          columns={columns}
-          dataSource={filteredCategories}
+          columns={getVisibleColumns()}
+          dataSource={filteredCategories as FinancialCategory[]}
           loading={loading}
           onRowClick={(record: FinancialCategory) => setSelectedCategory(record)}
           paging={true}
           pagination={{
-            current: pagination.current,
-            limit: pagination.limit,
-            onChange: (page, pageSize) => {
-              setPagination({ current: page, limit: pageSize || 20 });
-            },
+            ...pagination,
+            onChange: handlePageChange,
           }}
           total={filteredCategories.length}
         />

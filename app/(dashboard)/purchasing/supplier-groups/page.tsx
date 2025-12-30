@@ -34,6 +34,7 @@ export default function SupplierGroupsPage() {
     const [suppliersLoading, setSuppliersLoading] = useState(false);
     const [pagination, setPagination] = useState({ current: 1, limit: 20 });
     const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
+    const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
     const [formData, setFormData] = useState({
         groupCode: '',
         groupName: '',
@@ -221,39 +222,72 @@ export default function SupplierGroupsPage() {
                         placeholder: 'Tìm theo tên, mã nhóm...',
                         filterKeys: ['groupName', 'groupCode'],
                     },
+                    filters: {
+                        query: filterQueries,
+                        onApplyFilter: (arr) => {
+                            const newQueries: Record<string, any> = { ...filterQueries };
+                            arr.forEach(({ key, value }) => {
+                                if (value) {
+                                    newQueries[key] = value;
+                                } else {
+                                    delete newQueries[key];
+                                }
+                            });
+                            setFilterQueries(newQueries);
+                        },
+                        onReset: () => setFilterQueries({}),
+                    },
                 }}
             >
-                {groups.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
-                        <div className="text-6xl mb-2">📊</div>
-                        <div>Chưa có nhóm nhà cung cấp</div>
-                    </div>
-                ) : (
-                    <CommonTable
-                        columns={columns}
-                        dataSource={groups}
-                        loading={loading}
-                        onRowClick={(record: SupplierGroup) => handleViewDetail(record)}
-                        paging={true}
-                        pagination={{
-                            current: pagination.current,
-                            limit: pagination.limit,
-                            onChange: (page, pageSize) => {
-                                setPagination({ current: page, limit: pageSize || 20 });
-                            },
-                        }}
-                        total={groups.length}
-                        rowSelection={{
-                            selectedRowKeys: selectedIds,
-                            onChange: setSelectedIds,
-                        }}
-                        onBulkDelete={handleBulkDelete}
-                        bulkDeleteConfig={{
-                            confirmTitle: 'Xác nhận xóa nhóm',
-                            confirmMessage: 'Bạn có chắc muốn xóa {count} nhóm đã chọn?'
-                        }}
-                    />
-                )}
+                {(() => {
+                    // Apply search filter
+                    const searchKey = 'search,groupName,groupCode';
+                    const searchValue = filterQueries[searchKey] || '';
+                    const filteredGroups = groups.filter(group => {
+                        if (!searchValue) return true;
+                        const search = searchValue.toLowerCase();
+                        return (
+                            group.groupName.toLowerCase().includes(search) ||
+                            group.groupCode.toLowerCase().includes(search)
+                        );
+                    });
+
+                    if (filteredGroups.length === 0) {
+                        return (
+                            <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
+                                <div className="text-6xl mb-2">📊</div>
+                                <div>Không tìm thấy nhóm nào</div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <CommonTable
+                            columns={columns}
+                            dataSource={filteredGroups}
+                            loading={loading}
+                            onRowClick={(record: SupplierGroup) => handleViewDetail(record)}
+                            paging={true}
+                            pagination={{
+                                current: pagination.current,
+                                limit: pagination.limit,
+                                onChange: (page, pageSize) => {
+                                    setPagination({ current: page, limit: pageSize || 20 });
+                                },
+                            }}
+                            total={filteredGroups.length}
+                            rowSelection={{
+                                selectedRowKeys: selectedIds,
+                                onChange: setSelectedIds,
+                            }}
+                            onBulkDelete={handleBulkDelete}
+                            bulkDeleteConfig={{
+                                confirmTitle: 'Xác nhận xóa nhóm',
+                                confirmMessage: 'Bạn có chắc muốn xóa {count} nhóm đã chọn?'
+                            }}
+                        />
+                    );
+                })()}
             </WrapperContent>
 
             {/* Detail Drawer */}
