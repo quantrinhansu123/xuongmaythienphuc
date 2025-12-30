@@ -261,6 +261,12 @@ export const allMenuItems: Array<{
           href: "/admin/warehouses",
           permission: "admin.warehouses",
         },
+        {
+          icon: <BankOutlined />,
+          title: "Thông tin doanh nghiệp",
+          href: "/admin/company-info",
+          permission: "admin.company-info",
+        },
         // {
         //   icon: <SafetyOutlined />,
         //   title: "API Keys",

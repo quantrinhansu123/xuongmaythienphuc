@@ -1,10 +1,9 @@
 "use client";
 
-import CompanyConfigModal from "@/components/CompanyConfigModal";
 import { allMenuItems } from "@/configs/menu";
 import { usePermissions } from "@/hooks/usePermissions";
-import { AppstoreOutlined, SettingOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Flex, Menu, Row, Tooltip, Typography } from "antd";
+import { AppstoreOutlined } from "@ant-design/icons";
+import { Card, Col, Flex, Menu, Row, Typography } from "antd";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -20,7 +19,7 @@ export default function DashboardPage() {
     return allMenuItems
       .filter((item) => {
         if (!item.children || item.children.length === 0) return false;
-        
+
         if (item.permission && !isAdmin && !can(item.permission, "view")) {
           return false;
         }
@@ -44,7 +43,7 @@ export default function DashboardPage() {
 
   // Tất cả các chức năng con
   const allChildren = useMemo(() => {
-    return menuGroups.flatMap((group) => 
+    return menuGroups.flatMap((group) =>
       (group.children || []).map((child) => ({
         ...child,
         groupTitle: group.title,
@@ -77,8 +76,8 @@ export default function DashboardPage() {
   ];
 
   // Tên nhóm đang chọn
-  const selectedGroupTitle = selectedGroupKey === "all" 
-    ? "Tất cả chức năng" 
+  const selectedGroupTitle = selectedGroupKey === "all"
+    ? "Tất cả chức năng"
     : menuGroups.find((g) => g.key === selectedGroupKey)?.title || "";
 
   const selectedGroupIcon = selectedGroupKey === "all"
@@ -87,20 +86,8 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full">
-      {/* Header với nút cài đặt */}
-      {isAdmin && (
-        <Flex justify="flex-end" style={{ marginBottom: 16 }}>
-          <Tooltip title="Cài đặt thông tin công ty">
-            <Button
-              type="primary"
-              icon={<SettingOutlined />}
-              onClick={() => setCompanyModalOpen(true)}
-            >
-              Thông tin công ty
-            </Button>
-          </Tooltip>
-        </Flex>
-      )}
+      {/* Header với nút cài đặt - Đã chuyển sang menu Hệ thống -> Thông tin doanh nghiệp */}
+
 
       <Row gutter={16} style={{ minHeight: "calc(100vh - 220px)" }}>
         {/* Menu dọc bên trái - Các nhóm chức năng */}
@@ -115,7 +102,7 @@ export default function DashboardPage() {
               body: { padding: 0 },
               header: { minHeight: 40, padding: "8px 16px" },
             }}
-            style={{ 
+            style={{
               borderRadius: 12,
               position: "sticky",
               top: 80,
@@ -205,10 +192,7 @@ export default function DashboardPage() {
       </Row>
 
       {/* Modal cài đặt công ty */}
-      <CompanyConfigModal
-        open={companyModalOpen}
-        onClose={() => setCompanyModalOpen(false)}
-      />
+
 
       <style jsx global>{`
         .dashboard-app-card:hover {
