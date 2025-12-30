@@ -7,7 +7,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
-import { formatCurrency, formatQuantity } from "@/utils/format";
+import { formatQuantity } from "@/utils/format";
 import { DownloadOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -25,6 +25,8 @@ type TransactionHistory = {
   notes?: string;
   fromWarehouseName?: string;
   toWarehouseName?: string;
+  createdByName?: string;
+  approvedByName?: string;
 };
 
 type BalanceItem = {
@@ -232,7 +234,7 @@ export default function Page() {
                 ]}
               />
               <Select
-                style={{ width: 220 }}
+                style={{ width: 300 }}
                 placeholder="Chọn kho"
                 value={selectedWarehouseId}
                 onChange={(value) => setSelectedWarehouseId(value)}
@@ -285,7 +287,7 @@ export default function Page() {
         title="Chi tiết tồn kho"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={640}
+        width={1000}
       >
         {selectedItem && (
           <>
@@ -361,6 +363,20 @@ export default function Page() {
                       ),
                     },
                     {
+                      title: "Từ kho",
+                      dataIndex: "fromWarehouseName",
+                      key: "fromWarehouseName",
+                      width: 150,
+                      render: (v: string) => <span className="text-xs">{v || '-'}</span>
+                    },
+                    {
+                      title: "Đến kho",
+                      dataIndex: "toWarehouseName",
+                      key: "toWarehouseName",
+                      width: 150,
+                      render: (v: string) => <span className="text-xs">{v || '-'}</span>
+                    },
+                    {
                       title: "SL",
                       dataIndex: "quantity",
                       key: "quantity",
@@ -382,20 +398,18 @@ export default function Page() {
                       ),
                     },
                     {
-                      title: "Đơn giá",
-                      dataIndex: "unitPrice",
-                      key: "unitPrice",
-                      width: 100,
-                      align: "right" as const,
-                      render: (v: number) => formatCurrency(v, ""),
+                      title: "Người tạo",
+                      dataIndex: "createdByName",
+                      key: "createdByName",
+                      width: 120,
+                      render: (v: string) => <span className="text-xs">{v}</span>
                     },
                     {
-                      title: "Thành tiền",
-                      dataIndex: "totalAmount",
-                      key: "totalAmount",
-                      width: 110,
-                      align: "right" as const,
-                      render: (v: number) => formatCurrency(v, ""),
+                      title: "Người duyệt",
+                      dataIndex: "approvedByName",
+                      key: "approvedByName",
+                      width: 120,
+                      render: (v: string) => <span className="text-xs">{v || '-'}</span>
                     },
                     {
                       title: "Ngày",

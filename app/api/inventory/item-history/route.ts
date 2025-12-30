@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     let paramIndex = 2;
 
     // Lọc theo kho nếu có
-    if (warehouseId) {
+    if (warehouseId && warehouseId !== '0') {
       whereClause += ` AND (it.from_warehouse_id = $${paramIndex} OR it.to_warehouse_id = $${paramIndex})`;
       params.push(parseInt(warehouseId));
       paramIndex++;
@@ -53,13 +53,17 @@ export async function GET(request: NextRequest) {
         it.notes,
         it.created_at as "createdAt",
         w1.warehouse_name as "fromWarehouseName",
-        w2.warehouse_name as "toWarehouseName"
+        w2.warehouse_name as "toWarehouseName",
+        u1.full_name as "createdByName",
+        u2.full_name as "approvedByName"
        FROM inventory_transaction_details itd
        JOIN inventory_transactions it ON it.id = itd.transaction_id
        LEFT JOIN materials m ON m.id = itd.material_id
        LEFT JOIN products p ON p.id = itd.product_id
        LEFT JOIN warehouses w1 ON w1.id = it.from_warehouse_id
        LEFT JOIN warehouses w2 ON w2.id = it.to_warehouse_id
+       LEFT JOIN users u1 ON u1.id = it.created_by
+       LEFT JOIN users u2 ON u2.id = it.approved_by
        ${whereClause}
        ORDER BY it.created_at DESC
        LIMIT 50`,

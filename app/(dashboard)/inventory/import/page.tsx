@@ -8,7 +8,7 @@ import { useFileExport } from "@/hooks/useFileExport";
 import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
-import { formatCurrency, formatQuantity } from "@/utils/format";
+import { formatQuantity } from "@/utils/format";
 import {
   DownloadOutlined,
   PlusOutlined,
@@ -19,14 +19,18 @@ import type { TableColumnsType } from "antd";
 import {
   App,
   Button,
+  DatePicker,
   Descriptions,
   Drawer,
   Modal,
   Select,
   Tag,
-  message,
+  message
 } from "antd";
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
+
+const { RangePicker } = DatePicker;
 
 type ImportTransaction = {
   id: number;
@@ -81,7 +85,7 @@ export default function Page() {
 
   // Tự động chọn kho đầu tiên
   useEffect(() => {
-    if (warehousesData.length > 0 && !selectedWarehouseId) {
+    if (warehousesData.length > 0 && selectedWarehouseId === null) {
       setSelectedWarehouseId(warehousesData[0].id);
     }
   }, [warehousesData, selectedWarehouseId]);
@@ -91,12 +95,16 @@ export default function Page() {
     isLoading,
     isFetching,
   } = useQuery<ImportTransaction[]>({
-    queryKey: ["inventory", "import", selectedWarehouseId],
-    enabled: !!selectedWarehouseId,
+    queryKey: ["inventory", "import", selectedWarehouseId, query],
+    enabled: selectedWarehouseId !== null,
     queryFn: async () => {
-      const res = await fetch(
-        `/api/inventory/import?warehouseId=${selectedWarehouseId}`
-      );
+      const params = new URLSearchParams();
+      if (selectedWarehouseId !== null) params.append("warehouseId", String(selectedWarehouseId));
+      if (query.status) params.append("status", String(query.status));
+      if (query.startDate) params.append("startDate", String(query.startDate));
+      if (query.endDate) params.append("endDate", String(query.endDate));
+
+      const res = await fetch(`/api/inventory/import?${params.toString()}`);
       const body = await res.json();
       return body.success ? body.data : [];
     },
@@ -166,18 +174,17 @@ export default function Page() {
       },
     },
     {
-      title: "Tổng tiền",
-      dataIndex: "totalAmount",
-      key: "totalAmount",
-      width: 140,
-      align: "right",
-      render: (val: number) => formatCurrency(val, ""),
-    },
-    {
       title: "Người tạo",
       dataIndex: "createdByName",
       key: "createdByName",
       width: 160,
+    },
+    {
+      title: "Người duyệt",
+      dataIndex: "approvedByName",
+      key: "approvedByName",
+      width: 160,
+      render: (val: string) => val || "-",
     },
     {
       title: "Ngày tạo",
@@ -306,16 +313,68 @@ export default function Page() {
             ? ["inventory", "import", String(selectedWarehouseId)]
             : ["inventory", "import"],
           customToolbar: (
-            <Select
-              style={{ width: 200 }}
-              placeholder="Chọn kho"
-              value={selectedWarehouseId}
-              onChange={(value) => setSelectedWarehouseId(value)}
-              options={warehousesData.map((w) => ({
-                label: `${w.warehouseName} (${w.branchName || ""})`,
-                value: w.id,
-              }))}
-            />
+            <div className="flex gap-2">
+              <Select
+                style={{ width: 250 }}
+                placeholder="Chọn kho"
+                value={selectedWarehouseId}
+                onChange={(value) => setSelectedWarehouseId(value)}
+                showSearch
+                optionFilterProp="label"
+                options={[
+                  ...(can('inventory.import', 'view') ? [{ label: 'Toàn hệ thống', value: 0 }] : []),
+                  ...warehousesData.map((w) => ({
+                    label: `${w.warehouseName} (${w.branchName || ''})`,
+                    value: w.id,
+                  }))
+                ]}
+              />
+              <Select
+                style={{ width: 150 }}
+                placeholder="Trạng thái"
+                allowClear
+                value={query.status}
+                onChange={(val) => updateQueries([{ key: "status", value: val }])}
+                options={[
+                  { label: "Chờ duyệt", value: "PENDING" },
+                  { label: "Đã duyệt", value: "APPROVED" },
+                  { label: "Hoàn thành", value: "COMPLETED" },
+                ]}
+              />
+            </div>
+          ),
+          customToolbarSecondRow: (
+            <div className="flex gap-2 items-center">
+              <RangePicker
+                placeholder={["Từ ngày", "Đến ngày"]}
+                style={{ width: 260 }}
+                presets={[
+                  { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                  { label: 'Hôm qua', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+                  { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                  { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                  { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                ]}
+                value={
+                  query.startDate && query.endDate
+                    ? [dayjs(query.startDate as string), dayjs(query.endDate as string)]
+                    : null
+                }
+                onChange={(dates) => {
+                  if (dates) {
+                    updateQueries([
+                      { key: "startDate", value: dates[0]?.startOf('day').toISOString() },
+                      { key: "endDate", value: dates[1]?.endOf('day').toISOString() },
+                    ]);
+                  } else {
+                    updateQueries([
+                      { key: "startDate", value: "" },
+                      { key: "endDate", value: "" },
+                    ]);
+                  }
+                }}
+              />
+            </div>
           ),
           buttonEnds: [
             {
@@ -342,21 +401,8 @@ export default function Page() {
             filterKeys: ["transactionCode", "toWarehouseName", "createdByName"],
           },
           filters: {
-            fields: [
-              {
-                type: "select",
-                name: "status",
-                label: "Trạng thái",
-                options: [
-                  { label: "Chờ duyệt", value: "PENDING" },
-                  { label: "Đã duyệt", value: "APPROVED" },
-                  { label: "Hoàn thành", value: "COMPLETED" },
-                ],
-              },
-            ],
             onApplyFilter: (arr) => updateQueries(arr),
             onReset: () => reset(),
-            query,
           },
           columnSettings: {
             columns: columnsCheck,
@@ -373,7 +419,7 @@ export default function Page() {
           rank
           onRowClick={handleView}
         />
-      </WrapperContent>
+      </WrapperContent >
 
       <Drawer
         title="Chi tiết phiếu nhập kho"
@@ -474,8 +520,6 @@ export default function Page() {
                     <th className="px-4 py-2 text-left border">Tên</th>
                     <th className="px-4 py-2 text-right border">Số lượng</th>
                     <th className="px-4 py-2 text-left border">ĐVT</th>
-                    <th className="px-4 py-2 text-right border">Đơn giá</th>
-                    <th className="px-4 py-2 text-right border">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -489,25 +533,9 @@ export default function Page() {
                         {formatQuantity(detail.quantity)}
                       </td>
                       <td className="px-4 py-2 border">{detail.unit}</td>
-                      <td className="px-4 py-2 border text-right">
-                        {formatCurrency(detail.unitPrice, "")}
-                      </td>
-                      <td className="px-4 py-2 border text-right font-semibold">
-                        {formatCurrency(detail.totalAmount, "")}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-gray-50 font-semibold">
-                  <tr>
-                    <td colSpan={5} className="px-4 py-2 border text-right">
-                      Tổng cộng:
-                    </td>
-                    <td className="px-4 py-2 border text-right">
-                      {formatCurrency(transactionDetails.reduce((sum, d) => sum + (d.totalAmount || 0), 0), "")}
-                    </td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           </div>

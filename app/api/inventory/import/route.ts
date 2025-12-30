@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     // Lọc theo kho cụ thể nếu có
-    if (warehouseId) {
+    if (warehouseId && warehouseId !== '0') {
       whereClause += ` AND it.to_warehouse_id = $${paramIndex}`;
       params.push(parseInt(warehouseId));
       paramIndex++;
@@ -40,6 +40,24 @@ export async function GET(request: NextRequest) {
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ` AND w.branch_id = $${paramIndex}`;
       params.push(currentUser.branchId);
+      paramIndex++;
+    }
+
+    // Filter by Date Range
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    console.log('Filter Params:', { startDate, endDate, status, warehouseId });
+
+    if (startDate) {
+      whereClause += ` AND it.created_at >= $${paramIndex}::timestamptz`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      whereClause += ` AND it.created_at <= $${paramIndex}::timestamptz`;
+      params.push(endDate);
       paramIndex++;
     }
 
@@ -114,7 +132,7 @@ export async function POST(request: NextRequest) {
       'SELECT branch_id, warehouse_type FROM warehouses WHERE id = $1',
       [toWarehouseId]
     );
-    
+
     if (warehouseCheck.rows.length === 0) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -123,7 +141,7 @@ export async function POST(request: NextRequest) {
     }
 
     const warehouseType = warehouseCheck.rows[0].warehouse_type;
-    
+
     if (currentUser.roleCode !== 'ADMIN' && warehouseCheck.rows[0].branch_id !== currentUser.branchId) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -135,14 +153,14 @@ export async function POST(request: NextRequest) {
     for (const item of items) {
       const isProduct = !!item.productId;
       const isMaterial = !!item.materialId;
-      
+
       if (warehouseType === 'NVL' && isProduct) {
         return NextResponse.json<ApiResponse>({
           success: false,
           error: 'Kho NVL chỉ nhận nguyên vật liệu, không nhận sản phẩm'
         }, { status: 400 });
       }
-      
+
       if (warehouseType === 'THANH_PHAM' && isMaterial) {
         return NextResponse.json<ApiResponse>({
           success: false,

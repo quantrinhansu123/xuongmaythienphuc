@@ -299,7 +299,7 @@ export default function Page() {
             : ["inventory", "transfer"],
           customToolbar: (
             <Select
-              style={{ width: 200 }}
+              style={{ width: 300 }}
               placeholder="Chọn kho"
               value={selectedWarehouseId}
               onChange={(value) => setSelectedWarehouseId(value)}

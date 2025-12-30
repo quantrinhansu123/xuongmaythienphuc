@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     // Lọc theo kho cụ thể nếu có
-    if (warehouseId) {
+    if (warehouseId && warehouseId !== '0') {
       whereClause += ` AND it.from_warehouse_id = $${paramIndex}`;
       params.push(parseInt(warehouseId));
       paramIndex++;
@@ -37,6 +37,24 @@ export async function GET(request: NextRequest) {
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ` AND w.branch_id = $${paramIndex}`;
       params.push(currentUser.branchId);
+      paramIndex++;
+    }
+
+    // Filter by Date Range
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    console.log('Export Filter Params:', { startDate, endDate, status, warehouseId });
+
+    if (startDate) {
+      whereClause += ` AND it.created_at >= $${paramIndex}::timestamptz`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      whereClause += ` AND it.created_at <= $${paramIndex}::timestamptz`;
+      params.push(endDate);
       paramIndex++;
     }
 
