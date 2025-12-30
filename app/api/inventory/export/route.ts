@@ -1,6 +1,7 @@
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { getUTCRange } from '@/utils/date';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -45,16 +46,14 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
 
     if (startDate) {
-      // Force Vietnam Timezone (+07) for start of day
-      whereClause += ` AND it.created_at >= $${paramIndex}::timestamptz`;
-      params.push(`${startDate} 00:00:00+07`);
+      whereClause += ` AND it.created_at >= $${paramIndex}`;
+      params.push(getUTCRange(startDate, false));
       paramIndex++;
     }
 
     if (endDate) {
-      // Force Vietnam Timezone (+07) for end of day
-      whereClause += ` AND it.created_at <= $${paramIndex}::timestamptz`;
-      params.push(`${endDate} 23:59:59.999+07`);
+      whereClause += ` AND it.created_at <= $${paramIndex}`;
+      params.push(getUTCRange(endDate, true));
       paramIndex++;
     }
 

@@ -1,6 +1,7 @@
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { getUTCRange } from '@/utils/date';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -31,6 +32,20 @@ export async function GET(request: NextRequest) {
     if (currentUser.roleCode !== 'ADMIN' && currentUser.branchId) {
       whereClause += ` AND (w1.branch_id = $2 OR w2.branch_id = $2)`;
       params.push(currentUser.branchId);
+    }
+
+    // Filter by Date Range
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    if (startDate) {
+      whereClause += ` AND it.created_at >= $${params.length + 1}`;
+      params.push(getUTCRange(startDate, false));
+    }
+
+    if (endDate) {
+      whereClause += ` AND it.created_at <= $${params.length + 1}`;
+      params.push(getUTCRange(endDate, true));
     }
 
     const result = await query(

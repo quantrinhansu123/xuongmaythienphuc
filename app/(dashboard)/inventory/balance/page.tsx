@@ -50,7 +50,7 @@ type Warehouse = {
 
 export default function Page() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { reset, applyFilter, updateQueries, query, pagination, handlePageChange } = useFilter();
   const queryClient = useQueryClient();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -279,6 +279,7 @@ export default function Page() {
           dataSource={filteredDetails}
           paging
           rank
+          pagination={{ ...pagination, onChange: handlePageChange }}
           onRowClick={handleViewDetail}
         />
       </WrapperContent>

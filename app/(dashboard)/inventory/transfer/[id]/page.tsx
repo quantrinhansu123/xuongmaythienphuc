@@ -36,7 +36,7 @@ export default function TransferWarehousePage() {
   const router = useRouter();
   const warehouseId = params?.id;
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { reset, applyFilter, updateQueries, query, pagination, handlePageChange } = useFilter();
   const queryClient = useQueryClient();
   const { modal } = App.useApp();
 
@@ -276,6 +276,7 @@ export default function TransferWarehousePage() {
           loading={isLoading || isFetching || deleteMutation.isPending}
           paging
           rank
+          pagination={{ ...pagination, onChange: handlePageChange }}
         />
       </WrapperContent>
 

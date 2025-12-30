@@ -49,7 +49,7 @@ export default function TransactionHistoryWarehousePage() {
   const router = useRouter();
   const warehouseId = params?.id;
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { reset, applyFilter, updateQueries, query, pagination, handlePageChange } = useFilter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<HistoryTransaction | null>(null);
 
@@ -242,6 +242,7 @@ export default function TransactionHistoryWarehousePage() {
           loading={isLoading || isFetching}
           paging
           rank
+          pagination={{ ...pagination, onChange: handlePageChange }}
         />
       </WrapperContent>
 

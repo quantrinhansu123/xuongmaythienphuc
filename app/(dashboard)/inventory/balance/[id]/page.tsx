@@ -27,7 +27,7 @@ export default function PageClient() {
   const router = useRouter();
   const warehouseId = params?.id;
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { reset, applyFilter, updateQueries, query, pagination, handlePageChange } = useFilter();
 
   const [view, setView] = useState<"detail" | "summary">("detail");
 
@@ -164,6 +164,7 @@ export default function PageClient() {
           dataSource={filteredDetails}
           paging
           rank
+          pagination={{ ...pagination, onChange: handlePageChange }}
         />
       ) : (
         <table className="w-full bg-white rounded-lg">

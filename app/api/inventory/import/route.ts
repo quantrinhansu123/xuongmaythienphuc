@@ -1,6 +1,7 @@
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { getUTCRange } from '@/utils/date';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Lấy danh sách phiếu nhập kho
@@ -50,14 +51,14 @@ export async function GET(request: NextRequest) {
     console.log('Filter Params:', { startDate, endDate, status, warehouseId });
 
     if (startDate) {
-      whereClause += ` AND it.created_at >= $${paramIndex}::timestamptz`;
-      params.push(startDate);
+      whereClause += ` AND it.created_at >= $${paramIndex}`;
+      params.push(getUTCRange(startDate, false));
       paramIndex++;
     }
 
     if (endDate) {
-      whereClause += ` AND it.created_at <= $${paramIndex}::timestamptz`;
-      params.push(endDate);
+      whereClause += ` AND it.created_at <= $${paramIndex}`;
+      params.push(getUTCRange(endDate, true));
       paramIndex++;
     }
 

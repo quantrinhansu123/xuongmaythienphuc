@@ -10,22 +10,22 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatQuantity } from "@/utils/format";
 import {
-  DownloadOutlined,
-  PlusOutlined,
-  UploadOutlined
+    DownloadOutlined,
+    PlusOutlined,
+    UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-  App,
-  Button,
-  DatePicker,
-  Descriptions,
-  Drawer,
-  Modal,
-  Select,
-  Tag,
-  message
+    App,
+    Button,
+    DatePicker,
+    Descriptions,
+    Drawer,
+    Modal,
+    Select,
+    Tag,
+    message
 } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
@@ -61,7 +61,7 @@ type Warehouse = {
 
 export default function Page() {
   const { can } = usePermissions();
-  const { reset, applyFilter, updateQueries, query } = useFilter();
+  const { reset, applyFilter, updateQueries, query, pagination, handlePageChange } = useFilter();
   const queryClient = useQueryClient();
   const { modal } = App.useApp();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(
@@ -281,7 +281,7 @@ export default function Page() {
   const { exportToXlsx } = useFileExport(columnsAll);
   const { openFileDialog } = useFileImport();
 
-  const filtered = applyFilter<ImportTransaction>(imports);
+  const filtered = applyFilter<ImportTransaction>(imports, ['startDate', 'endDate']);
 
   const handleExportExcel = () => {
     exportToXlsx(filtered, 'phieu-nhap-kho');
@@ -417,6 +417,7 @@ export default function Page() {
           loading={isLoading || isFetching || deleteMutation.isPending}
           paging
           rank
+          pagination={{ ...pagination, onChange: handlePageChange }}
           onRowClick={handleView}
         />
       </WrapperContent >
