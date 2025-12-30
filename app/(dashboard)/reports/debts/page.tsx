@@ -21,6 +21,9 @@ interface CustomerSummary {
   paidAmount: number;
   remainingAmount: number;
   unpaidOrders: number;
+  openingBalance: number;
+  periodDebt: number;
+  closingBalance: number;
 }
 
 interface SupplierSummary {
@@ -33,6 +36,21 @@ interface SupplierSummary {
   paidAmount: number;
   remainingAmount: number;
   unpaidOrders: number;
+  openingBalance: number;
+  periodDebt: number;
+  closingBalance: number;
+}
+
+interface Supplier {
+  id: number;
+  supplierCode: string;
+  supplierName: string;
+}
+
+interface Customer {
+  id: number;
+  customerCode: string;
+  customerName: string;
 }
 
 interface Branch {
@@ -53,7 +71,11 @@ export default function DebtsReportPage() {
   const [customerSummaries, setCustomerSummaries] = useState<CustomerSummary[]>([]);
   const [supplierSummaries, setSupplierSummaries] = useState<SupplierSummary[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | 'all'>('all');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | 'all'>('all');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -64,13 +86,15 @@ export default function DebtsReportPage() {
   useEffect(() => {
     fetchCurrentUser();
     fetchBranches();
+    fetchSuppliers();
+    fetchCustomers();
   }, []);
 
   useEffect(() => {
     if (currentUser) {
       fetchData();
     }
-  }, [selectedBranchId, currentUser, dateRange]);
+  }, [selectedBranchId, selectedSupplierId, selectedCustomerId, currentUser, dateRange]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -96,16 +120,41 @@ export default function DebtsReportPage() {
     }
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const res = await fetch('/api/purchasing/suppliers?limit=1000');
+      const data = await res.json();
+      if (data.success) {
+        setSuppliers(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch('/api/sales/customers?limit=1000');
+      const data = await res.json();
+      if (data.success) {
+        setCustomers(data.data.customers || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const branchParam = selectedBranchId !== 'all' ? `&branchId=${selectedBranchId}` : '';
-      const dateParams = dateRange 
+      const supplierParam = selectedSupplierId !== 'all' ? `&supplierId=${selectedSupplierId}` : '';
+      const dateParams = dateRange
         ? `&startDate=${dateRange[0].format('YYYY-MM-DD')}&endDate=${dateRange[1].format('YYYY-MM-DD')}`
         : '';
-      
+
       const [customersRes, suppliersRes] = await Promise.all([
         fetch(`/api/finance/debts/summary?type=customers${branchParam}${dateParams}`),
-        fetch(`/api/finance/debts/summary?type=suppliers${branchParam}${dateParams}`),
+        fetch(`/api/finance/debts/summary?type=suppliers${branchParam}${supplierParam}${dateParams}`),
       ]);
 
       const customersData = await customersRes.json();
@@ -180,6 +229,36 @@ export default function DebtsReportPage() {
                 ]}
               />
             )}
+            <Select
+              style={{ width: 250 }}
+              placeholder="Lọc theo khách hàng"
+              value={selectedCustomerId}
+              onChange={(value) => setSelectedCustomerId(value)}
+              showSearch
+              optionFilterProp="label"
+              options={[
+                { label: 'Tất cả khách hàng', value: 'all' },
+                ...customers.map((c) => ({
+                  label: `${c.customerCode} - ${c.customerName}`,
+                  value: c.id,
+                })),
+              ]}
+            />
+            <Select
+              style={{ width: 250 }}
+              placeholder="Lọc theo NCC"
+              value={selectedSupplierId}
+              onChange={(value) => setSelectedSupplierId(value)}
+              showSearch
+              optionFilterProp="label"
+              options={[
+                { label: 'Tất cả nhà cung cấp', value: 'all' },
+                ...suppliers.map((s) => ({
+                  label: `${s.supplierCode} - ${s.supplierName}`,
+                  value: s.id,
+                })),
+              ]}
+            />
             <button className="px-4 py-2 border rounded hover:bg-gray-50 flex items-center gap-2">
               <DownloadOutlined /> Xuất báo cáo
             </button>
@@ -220,11 +299,10 @@ export default function DebtsReportPage() {
             </div>
           </div>
 
-          <div className={`p-6 rounded-lg border-2 shadow-sm ${
-            netDebt >= 0 
-              ? 'bg-blue-50 border-blue-200' 
-              : 'bg-orange-50 border-orange-200'
-          }`}>
+          <div className={`p-6 rounded-lg border-2 shadow-sm ${netDebt >= 0
+            ? 'bg-blue-50 border-blue-200'
+            : 'bg-orange-50 border-orange-200'
+            }`}>
             <div className="text-sm font-medium mb-2" style={{ color: netDebt >= 0 ? '#2563eb' : '#ea580c' }}>
               Công nợ ròng
             </div>
@@ -294,6 +372,103 @@ export default function DebtsReportPage() {
           </div>
         </div>
 
+        {/* Period Debt Details */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Customer Period Debts */}
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="px-6 py-4 border-b bg-green-50">
+              <h3 className="text-lg font-semibold text-green-700">
+                Công nợ khách hàng theo kỳ
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đầu kỳ</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Trong kỳ</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cuối kỳ</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {customersWithDebt.slice(0, 10).map((customer) => (
+                    <tr key={customer.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900">{customer.customerName}</div>
+                        <div className="text-xs text-gray-500">{customer.customerCode}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-700">
+                        {parseFloat(customer.openingBalance?.toString() || '0').toLocaleString('vi-VN')} đ
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-blue-600 font-medium">
+                        {parseFloat(customer.periodDebt?.toString() || '0').toLocaleString('vi-VN')} đ
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-orange-700 font-bold">
+                        {parseFloat(customer.closingBalance?.toString() || '0').toLocaleString('vi-VN')} đ
+                      </td>
+                    </tr>
+                  ))}
+                  {customersWithDebt.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                        Không có dữ liệu
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Supplier Period Debts */}
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="px-6 py-4 border-b bg-red-50">
+              <h3 className="text-lg font-semibold text-red-700">
+                Công nợ nhà cung cấp theo kỳ
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nhà cung cấp</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đầu kỳ</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Trong kỳ</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cuối kỳ</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {suppliersWithDebt.slice(0, 10).map((supplier) => (
+                    <tr key={supplier.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900">{supplier.supplierName}</div>
+                        <div className="text-xs text-gray-500">{supplier.supplierCode}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-700">
+                        {parseFloat(supplier.openingBalance?.toString() || '0').toLocaleString('vi-VN')} đ
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-blue-600 font-medium">
+                        {parseFloat(supplier.periodDebt?.toString() || '0').toLocaleString('vi-VN')} đ
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-orange-700 font-bold">
+                        {parseFloat(supplier.closingBalance?.toString() || '0').toLocaleString('vi-VN')} đ
+                      </td>
+                    </tr>
+                  ))}
+                  {suppliersWithDebt.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                        Không có dữ liệu
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         {/* Top Debtors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Customers */}
@@ -303,8 +478,8 @@ export default function DebtsReportPage() {
                 <h3 className="text-lg font-semibold text-green-700">
                   Top 5 khách hàng nợ nhiều nhất
                 </h3>
-                <Link 
-                  href="/sales/debts" 
+                <Link
+                  href="/sales/debts"
                   className="text-sm text-green-600 hover:text-green-800 flex items-center gap-1"
                 >
                   Xem tất cả <ArrowRightOutlined />
@@ -353,8 +528,8 @@ export default function DebtsReportPage() {
                 <h3 className="text-lg font-semibold text-red-700">
                   Top 5 nhà cung cấp nợ nhiều nhất
                 </h3>
-                <Link 
-                  href="/purchasing/debts" 
+                <Link
+                  href="/purchasing/debts"
                   className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1"
                 >
                   Xem tất cả <ArrowRightOutlined />
@@ -418,20 +593,20 @@ export default function DebtsReportPage() {
           <div className="bg-white p-4 rounded-lg border shadow-sm">
             <div className="text-sm text-gray-600 mb-1">Đơn hàng chưa TT (KH)</div>
             <div className="text-2xl font-bold text-gray-900">
-              {customerSummaries.reduce((sum, c) => sum + c.unpaidOrders, 0)}
+              {customerSummaries.reduce((sum, c) => sum + parseInt(c.unpaidOrders?.toString() || '0'), 0)}
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              / {customerSummaries.reduce((sum, c) => sum + c.totalOrders, 0)} tổng đơn
+              / {customerSummaries.reduce((sum, c) => sum + parseInt(c.totalOrders?.toString() || '0'), 0)} tổng đơn
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-lg border shadow-sm">
             <div className="text-sm text-gray-600 mb-1">Đơn mua chưa TT (NCC)</div>
             <div className="text-2xl font-bold text-gray-900">
-              {supplierSummaries.reduce((sum, s) => sum + s.unpaidOrders, 0)}
+              {supplierSummaries.reduce((sum, s) => sum + parseInt(s.unpaidOrders?.toString() || '0'), 0)}
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              / {supplierSummaries.reduce((sum, s) => sum + s.totalOrders, 0)} tổng đơn
+              / {supplierSummaries.reduce((sum, s) => sum + parseInt(s.totalOrders?.toString() || '0'), 0)} tổng đơn
             </div>
           </div>
         </div>

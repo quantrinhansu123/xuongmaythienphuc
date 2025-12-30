@@ -4,7 +4,7 @@ import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency, formatQuantity } from '@/utils/format';
 import { CalendarOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
-import { DatePicker, Select } from 'antd';
+import { DatePicker, Select, Table } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import {
@@ -43,10 +43,10 @@ interface SalesSummary {
     totalOrders: number;
     totalAmount: number;
   }>;
-  topProducts: Array<{
+  topItems: Array<{
     id: number;
-    productCode: string;
-    productName: string;
+    itemCode: string;
+    itemName: string;
     unit: string;
     totalQuantity: number;
     totalAmount: number;
@@ -88,8 +88,13 @@ export default function SalesReportsPage() {
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [salesEmployees, setSalesEmployees] = useState<User[]>([]);
+  const [items, setItems] = useState<Array<{ id: number; itemCode: string; itemName: string }>>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<number | 'all'>('all');
   const [selectedSalesEmployeeId, setSelectedSalesEmployeeId] = useState<number | 'all'>('all');
+  const [selectedItemId, setSelectedItemId] = useState<number | 'all'>('all');
+  const [viewMode, setViewMode] = useState<'summary' | 'branch_comparison'>('summary');
+  const [branchReportData, setBranchReportData] = useState<any[]>([]);
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [summary, setSummary] = useState<SalesSummary>({
     totalOrders: 0,
@@ -103,7 +108,7 @@ export default function SalesReportsPage() {
     inProductionOrders: 0,
     cancelledOrders: 0,
     topCustomers: [],
-    topProducts: [],
+    topItems: [],
   });
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
@@ -116,6 +121,7 @@ export default function SalesReportsPage() {
     fetchCurrentUser();
     fetchBranches();
     fetchSalesEmployees();
+    fetchItems();
   }, []);
 
   useEffect(() => {
@@ -124,9 +130,13 @@ export default function SalesReportsPage() {
       return;
     }
     if (currentUser) {
-      fetchReportData();
+      if (viewMode === 'summary') {
+        fetchReportData();
+      } else {
+        fetchBranchReport();
+      }
     }
-  }, [dateRange, selectedBranchId, selectedSalesEmployeeId, currentUser]);
+  }, [dateRange, selectedBranchId, selectedSalesEmployeeId, selectedItemId, currentUser, viewMode]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -154,8 +164,7 @@ export default function SalesReportsPage() {
 
   const fetchSalesEmployees = async () => {
     try {
-      // Fetch all users for now, ideally filter by role SALES/MANAGER
-      const res = await fetch('/api/admin/users?limit=100'); // Fetch more users
+      const res = await fetch('/api/admin/users?limit=100');
       const data = await res.json();
       if (data.success) {
         setSalesEmployees(data.data.users || []);
@@ -165,20 +174,42 @@ export default function SalesReportsPage() {
     }
   };
 
+  const fetchItems = async () => {
+    try {
+      const res = await fetch('/api/products/items?limit=1000'); // Fetch enough items
+      const data = await res.json();
+      if (data.success) {
+        setItems(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    }
+  };
+
   const isAdmin = currentUser?.roleCode === 'ADMIN';
+
+  const getQueryParams = () => {
+    let queryParams = `startDate=${dateRange[0].format('YYYY-MM-DD')}&endDate=${dateRange[1].format('YYYY-MM-DD')}`;
+
+    if (selectedBranchId !== 'all') {
+      queryParams += `&branchId=${selectedBranchId}`;
+    }
+
+    if (selectedSalesEmployeeId !== 'all') {
+      queryParams += `&salesEmployeeId=${selectedSalesEmployeeId}`;
+    }
+
+    if (selectedItemId !== 'all') {
+      queryParams += `&itemId=${selectedItemId}`;
+    }
+
+    return queryParams;
+  }
 
   const fetchReportData = async () => {
     setLoading(true);
     try {
-      let queryParams = `startDate=${dateRange[0].format('YYYY-MM-DD')}&endDate=${dateRange[1].format('YYYY-MM-DD')}`;
-
-      if (selectedBranchId !== 'all') {
-        queryParams += `&branchId=${selectedBranchId}`;
-      }
-
-      if (selectedSalesEmployeeId !== 'all') {
-        queryParams += `&salesEmployeeId=${selectedSalesEmployeeId}`;
-      }
+      const queryParams = getQueryParams();
 
       // Fetch summary
       const summaryRes = await fetch(`/api/sales/reports/summary?${queryParams}`);
@@ -207,12 +238,32 @@ export default function SalesReportsPage() {
     }
   };
 
+  const fetchBranchReport = async () => {
+    setLoading(true);
+    try {
+      const queryParams = getQueryParams();
+      const res = await fetch(`/api/sales/reports/by-branch?${queryParams}`);
+      const data = await res.json();
+      if (data.success) {
+        setBranchReportData(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching branch report:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const handleExportPDF = () => {
     alert('Chức năng xuất PDF đang được phát triển');
   };
 
   const handleRefresh = () => {
-    fetchReportData();
+    if (viewMode === 'summary') {
+      fetchReportData();
+    } else {
+      fetchBranchReport();
+    }
   };
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
@@ -235,6 +286,15 @@ export default function SalesReportsPage() {
         header={{
           customToolbar: (
             <div className="flex gap-3 items-center flex-wrap">
+              <Select
+                value={viewMode}
+                onChange={setViewMode}
+                options={[
+                  { label: 'Tổng quan', value: 'summary' },
+                  { label: 'So sánh chi nhánh', value: 'branch_comparison' },
+                ]}
+                style={{ width: 160 }}
+              />
               <RangePicker
                 value={dateRange}
                 onChange={(dates) => {
@@ -254,7 +314,7 @@ export default function SalesReportsPage() {
                   { label: 'Năm này', value: [dayjs().startOf('year'), dayjs()] },
                 ]}
               />
-              {isAdmin && (
+              {isAdmin && viewMode === 'summary' && (
                 <Select
                   style={{ width: 200 }}
                   placeholder="Chọn chi nhánh"
@@ -284,6 +344,21 @@ export default function SalesReportsPage() {
                   })),
                 ]}
               />
+              <Select
+                style={{ width: 250 }}
+                placeholder="Lọc theo sản phẩm"
+                value={selectedItemId}
+                onChange={(value: number | 'all') => setSelectedItemId(value)}
+                showSearch
+                optionFilterProp="label"
+                options={[
+                  { label: 'Tất cả sản phẩm', value: 'all' },
+                  ...items.map((i) => ({
+                    label: `${i.itemCode} - ${i.itemName}`,
+                    value: i.id,
+                  })),
+                ]}
+              />
             </div>
           ),
           buttonEnds: [
@@ -304,159 +379,207 @@ export default function SalesReportsPage() {
       >
         <div className="space-y-6">
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-              <div className="text-sm text-blue-600 mb-1">Tổng đơn hàng</div>
-              <div className="text-2xl font-bold text-blue-700">
-                {summary.totalOrders}
+          {viewMode === 'summary' ? (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                  <div className="text-sm text-blue-600 mb-1">Tổng đơn hàng</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {summary.totalOrders}
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    {summary.completedOrders} hoàn thành
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+                  <div className="text-sm text-green-600 mb-1">Tổng doanh thu</div>
+                  <div className="text-2xl font-bold text-green-700">
+                    {formatCurrency(summary.totalAmount)}
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                  <div className="text-sm text-purple-600 mb-1">Đã thu</div>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {formatCurrency(summary.totalPaid)}
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+                  <div className="text-sm text-orange-600 mb-1">Còn nợ</div>
+                  <div className="text-2xl font-bold text-orange-700">
+                    {formatCurrency(summary.totalUnpaid)}
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-blue-600 mt-1">
-                {summary.completedOrders} hoàn thành
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-              <div className="text-sm text-green-600 mb-1">Tổng doanh thu</div>
-              <div className="text-2xl font-bold text-green-700">
-                {formatCurrency(summary.totalAmount)}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-              <div className="text-sm text-purple-600 mb-1">Đã thu</div>
-              <div className="text-2xl font-bold text-purple-700">
-                {formatCurrency(summary.totalPaid)}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
-              <div className="text-sm text-orange-600 mb-1">Còn nợ</div>
-              <div className="text-2xl font-bold text-orange-700">
-                {formatCurrency(summary.totalUnpaid)}
-              </div>
-            </div>
-          </div>
 
-          {/* Monthly Trend Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Xu hướng doanh thu theo tháng</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#10B981" name="Doanh thu" strokeWidth={2} />
-                <Line type="monotone" dataKey="paid" stroke="#8B5CF6" name="Đã thu" strokeWidth={2} />
-                <Line type="monotone" dataKey="unpaid" stroke="#F59E0B" name="Còn nợ" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Daily Revenue Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Doanh thu theo ngày</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend />
-                <Bar dataKey="revenue" fill="#10B981" name="Doanh thu" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Order Status Pie Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Trạng thái đơn hàng</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={orderStatusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value, percent }) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {orderStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Top Customers and Products */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Top Customers */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Top 10 khách hàng</h3>
-              <div className="overflow-auto max-h-96">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mã KH</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tên KH</th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Số ĐH</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Doanh thu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {summary.topCustomers.map((customer, index) => (
-                      <tr key={customer.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm">
-                          <span className="font-medium text-blue-600">#{index + 1}</span> {customer.customerCode}
-                        </td>
-                        <td className="px-4 py-2 text-sm">{customer.customerName}</td>
-                        <td className="px-4 py-2 text-sm text-center">{customer.totalOrders}</td>
-                        <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
-                          {formatCurrency(customer.totalAmount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Monthly Trend Chart */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold mb-4">Xu hướng doanh thu theo tháng</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend />
+                    <Line type="monotone" dataKey="revenue" stroke="#10B981" name="Doanh thu" strokeWidth={2} />
+                    <Line type="monotone" dataKey="paid" stroke="#8B5CF6" name="Đã thu" strokeWidth={2} />
+                    <Line type="monotone" dataKey="unpaid" stroke="#F59E0B" name="Còn nợ" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            </div>
 
-            {/* Top Products */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Top 10 sản phẩm bán chạy</h3>
-              <div className="overflow-auto max-h-96">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mã SP</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tên SP</th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">SL bán</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Doanh thu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {summary.topProducts.map((product, index) => (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm">
-                          <span className="font-medium text-blue-600">#{index + 1}</span> {product.productCode}
-                        </td>
-                        <td className="px-4 py-2 text-sm">{product.productName}</td>
-                        <td className="px-4 py-2 text-sm text-center">
-                          {formatQuantity(product.totalQuantity, product.unit)}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
-                          {formatCurrency(product.totalAmount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Daily Revenue Chart */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold mb-4">Doanh thu theo ngày</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dailyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend />
+                    <Bar dataKey="revenue" fill="#10B981" name="Doanh thu" />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
+
+              {/* Order Status Pie Chart */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold mb-4">Trạng thái đơn hàng</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={orderStatusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value, percent }) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {orderStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top Customers and Products */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Top Customers */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold mb-4">Top 10 khách hàng</h3>
+                  <div className="overflow-auto max-h-96">
+                    <table className="min-w-full">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mã KH</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tên KH</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Số ĐH</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Doanh thu</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {summary.topCustomers.map((customer, index) => (
+                          <tr key={customer.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-sm">
+                              <span className="font-medium text-blue-600">#{index + 1}</span> {customer.customerCode}
+                            </td>
+                            <td className="px-4 py-2 text-sm">{customer.customerName}</td>
+                            <td className="px-4 py-2 text-sm text-center">{customer.totalOrders}</td>
+                            <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
+                              {formatCurrency(customer.totalAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Top Products */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold mb-4">Top 10 sản phẩm bán chạy</h3>
+                  <div className="overflow-auto max-h-96">
+                    <table className="min-w-full">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mã SP</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Tên SP</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">SL bán</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Doanh thu</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {summary.topItems.map((item, index) => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-sm">
+                              <span className="font-medium text-blue-600">#{index + 1}</span> {item.itemCode}
+                            </td>
+                            <td className="px-4 py-2 text-sm">{item.itemName}</td>
+                            <td className="px-4 py-2 text-sm text-center">
+                              {formatQuantity(item.totalQuantity, item.unit)}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-right font-medium text-green-600">
+                              {formatCurrency(item.totalAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <Table
+                dataSource={branchReportData}
+                rowKey="branchId"
+                pagination={false}
+                columns={[
+                  {
+                    title: 'Tên chi nhánh',
+                    dataIndex: 'branchName',
+                    key: 'branchName',
+                    render: (text) => <span className="font-medium text-blue-600">{text}</span>
+                  },
+                  {
+                    title: 'Số đơn hàng',
+                    dataIndex: 'totalOrders',
+                    key: 'totalOrders',
+                    align: 'center',
+                  },
+                  {
+                    title: 'Doanh thu',
+                    dataIndex: 'totalRevenue',
+                    key: 'totalRevenue',
+                    align: 'right',
+                    render: (val) => <span className="text-green-600 font-medium">{formatCurrency(val)}</span>
+                  },
+                  {
+                    title: 'Thực thu',
+                    dataIndex: 'totalPaid',
+                    key: 'totalPaid',
+                    align: 'right',
+                    render: (val) => <span className="text-purple-600 font-medium">{formatCurrency(val)}</span>
+                  },
+                  {
+                    title: 'Còn nợ',
+                    dataIndex: 'totalUnpaid',
+                    key: 'totalUnpaid',
+                    align: 'right',
+                    render: (val) => <span className="text-orange-600 font-medium">{formatCurrency(val)}</span>
+                  },
+                ]}
+              />
             </div>
-          </div>
+          )}
+
         </div>
       </WrapperContent>
     </>

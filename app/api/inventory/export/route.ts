@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
         it.approved_by as "approvedBy",
         u2.full_name as "approvedByName",
         it.approved_at as "approvedAt",
-        COALESCE((SELECT SUM(itd.total_amount) FROM inventory_transaction_details itd WHERE itd.transaction_id = it.id), 0) as "totalAmount"
+        it.total_amount as "totalAmount"
        FROM inventory_transactions it
        LEFT JOIN warehouses w ON w.id = it.from_warehouse_id
        LEFT JOIN users u1 ON u1.id = it.created_by
@@ -213,10 +213,10 @@ export async function POST(request: NextRequest) {
 
     // Tạo phiếu xuất với thông tin đơn hàng
     const transResult = await query(
-      `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by, related_order_code, related_customer_name, approved_by, approved_at)
-       VALUES ($1, 'XUAT', $2, $3, $4, $5, $6, $7, $8, ${approvedAt})
+      `INSERT INTO inventory_transactions (transaction_code, transaction_type, from_warehouse_id, status, notes, created_by, related_order_code, related_customer_name, approved_by, approved_at, total_amount)
+       VALUES ($1, 'XUAT', $2, $3, $4, $5, $6, $7, $8, ${approvedAt}, $9)
        RETURNING id`,
-      [transactionCode, fromWarehouseId, initialStatus, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null, approvedBy]
+      [transactionCode, fromWarehouseId, initialStatus, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null, approvedBy, 0]
     );
 
     const transactionId = transResult.rows[0].id;
@@ -252,13 +252,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Thêm chi tiết
+    let totalAmount = 0;
     for (const item of items) {
+      const itemTotal = item.quantity * (item.unitPrice || 0); // Note: export may not have unit price in body, but we follow import's logic if applicable
+      totalAmount += itemTotal;
       await query(
-        `INSERT INTO inventory_transaction_details (transaction_id, product_id, material_id, quantity, notes)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [transactionId, item.productId || null, item.materialId || null, item.quantity, item.notes || null]
+        `INSERT INTO inventory_transaction_details (transaction_id, product_id, material_id, quantity, unit_price, total_amount, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [transactionId, item.productId || null, item.materialId || null, item.quantity, item.unitPrice || 0, itemTotal, item.notes || null]
       );
     }
+
+    // Cập nhật tổng tiền vào phiếu
+    await query(
+      `UPDATE inventory_transactions SET total_amount = $1 WHERE id = $2`,
+      [totalAmount, transactionId]
+    );
 
     // Nếu autoApprove, trừ tồn kho ngay lập tức
     if (autoApprove) {

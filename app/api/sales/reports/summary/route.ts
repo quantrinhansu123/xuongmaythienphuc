@@ -15,10 +15,12 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
     const branchIdParam = searchParams.get('branchId');
     const salesEmployeeId = searchParams.get('salesEmployeeId');
+    const itemIdParam = searchParams.get('itemId');
 
     const params: any[] = [startDate, endDate];
     let paramIndex = 3;
     let branchFilter = '';
+    let itemFilter = '';
 
     // Xử lý filter chi nhánh
     if (user.roleCode !== 'ADMIN') {
@@ -39,6 +41,13 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
+    // Xử lý filter sản phẩm
+    if (itemIdParam && itemIdParam !== 'all') {
+      itemFilter = ` AND EXISTS (SELECT 1 FROM order_details od WHERE od.order_id = orders.id AND od.item_id = $${paramIndex})`;
+      params.push(parseInt(itemIdParam));
+      paramIndex++;
+    }
+
     // Chạy 3 queries song song để tăng tốc
     const [ordersResult, topCustomersResult, topProductsResult] = await Promise.all([
       // Tổng quan đơn hàng
@@ -55,7 +64,7 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN status = 'IN_PRODUCTION' THEN 1 END) as in_production_orders,
           COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END) as cancelled_orders
         FROM orders
-        WHERE order_date::date BETWEEN $1::date AND $2::date${branchFilter}
+        WHERE order_date::date BETWEEN $1::date AND $2::date${branchFilter}${itemFilter}
       `, params),
 
       // Top khách hàng
@@ -69,7 +78,7 @@ export async function GET(request: NextRequest) {
         FROM customers c
         JOIN orders o ON o.customer_id = c.id
         WHERE o.order_date::date BETWEEN $1::date AND $2::date
-          AND o.status != 'CANCELLED'${branchFilter.replace('branch_id', 'o.branch_id')}
+          AND o.status != 'CANCELLED'${branchFilter.replace('branch_id', 'o.branch_id')}${itemFilter.replace('orders', 'o')}
         GROUP BY c.id, c.customer_code, c.customer_name
         ORDER BY COALESCE(SUM(o.final_amount), 0) DESC
         LIMIT 10
@@ -78,18 +87,18 @@ export async function GET(request: NextRequest) {
       // Top sản phẩm bán chạy
       query(`
         SELECT 
-          p.id,
-          p.product_code as "productCode",
-          p.product_name as "productName",
-          p.unit,
+          i.id,
+          i.item_code as "itemCode",
+          i.item_name as "itemName",
+          i.unit,
           COALESCE(SUM(od.quantity), 0) as "totalQuantity",
           COALESCE(SUM(od.total_amount), 0) as "totalAmount"
-        FROM products p
-        JOIN order_details od ON od.product_id = p.id
+        FROM items i
+        JOIN order_details od ON od.item_id = i.id
         JOIN orders o ON o.id = od.order_id
         WHERE o.order_date::date BETWEEN $1::date AND $2::date
-          AND o.status != 'CANCELLED'${branchFilter.replace('branch_id', 'o.branch_id')}
-        GROUP BY p.id, p.product_code, p.product_name, p.unit
+          AND o.status != 'CANCELLED'${branchFilter.replace('branch_id', 'o.branch_id')}${itemFilter.replace('orders', 'o')}
+        GROUP BY i.id, i.item_code, i.item_name, i.unit
         ORDER BY COALESCE(SUM(od.quantity), 0) DESC
         LIMIT 10
       `, params)
@@ -107,7 +116,7 @@ export async function GET(request: NextRequest) {
       inProductionOrders: parseInt(ordersResult.rows[0]?.in_production_orders || '0'),
       cancelledOrders: parseInt(ordersResult.rows[0]?.cancelled_orders || '0'),
       topCustomers: topCustomersResult.rows,
-      topProducts: topProductsResult.rows,
+      topItems: topProductsResult.rows,
     };
 
     return NextResponse.json({ success: true, data: summary });

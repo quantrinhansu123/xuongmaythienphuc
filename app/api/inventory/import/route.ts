@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
         it.approved_by as "approvedBy",
         u2.full_name as "approvedByName",
         it.approved_at as "approvedAt",
-        COALESCE((SELECT SUM(itd.total_amount) FROM inventory_transaction_details itd WHERE itd.transaction_id = it.id), 0) as "totalAmount"
+        it.total_amount as "totalAmount"
        FROM inventory_transactions it
        LEFT JOIN warehouses w ON w.id = it.to_warehouse_id
        LEFT JOIN users u1 ON u1.id = it.created_by
@@ -192,16 +192,19 @@ export async function POST(request: NextRequest) {
 
     // Tạo phiếu nhập với thông tin đơn hàng
     const transResult = await query(
-      `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by, related_order_code, related_customer_name)
-       VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4, $5, $6)
+      `INSERT INTO inventory_transactions (transaction_code, transaction_type, to_warehouse_id, status, notes, created_by, related_order_code, related_customer_name, total_amount)
+       VALUES ($1, 'NHAP', $2, 'PENDING', $3, $4, $5, $6, $7)
        RETURNING id`,
-      [transactionCode, toWarehouseId, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null]
+      [transactionCode, toWarehouseId, notes, currentUser.id, relatedOrderCode || null, relatedCustomerName || null, 0]
     );
 
     const transactionId = transResult.rows[0].id;
 
     // Thêm chi tiết (chưa cập nhật tồn kho)
+    let totalAmount = 0;
     for (const item of items) {
+      const itemTotal = item.quantity * (item.unitPrice || 0);
+      totalAmount += itemTotal;
       await query(
         `INSERT INTO inventory_transaction_details (transaction_id, product_id, material_id, quantity, unit_price, total_amount, notes)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -211,11 +214,17 @@ export async function POST(request: NextRequest) {
           item.materialId || null,
           item.quantity,
           item.unitPrice || 0,
-          (item.quantity * (item.unitPrice || 0)),
+          itemTotal,
           item.notes || null
         ]
       );
     }
+
+    // Cập nhật tổng tiền vào phiếu
+    await query(
+      `UPDATE inventory_transactions SET total_amount = $1 WHERE id = $2`,
+      [totalAmount, transactionId]
+    );
 
     return NextResponse.json<ApiResponse>({
       success: true,

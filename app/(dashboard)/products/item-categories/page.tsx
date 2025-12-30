@@ -415,7 +415,6 @@ export default function ItemCategoriesPage() {
                 isRefetching={categoriesFetching}
                 isEmpty={categories.length === 0}
                 header={{
-                    buttonBackTo: "/dashboard/products",
                     refetchDataWithKeys: ["item-categories"],
                     buttonEnds: [
                         {

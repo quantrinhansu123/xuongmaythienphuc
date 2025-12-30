@@ -16,8 +16,11 @@ export async function GET(request: NextRequest) {
     const branchIdParam = searchParams.get('branchId');
     const salesEmployeeId = searchParams.get('salesEmployeeId');
 
+    const itemIdParam = searchParams.get('itemId');
+
     const params: any[] = [startDate, endDate];
     let branchFilter = '';
+    let itemFilter = '';
     let paramIndex = 3;
 
     // Xử lý filter chi nhánh
@@ -37,6 +40,13 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
+    // Xử lý filter sản phẩm
+    if (itemIdParam && itemIdParam !== 'all') {
+      itemFilter = ` AND EXISTS (SELECT 1 FROM order_details od WHERE od.order_id = orders.id AND od.item_id = $${paramIndex})`;
+      params.push(parseInt(itemIdParam));
+      paramIndex++;
+    }
+
     const result = await query(`
       SELECT 
         TO_CHAR(order_date, 'YYYY-MM-DD') as date,
@@ -46,7 +56,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(final_amount - COALESCE(paid_amount, 0)), 0) as unpaid
       FROM orders
       WHERE order_date::date BETWEEN $1::date AND $2::date
-        AND status != 'CANCELLED'${branchFilter}
+        AND status != 'CANCELLED'${branchFilter}${itemFilter}
       GROUP BY TO_CHAR(order_date, 'YYYY-MM-DD')
       ORDER BY date
     `, params);

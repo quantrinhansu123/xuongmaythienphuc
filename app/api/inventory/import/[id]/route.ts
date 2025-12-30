@@ -32,9 +32,9 @@ export async function GET(
         it.related_customer_name as "relatedCustomerName",
         u1.full_name as "createdBy",
         it.created_at as "createdAt",
-        u2.full_name as "approvedBy",
         it.approved_at as "approvedAt",
-        it.completed_at as "completedAt"
+        it.completed_at as "completedAt",
+        it.total_amount as "totalAmount"
        FROM inventory_transactions it
        LEFT JOIN warehouses w ON w.id = it.to_warehouse_id
        LEFT JOIN users u1 ON u1.id = it.created_by

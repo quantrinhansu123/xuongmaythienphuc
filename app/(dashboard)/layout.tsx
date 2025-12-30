@@ -144,6 +144,32 @@ export default function DashboardLayout({
     return path.split("/").pop() || "Trang";
   }, []);
 
+  // Find menu item by path to build breadcrumb from menu structure
+  const findMenuItemByPath = useCallback((path: string) => {
+    let bestMatch: { parent: any; item: any; length: number } | null = null;
+
+    for (const menuItem of allMenuItems) {
+      // Check top-level items
+      if (menuItem.href && (path === menuItem.href || path.startsWith(menuItem.href + "/"))) {
+        if (!bestMatch || menuItem.href.length > bestMatch.length) {
+          bestMatch = { parent: null, item: menuItem, length: menuItem.href.length };
+        }
+      }
+
+      // Check children
+      if (menuItem.children) {
+        for (const child of menuItem.children) {
+          if (child.href && (path === child.href || path.startsWith(child.href + "/"))) {
+            if (!bestMatch || child.href.length > bestMatch.length) {
+              bestMatch = { parent: menuItem, item: child, length: child.href.length };
+            }
+          }
+        }
+      }
+    }
+    return bestMatch;
+  }, [allMenuItems]);
+
   // Memoize menu items - chỉ tính toán lại khi can thay đổi
   const menuItems = useMemo(() => {
     return allMenuItems
@@ -282,19 +308,48 @@ export default function DashboardLayout({
     ];
 
     if (pathname !== "/dashboard") {
-      items.push({
-        title: <span>{getBreadcrumbTitle(pathname)}</span>,
-      });
-    }
+      // Try to find the menu item for this path
+      const menuMatch = findMenuItemByPath(pathname);
 
-    if (titlePage) {
-      items.push({
-        title: <Text strong>{titlePage}</Text>,
-      });
+      if (menuMatch) {
+        const isExactMatch = menuMatch.item.href === pathname;
+
+        if (isExactMatch) {
+          // Exact match - just show the title (non-clickable)
+          items.push({
+            title: <Text strong>{menuMatch.item.title}</Text>,
+          });
+        } else {
+          // Sub-page match - make the main page clickable
+          items.push({
+            title: (
+              <Link href={menuMatch.item.href}>
+                <span>{menuMatch.item.title}</span>
+              </Link>
+            ),
+          });
+
+          // Add the current page specific title
+          items.push({
+            title: <Text strong>{titlePage || getBreadcrumbTitle(pathname)}</Text>,
+          });
+        }
+      } else {
+        // Fallback to old behavior if not found in menu
+        items.push({
+          title: <span>{getBreadcrumbTitle(pathname)}</span>,
+        });
+
+        if (titlePage) {
+          items.push({
+            title: <Text strong>{titlePage}</Text>,
+          });
+        }
+      }
     }
 
     return items;
-  }, [pathname, titlePage, getBreadcrumbTitle]);
+  }, [pathname, titlePage, findMenuItemByPath, getBreadcrumbTitle]);
 
   // Memoize user menu items
   const userMenuItems: MenuProps["items"] = useMemo(() => [
