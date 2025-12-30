@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
         o.total_amount as "totalAmount",
         o.discount_amount as "discountAmount",
         o.final_amount as "finalAmount",
+        COALESCE(o.other_costs, 0) as "otherCosts",
         COALESCE(o.deposit_amount, 0) as "depositAmount",
         COALESCE(o.paid_amount, 0) as "paidAmount",
         (o.final_amount - COALESCE(o.deposit_amount, 0) - COALESCE(o.paid_amount, 0)) as "remainingAmount",
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, depositAccountId, depositMethod, notes, branchId } = body;
+    const { customerId, newCustomer, orderDate, items, discountAmount, depositAmount, depositAccountId, depositMethod, notes, branchId, otherCosts } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json<ApiResponse>({
@@ -246,7 +247,7 @@ export async function POST(request: NextRequest) {
     const totalAmount = items.reduce((sum: number, item: any) =>
       sum + (item.quantity * item.unitPrice), 0
     );
-    const finalAmount = totalAmount - (discountAmount || 0);
+    const finalAmount = totalAmount - (discountAmount || 0) + (otherCosts || 0);
 
     // Validate deposit amount
     const deposit = parseFloat(depositAmount || 0);
@@ -286,10 +287,10 @@ export async function POST(request: NextRequest) {
     const orderResult = await query(
       `INSERT INTO orders (
         order_code, customer_id, branch_id, order_date,
-        total_amount, discount_amount, final_amount,
+        total_amount, discount_amount, final_amount, other_costs,
         deposit_amount, payment_status,
         notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING id`,
       [
         orderCode,
@@ -299,6 +300,7 @@ export async function POST(request: NextRequest) {
         totalAmount,
         discountAmount || 0,
         finalAmount,
+        otherCosts || 0,
         deposit || 0,
         paymentStatus,
         notes || null,

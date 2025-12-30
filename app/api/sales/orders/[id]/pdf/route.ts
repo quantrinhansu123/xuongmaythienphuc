@@ -37,6 +37,7 @@ export async function GET(
         o.total_amount as "totalAmount",
         o.discount_amount as "discountAmount",
         o.final_amount as "finalAmount",
+        COALESCE(o.other_costs, 0) as "otherCosts",
         COALESCE(o.deposit_amount, 0) as "depositAmount",
         COALESCE(o.paid_amount, 0) as "paidAmount",
         o.status,
@@ -225,7 +226,8 @@ export async function GET(
   <div class="total-section">
     ${(() => {
         const totalOriginal = details.reduce((sum: number, item: any) => sum + (parseFloat(item.costPrice || item.unitPrice) * parseFloat(item.quantity)), 0);
-        const totalReduction = totalOriginal - parseFloat(order.finalAmount);
+        const otherCosts = parseFloat(order.otherCosts) || 0;
+        const totalReduction = totalOriginal - (parseFloat(order.finalAmount) - otherCosts);
 
         return `
         <div class="total-row">
@@ -236,6 +238,11 @@ export async function GET(
         <div class="total-row" style="color: #dc2626;">
           <span>Giảm giá:</span>
           <span>-${formatNumber(totalReduction)} đ</span>
+        </div>` : ''}
+        ${otherCosts > 0 ? `
+        <div class="total-row">
+          <span>Chi phí phát sinh:</span>
+          <span>+${formatNumber(otherCosts)} đ</span>
         </div>` : ''}
         <div class="total-row final">
           <span>THÀNH TIỀN:</span>

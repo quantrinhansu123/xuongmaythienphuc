@@ -32,6 +32,7 @@ export async function GET(
         o.total_amount as "totalAmount",
         o.discount_amount as "discountAmount",
         o.final_amount as "finalAmount",
+        COALESCE(o.other_costs, 0) as "otherCosts",
         o.status,
         COALESCE(o.deposit_amount, 0) as "depositAmount",
         COALESCE(o.paid_amount, 0) as "paidAmount",
@@ -147,7 +148,7 @@ export async function PUT(
     const resolvedParams = await params;
     const orderId = parseInt(resolvedParams.id);
     const body = await request.json();
-    const { customerId, notes, discountAmount, items } = body;
+    const { customerId, notes, discountAmount, otherCosts, items } = body;
 
     // Check order exists and is PENDING
     const orderCheck = await query(
@@ -175,15 +176,15 @@ export async function PUT(
       totalAmount = items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
     }
     const discount = discountAmount || 0;
-    const finalAmount = totalAmount - discount;
+    const finalAmount = totalAmount - discount + (otherCosts || 0);
 
     // Update order
     await query(
       `UPDATE orders 
        SET customer_id = $1, notes = $2, discount_amount = $3, 
-           total_amount = $4, final_amount = $5, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6`,
-      [customerId, notes || null, discount, totalAmount, finalAmount, orderId]
+           total_amount = $4, final_amount = $5, other_costs = $6, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7`,
+      [customerId, notes || null, discount, totalAmount, finalAmount, otherCosts || 0, orderId]
     );
 
     // Delete existing order details

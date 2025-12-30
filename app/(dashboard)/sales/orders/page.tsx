@@ -130,6 +130,7 @@ interface Order {
   createdBy: string;
   createdAt: string;
   notes?: string;
+  otherCosts?: number;
   details?: OrderItem[];
 
 }
@@ -343,14 +344,26 @@ function OrderDetailDrawer({
           <Descriptions.Item label="Người tạo">
             {data.createdBy}
           </Descriptions.Item>
-          <Descriptions.Item label="Tổng tiền">
+          <Descriptions.Item label="Tổng tiền (gốc)">
             <Typography.Text strong style={{ color: '#1890ff' }}>
-              {formatCurrency(data.finalAmount)}
+              {(() => {
+                const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(String(item.costPrice || item.unitPrice)) * parseFloat(String(item.quantity))), 0);
+                return formatCurrency(totalOriginal);
+              })()}
             </Typography.Text>
           </Descriptions.Item>
-          <Descriptions.Item label="Giảm giá">
+          <Descriptions.Item label="Giảm giá (Tổng cộng)">
             <Typography.Text type="danger">
-              -{formatCurrency(data.discountAmount || 0)}
+              {(() => {
+                const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(String(item.costPrice || item.unitPrice)) * parseFloat(String(item.quantity))), 0);
+                const totalReduction = totalOriginal - (parseFloat(String(data.finalAmount)) - (data.otherCosts || 0));
+                return `-${formatCurrency(totalReduction)}`;
+              })()}
+            </Typography.Text>
+          </Descriptions.Item>
+          <Descriptions.Item label="Chi phí phát sinh">
+            <Typography.Text style={{ color: (data.otherCosts || 0) > 0 ? '#fa8c16' : '#999' }}>
+              +{formatCurrency(data.otherCosts || 0)}
             </Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="Tiền đặt cọc">
@@ -836,13 +849,13 @@ function OrderDetailDrawer({
         />
         <div className="mt-4 space-y-2 text-right">
           {(() => {
-            const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(item.costPrice || item.unitPrice) * parseFloat(item.quantity)), 0);
-            const totalReduction = totalOriginal - parseFloat(data.finalAmount);
+            const totalOriginal = (data.details || []).reduce((sum: number, item: any) => sum + (parseFloat(String(item.costPrice || item.unitPrice)) * parseFloat(String(item.quantity))), 0);
+            const totalReduction = totalOriginal - (parseFloat(String(data.finalAmount)) - (data.otherCosts || 0));
 
             return (
               <>
                 <div>
-                  <Typography.Text>Tổng tiền:</Typography.Text>{" "}
+                  <Typography.Text>Tổng tiền (gốc):</Typography.Text>{" "}
                   <Typography.Text strong>
                     {formatCurrency(totalOriginal)}
                   </Typography.Text>
@@ -1440,6 +1453,7 @@ export default function OrdersPage() {
     mutationFn: async (values: any) => {
       const payload = {
         ...values,
+        otherCosts: values.otherCosts || 0,
         items: orderItems.map(item => ({
           ...item,
           measurements: item.measurements?.map(m => ({
@@ -1479,6 +1493,7 @@ export default function OrdersPage() {
       setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
       setDiscountAmount(0);
       setDiscountPercent(0);
+      setOtherCosts(0);
       setDepositAmount(0);
       setDepositAccountId(null);
       setDepositMethod('CASH');
@@ -1540,6 +1555,7 @@ export default function OrdersPage() {
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [otherCosts, setOtherCosts] = useState(0);
   const [depositAmount, setDepositAmount] = useState(0);
   const [depositAccountId, setDepositAccountId] = useState<number | null>(null);
   const [depositMethod, setDepositMethod] = useState<string>('CASH');
@@ -1734,6 +1750,7 @@ export default function OrdersPage() {
     setNewCustomer({ customerName: "", phone: "", email: "", address: "" });
     setDiscountAmount(0);
     setDiscountPercent(0);
+    setOtherCosts(0);
     setDepositAmount(0);
     setDepositAccountId(null);
     setDepositMethod('CASH');
@@ -1742,6 +1759,7 @@ export default function OrdersPage() {
       customerId: undefined,
       discountAmount: 0,
       discountPercent: 0,
+      otherCosts: 0,
       depositAmount: 0,
       orderDate: new Date().toLocaleDateString('en-CA'),
     });
@@ -1751,6 +1769,7 @@ export default function OrdersPage() {
   // Handle edit order - load order data into form
   const handleEditOrder = (order: Order) => {
     setEditingOrderId(order.id);
+    setOtherCosts(order.otherCosts || 0);
     // Set customer
     setSelectedCustomer({ id: order.customerId, customerName: order.customerName, phone: '', address: '' } as any);
     // Set order items
@@ -1772,6 +1791,7 @@ export default function OrdersPage() {
     // Set form values
     form.setFieldsValue({
       customerId: order.customerId,
+      otherCosts: order.otherCosts || 0,
       notes: order.notes,
     });
     setShowCreateModal(true);
@@ -3091,15 +3111,38 @@ export default function OrdersPage() {
                   <div className="sticky top-0 bg-gray-50 rounded-lg p-4 space-y-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">💰 Thanh toán</h3>
 
-                    <div className="flex justify-between items-center text-base">
-                      <span className="text-gray-600">Tổng tiền hàng:</span>
-                      <span className="font-semibold text-lg">
-                        {formatCurrency(calculateTotal())}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Tổng tiền (gốc):</span>
+                        <span className="font-medium">
+                          {(() => {
+                            const originalTotal = orderItems.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
+                            return formatCurrency(originalTotal);
+                          })()}
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const originalTotal = orderItems.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
+                        const discountedProductTotal = calculateTotal();
+                        const customerDiscount = originalTotal - discountedProductTotal;
+
+                        return customerDiscount > 0 ? (
+                          <div className="flex justify-between items-center text-sm text-green-600">
+                            <span>Chiết khấu khách hàng:</span>
+                            <span>-{formatCurrency(customerDiscount)}</span>
+                          </div>
+                        ) : null;
+                      })()}
+
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Giá trị đơn hàng:</span>
+                        <span className="font-medium">{formatCurrency(calculateTotal())}</span>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <span className="text-gray-600 text-sm">Chiết khấu đơn hàng:</span>
+                    <div className="space-y-2 border-t border-gray-200 pt-2">
+                      <span className="text-gray-600 text-sm">Giảm giá thêm:</span>
                       <div className="flex items-center gap-2">
                         <Form.Item name="discountPercent" noStyle initialValue={0}>
                           <InputNumber
@@ -3143,12 +3186,43 @@ export default function OrdersPage() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-lg border-t border-gray-300 pt-3">
+                    <div className="space-y-2 border-t border-gray-200 pt-2">
+                      <span className="text-gray-600 text-sm">Chi phí phát sinh:</span>
+                      <Form.Item name="otherCosts" noStyle initialValue={0}>
+                        <InputNumber
+                          min={0}
+                          style={{ width: '100%' }}
+                          placeholder="0"
+                          value={otherCosts}
+                          formatter={(value: number | string | undefined) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                          parser={(value: string | undefined) => value!.replace(/\$\s?|(,*)/g, '')}
+                          onChange={(value: string | number | null) => {
+                            const val = typeof value === 'string' ? parseFloat(value) : value;
+                            setOtherCosts(val || 0);
+                            form.setFieldsValue({ otherCosts: val || 0 });
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+
+                    <div className="flex justify-between items-center text-lg border-t border-blue-200 pt-3 bg-blue-50 -mx-4 px-4 py-2">
                       <span className="font-bold text-gray-900">Khách phải trả:</span>
                       <span className="font-bold text-blue-600 text-xl">
-                        {formatCurrency(calculateTotal() - discountAmount)}
+                        {formatCurrency(calculateTotal() - discountAmount + otherCosts)}
                       </span>
                     </div>
+
+                    {(() => {
+                      const originalTotal = orderItems.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
+                      const finalToPayGoods = calculateTotal() - discountAmount;
+                      const totalReduction = originalTotal - finalToPayGoods;
+
+                      return totalReduction > 0 ? (
+                        <div className="text-right text-xs text-red-500 italic mt-1">
+                          (Tổng giảm giá: -{formatCurrency(totalReduction)})
+                        </div>
+                      ) : null;
+                    })()}
 
 
                     {/* Footer buttons */}
