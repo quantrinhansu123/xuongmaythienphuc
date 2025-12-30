@@ -18,8 +18,8 @@ export async function POST(
     const body = await request.json();
     const { paymentAmount, paymentDate, bankAccountId, notes, partnerType, orderId } = body;
 
-    // Validate - bankAccountId is now required
-    if (!paymentAmount || !paymentDate || !bankAccountId || !partnerType) {
+    // Validate
+    if (!paymentAmount || !paymentDate || !partnerType) {
       return NextResponse.json(
         { success: false, error: 'Thiếu thông tin bắt buộc' },
         { status: 400 }
@@ -33,10 +33,38 @@ export async function POST(
       );
     }
 
+    let finalAccountId = bankAccountId;
+
+    // Nếu chưa chọn tài khoản, thử tìm tài khoản mặc định
+    if (!finalAccountId) {
+      let categoryCode = partnerType === 'customer' ? 'BAN_HANG' : 'MUA_HANG'; // Mặc định
+      let type = partnerType === 'customer' ? 'THU' : 'CHI';
+      let categoryName = partnerType === 'customer' ? 'Bán hàng' : 'Mua hàng';
+
+      const catResult = await query(
+        `SELECT bank_account_id FROM financial_categories 
+         WHERE (category_code = $1 OR category_name = $2) 
+         AND type = $3 AND is_active = true 
+         LIMIT 1`,
+        [categoryCode, categoryName, type]
+      );
+
+      if (catResult.rows.length > 0) {
+        finalAccountId = catResult.rows[0].bank_account_id;
+      }
+    }
+
+    if (!finalAccountId) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng chọn tài khoản thanh toán hoặc thiết lập tài khoản mặc định cho sổ quỹ' },
+        { status: 400 }
+      );
+    }
+
     // Get bank account to determine payment method
     const accountResult = await query(
       `SELECT account_type FROM bank_accounts WHERE id = $1`,
-      [bankAccountId]
+      [finalAccountId]
     );
 
     if (accountResult.rows.length === 0) {
@@ -187,7 +215,7 @@ export async function POST(
         `INSERT INTO debt_payments 
           (debt_id, payment_amount, payment_date, payment_method, bank_account_id, notes, created_by)
          VALUES ($1::integer, $2::numeric, $3, $4, $5::integer, $6, $7::integer)`,
-        [debtId, paymentForThisOrder, paymentDate, paymentMethod, bankAccountId ? parseInt(bankAccountId) : null, notes || 'Thanh toán công nợ', user.id]
+        [debtId, paymentForThisOrder, paymentDate, paymentMethod, finalAccountId ? parseInt(finalAccountId) : null, notes || 'Thanh toán công nợ', user.id]
       );
 
       // Cập nhật remaining_amount trong debt_management
@@ -219,13 +247,13 @@ export async function POST(
     );
 
     // Cập nhật số dư tài khoản ngân hàng và ghi sổ quỹ nếu có
-    if (bankAccountId) {
+    if (finalAccountId) {
       const balanceChange = transactionType === 'THU' ? amount : -amount;
       await query(
         `UPDATE bank_accounts 
          SET balance = balance + $1::numeric 
          WHERE id = $2::integer`,
-        [balanceChange, parseInt(bankAccountId)]
+        [balanceChange, parseInt(finalAccountId)]
       );
 
       // Tạo mã giao dịch cho sổ quỹ
@@ -333,7 +361,7 @@ export async function POST(
           transactionType,
           amount,
           paymentMethod,
-          parseInt(bankAccountId),
+          parseInt(finalAccountId),
           categoryId,
           notes || description,
           user.branchId,

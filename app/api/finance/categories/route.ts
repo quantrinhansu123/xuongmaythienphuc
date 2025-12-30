@@ -17,32 +17,43 @@ export async function GET(request: NextRequest) {
 
     let sql = `
       SELECT 
-        id,
-        category_code as "categoryCode",
-        category_name as "categoryName",
-        type,
-        description,
-        is_active as "isActive",
-        created_at as "createdAt"
-      FROM financial_categories
+        fc.id,
+        fc.category_code as "categoryCode",
+        fc.category_name as "categoryName",
+        fc.type,
+        fc.description,
+        fc.is_active as "isActive",
+        fc.created_at as "createdAt",
+        fc.bank_account_id as "bankAccountId",
+        ba.bank_name as "bankName",
+        ba.account_number as "bankAccountNumber",
+        COALESCE(SUM(CASE WHEN cb.transaction_type = 'THU' THEN cb.amount ELSE 0 END), 0)::float as "totalIn",
+        COALESCE(SUM(CASE WHEN cb.transaction_type = 'CHI' THEN cb.amount ELSE 0 END), 0)::float as "totalOut",
+        (
+          COALESCE(SUM(CASE WHEN cb.transaction_type = 'THU' THEN cb.amount ELSE 0 END), 0) - 
+          COALESCE(SUM(CASE WHEN cb.transaction_type = 'CHI' THEN cb.amount ELSE 0 END), 0)
+        )::float as "balance"
+      FROM financial_categories fc
+      LEFT JOIN cash_books cb ON fc.id = cb.financial_category_id
+      LEFT JOIN bank_accounts ba ON fc.bank_account_id = ba.id
       WHERE 1=1
     `;
     const params: any[] = [];
     let paramCount = 1;
 
-    if (type) {
-      sql += ` AND type = $${paramCount}`;
+    if (type && type !== 'ALL') {
+      sql += ` AND fc.type = $${paramCount}`;
       params.push(type);
       paramCount++;
     }
 
     if (isActive !== null && isActive !== undefined) {
-      sql += ` AND is_active = $${paramCount}`;
+      sql += ` AND fc.is_active = $${paramCount}`;
       params.push(isActive === 'true');
       paramCount++;
     }
 
-    sql += ` ORDER BY type, category_name`;
+    sql += ` GROUP BY fc.id, ba.bank_name, ba.account_number ORDER BY fc.created_at DESC`;
 
     const result = await query(sql, params);
 
@@ -69,7 +80,7 @@ export async function POST(request: NextRequest) {
 
   try {
     let body = await request.json();
-    let { categoryCode, categoryName, type, description } = body;
+    let { categoryCode, categoryName, type, description, bankAccountId } = body;
 
     // Validate required fields (except categoryCode - will auto-generate if missing)
     if (!categoryName || !type) {
@@ -79,12 +90,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!['THU', 'CHI'].includes(type)) {
-      return NextResponse.json(
-        { success: false, error: 'Loại danh mục không hợp lệ (THU hoặc CHI)' },
-        { status: 400 }
-      );
-    }
+    // if (!['THU', 'CHI'].includes(type)) {
+    //   return NextResponse.json(
+    //     { success: false, error: 'Loại danh mục không hợp lệ (THU hoặc CHI)' },
+    //     { status: 400 }
+    //   );
+    // }
 
     // Auto-generate category code if not provided
     if (!categoryCode) {
@@ -114,8 +125,8 @@ export async function POST(request: NextRequest) {
 
     const result = await query(
       `INSERT INTO financial_categories 
-        (category_code, category_name, type, description)
-      VALUES ($1, $2, $3, $4)
+        (category_code, category_name, type, description, bank_account_id)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING 
         id,
         category_code as "categoryCode",
@@ -124,7 +135,7 @@ export async function POST(request: NextRequest) {
         description,
         is_active as "isActive",
         created_at as "createdAt"`,
-      [categoryCode, categoryName, type, description]
+      [categoryCode, categoryName, type, description, bankAccountId || null]
     );
 
     return NextResponse.json({

@@ -10,6 +10,9 @@ interface FinancialCategory {
   description: string;
   isActive: boolean;
   createdAt: string;
+  bankAccountId?: number;
+  bankName?: string;
+  bankAccountNumber?: string;
 }
 
 interface Props {
@@ -26,9 +29,27 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     categoryName: category.categoryName,
     type: category.type,
     description: category.description,
+    bankAccountId: category.bankAccountId,
   });
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchBankAccounts();
+  }, []);
+
+  const fetchBankAccounts = async () => {
+    try {
+      const res = await fetch('/api/finance/bank-accounts');
+      const data = await res.json();
+      if (data.success) {
+        setBankAccounts(data.data);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   useEffect(() => {
     fetchTransactions();
@@ -38,7 +59,7 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     setLoadingTransactions(true);
     try {
       // Fetch relevant transactions based on category type
-      const endpoint = `/api/finance/cashbooks?categoryId=${category.id}&transactionType=${category.type}`;
+      const endpoint = `/api/finance/cashbooks?categoryId=${category.id}`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -133,6 +154,14 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
                 <span className="text-sm text-gray-600">Mô tả:</span>
                 <span className="font-medium">{category.description || '-'}</span>
               </div>
+              {category.bankName && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">TK liên kết:</span>
+                  <span className="font-medium text-blue-600">
+                    {category.bankName} - {category.bankAccountNumber}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Trạng thái:</span>
                 <span className={`px-2 py-1 rounded text-xs ${category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -154,9 +183,33 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
               </div>
             </div>
 
+            {/* Fund Metrics */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gray-50 p-4 rounded-lg text-center">
+                <div className="text-gray-500 mb-1 text-xs">Tổng thu</div>
+                <div className="text-lg font-bold text-green-600">
+                  {formatCurrency(transactions.filter(t => t.transactionType === 'THU').reduce((sum, t) => sum + Number(t.amount), 0))}
+                </div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg text-center">
+                <div className="text-gray-500 mb-1 text-xs">Tổng chi</div>
+                <div className="text-lg font-bold text-red-600">
+                  {formatCurrency(transactions.filter(t => t.transactionType === 'CHI').reduce((sum, t) => sum + Number(t.amount), 0))}
+                </div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg text-center">
+                <div className="text-gray-500 mb-1 text-xs">Số dư</div>
+                <div className="text-lg font-bold text-blue-600">
+                  {formatCurrency(
+                    transactions.reduce((sum, t) => sum + (t.transactionType === 'THU' ? Number(t.amount) : -Number(t.amount)), 0)
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Transaction History */}
             <div className="mt-6">
-              <h3 className="font-semibold mb-3">Lịch sử {category.type === 'THU' ? 'thu' : 'chi'}</h3>
+              <h3 className="font-semibold mb-3">Lịch sử giao dịch</h3>
               {loadingTransactions ? (
                 <div className="text-center py-4">Đang tải...</div>
               ) : transactions.length === 0 ? (
@@ -176,8 +229,8 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`font-bold ${category.type === 'THU' ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(t.amount)}
+                        <div className={`font-bold ${t.transactionType === 'THU' ? 'text-green-600' : 'text-red-600'}`}>
+                          {t.transactionType === 'THU' ? '+' : '-'}{formatCurrency(t.amount)}
                         </div>
                       </div>
                     </div>
@@ -246,6 +299,21 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
                 className="w-full border rounded px-3 py-2"
                 rows={3}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Tài khoản mặc định</label>
+              <select
+                value={formData.bankAccountId || ''}
+                onChange={(e) => setFormData({ ...formData, bankAccountId: e.target.value ? Number(e.target.value) : undefined })}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="">-- Không chọn --</option>
+                {bankAccounts.map((acc: any) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.bankName} - {acc.accountNumber}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex gap-2">
               <button

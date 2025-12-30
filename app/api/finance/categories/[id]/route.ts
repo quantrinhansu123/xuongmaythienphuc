@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
+import { NextRequest, NextResponse } from 'next/server';
 
 // PUT - Cập nhật danh mục tài chính
 export async function PUT(
@@ -8,7 +8,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { hasPermission, error } = await requirePermission('finance.categories', 'edit');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }
@@ -17,7 +17,7 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { categoryName, type, description, isActive } = body;
+    const { categoryName, type, description, isActive, bankAccountId } = body;
 
     const result = await query(
       `UPDATE financial_categories 
@@ -25,8 +25,9 @@ export async function PUT(
         category_name = COALESCE($1, category_name),
         type = COALESCE($2, type),
         description = COALESCE($3, description),
-        is_active = COALESCE($4, is_active)
-      WHERE id = $5
+        is_active = COALESCE($4, is_active),
+        bank_account_id = $5
+      WHERE id = $6
       RETURNING 
         id,
         category_code as "categoryCode",
@@ -35,7 +36,7 @@ export async function PUT(
         description,
         is_active as "isActive",
         created_at as "createdAt"`,
-      [categoryName, type, description, isActive, id]
+      [categoryName, type, description, isActive, bankAccountId === undefined ? null : bankAccountId, id]
     );
 
     if (result.rows.length === 0) {
@@ -64,7 +65,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { hasPermission, error } = await requirePermission('finance.categories', 'delete');
-  
+
   if (!hasPermission) {
     return NextResponse.json({ success: false, error }, { status: 403 });
   }

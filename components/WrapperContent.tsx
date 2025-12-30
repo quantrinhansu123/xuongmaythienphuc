@@ -273,6 +273,7 @@ interface RightControlsProps {
       danger?: boolean;
       isLoading?: boolean;
       type?: "link" | "default" | "text" | "primary" | "dashed" | undefined;
+      className?: string;
       onClick?: () => void;
       name: string;
       icon: React.ReactNode;
@@ -355,6 +356,7 @@ const RightControls: React.FC<RightControlsProps> = ({
                   loading={buttonEnd.isLoading}
                   danger={buttonEnd.danger}
                   type={buttonEnd.type}
+                  className={buttonEnd.className}
                   onClick={buttonEnd.onClick}
                   icon={buttonEnd.icon}
                 />
@@ -412,6 +414,7 @@ const RightControls: React.FC<RightControlsProps> = ({
               loading={buttonEnd.isLoading}
               danger={buttonEnd.danger}
               type={buttonEnd.type}
+              className={buttonEnd.className}
               onClick={buttonEnd.onClick}
               icon={buttonEnd.icon}
             >
@@ -440,6 +443,7 @@ interface WrapperContentProps<T extends object> {
       danger?: boolean;
       isLoading?: boolean;
       type?: "link" | "default" | "text" | "primary" | "dashed" | undefined;
+      className?: string;
       onClick?: () => void;
       name: string;
       icon: React.ReactNode;

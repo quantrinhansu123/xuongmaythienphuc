@@ -17,15 +17,37 @@ interface FinancialCategory {
   description: string;
   isActive: boolean;
   createdAt: string;
+  totalIn: number;
+  totalOut: number;
+  balance: number;
+  bankAccountId?: number;
+  bankName?: string;
+  bankAccountNumber?: string;
+}
+
+interface BankAccount {
+  id: number;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
 }
 
 export default function FinancialCategoriesPage() {
   const { can } = usePermissions();
   const [categories, setCategories] = useState<FinancialCategory[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FinancialCategory | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FinancialCategory | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferData, setTransferData] = useState({
+    sourceCategoryId: '',
+    targetCategoryId: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    description: ''
+  });
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,10 +57,12 @@ export default function FinancialCategoriesPage() {
     categoryName: '',
     type: 'THU' as 'THU' | 'CHI',
     description: '',
+    bankAccountId: undefined as number | undefined,
   });
 
   useEffect(() => {
     fetchCategories();
+    fetchBankAccounts();
   }, []);
 
   const fetchCategories = async () => {
@@ -52,6 +76,18 @@ export default function FinancialCategoriesPage() {
       console.error('Error fetching categories:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBankAccounts = async () => {
+    try {
+      const res = await fetch('/api/finance/bank-accounts');
+      const data = await res.json();
+      if (data.success) {
+        setBankAccounts(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
     }
   };
 
@@ -94,6 +130,7 @@ export default function FinancialCategoriesPage() {
       categoryName: category.categoryName,
       type: category.type,
       description: category.description,
+      bankAccountId: category.bankAccountId,
     });
     setShowModal(true);
   };
@@ -126,14 +163,53 @@ export default function FinancialCategoriesPage() {
       categoryName: '',
       type: 'THU',
       description: '',
+      bankAccountId: undefined,
     });
     setEditingCategory(null);
+  };
+
+  const handleTransferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (transferData.sourceCategoryId === transferData.targetCategoryId) {
+      alert('Quỹ nguồn và đích phải khác nhau');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/finance/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transferData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Luân chuyển thành công!');
+        setShowTransferModal(false);
+        setTransferData({
+          sourceCategoryId: '',
+          targetCategoryId: '',
+          amount: '',
+          date: new Date().toISOString().split('T')[0],
+          description: ''
+        });
+        fetchCategories();
+      } else {
+        alert(data.error || 'Có lỗi xảy ra');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Có lỗi xảy ra');
+    }
   };
 
   const handleResetAll = () => {
     setFilterQueries({});
     setSearchTerm('');
     setFilterType('ALL');
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   const exportColumns = [
@@ -190,6 +266,13 @@ export default function FinancialCategoriesPage() {
                 icon: <PlusOutlined />,
               },
               {
+                type: 'primary',
+                name: 'Luân chuyển',
+                onClick: () => setShowTransferModal(true),
+                icon: <ReloadOutlined />, // Using Reload icon for transfer
+                className: 'bg-orange-500 hover:bg-orange-600 border-orange-500' // Custom color
+              },
+              {
                 type: 'default',
                 name: 'Xuất Excel',
                 onClick: handleExportExcel,
@@ -225,6 +308,7 @@ export default function FinancialCategoriesPage() {
                   }
                 }}
                 options={[
+                  { label: 'Tất cả', value: 'ALL' },
                   { label: 'Thu', value: 'THU' },
                   { label: 'Chi', value: 'CHI' },
                 ]}
@@ -258,8 +342,10 @@ export default function FinancialCategoriesPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên sổ quỹ</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">TK Liên kết</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng thu</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng chi</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
               </tr>
             </thead>
@@ -271,14 +357,29 @@ export default function FinancialCategoriesPage() {
                   className="hover:bg-gray-50 cursor-pointer"
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{category.categoryCode}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{category.categoryName}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded text-xs ${category.type === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                      {category.type}
-                    </span>
+                    <div>{category.categoryName}</div>
+                    <div className="text-xs text-gray-500">{category.description}</div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{category.description}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                    {category.bankName ? (
+                      <div>
+                        <div className="font-medium">{category.bankName}</div>
+                        <div className="text-xs">{category.bankAccountNumber}</div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-medium">
+                    {formatCurrency(category.totalIn)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600 font-medium">
+                    {formatCurrency(category.totalOut)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                    {formatCurrency(category.balance)}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 rounded text-xs ${category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                       }`}>
@@ -359,6 +460,21 @@ export default function FinancialCategoriesPage() {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium mb-1">Tài khoản mặc định (Tự động chọn khi giao dịch)</label>
+            <Select
+              value={formData.bankAccountId}
+              onChange={(value) => setFormData({ ...formData, bankAccountId: value })}
+              className="w-full"
+              allowClear
+              placeholder="Chọn tài khoản ngân hàng..."
+              options={bankAccounts.map(acc => ({
+                label: `${acc.bankName} - ${acc.accountNumber}`,
+                value: acc.id
+              }))}
+            />
+          </div>
+
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -375,6 +491,88 @@ export default function FinancialCategoriesPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               {editingCategory ? 'Cập nhật' : 'Tạo mới'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Transfer Modal */}
+      <Modal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        title="Luân chuyển quỹ"
+      >
+        <form onSubmit={handleTransferSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Từ quỹ nguồn (Chi)</label>
+            <Select
+              className="w-full"
+              value={transferData.sourceCategoryId ? Number(transferData.sourceCategoryId) : undefined}
+              onChange={(val) => setTransferData({ ...transferData, sourceCategoryId: val?.toString() || '' })}
+              placeholder="Chọn quỹ nguồn"
+              options={categories.map(c => ({
+                label: `${c.categoryName} (Dư: ${formatCurrency(c.balance)})`,
+                value: c.id
+              }))}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Đến quỹ đích (Thu)</label>
+            <Select
+              className="w-full"
+              value={transferData.targetCategoryId ? Number(transferData.targetCategoryId) : undefined}
+              onChange={(val) => setTransferData({ ...transferData, targetCategoryId: val?.toString() || '' })}
+              placeholder="Chọn quỹ đích"
+              options={categories.map(c => ({
+                label: c.categoryName,
+                value: c.id,
+                disabled: c.id.toString() === transferData.sourceCategoryId
+              }))}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Số tiền</label>
+            <input
+              type="number"
+              className="w-full px-3 py-2 border rounded"
+              value={transferData.amount}
+              onChange={(e) => setTransferData({ ...transferData, amount: e.target.value })}
+              required
+              min={0}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Ngày giao dịch</label>
+            <input
+              type="date"
+              className="w-full px-3 py-2 border rounded"
+              value={transferData.date}
+              onChange={(e) => setTransferData({ ...transferData, date: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Ghi chú</label>
+            <textarea
+              className="w-full px-3 py-2 border rounded"
+              value={transferData.description}
+              onChange={(e) => setTransferData({ ...transferData, description: e.target.value })}
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowTransferModal(false)}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+            >
+              Xác nhận chuyển
             </button>
           </div>
         </form>

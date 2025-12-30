@@ -343,20 +343,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Nếu có tiền cọc, ghi vào order_payments và cập nhật
+    let finalAccountId = depositAccountId;
+
+    if (deposit > 0 && !finalAccountId) {
+      const catResult = await query(
+        `SELECT bank_account_id FROM financial_categories 
+           WHERE (category_code = 'BAN_HANG' OR category_name = 'Bán hàng') 
+           AND type = 'THU' AND is_active = true 
+           LIMIT 1`
+      );
+      if (catResult.rows.length > 0) {
+        finalAccountId = catResult.rows[0].bank_account_id;
+      }
+    }
+
     if (deposit > 0) {
       // Ghi vào order_payments
       await query(
         `INSERT INTO order_payments (order_id, payment_type, amount, payment_method, bank_account_id, notes, created_by)
          VALUES ($1, 'DEPOSIT', $2, $3, $4, $5, $6)`,
-        [orderId, deposit, depositMethod || 'CASH', depositAccountId || null, 'Tiền đặt cọc khi tạo đơn', currentUser.id]
+        [orderId, deposit, depositMethod || 'CASH', finalAccountId || null, 'Tiền đặt cọc khi tạo đơn', currentUser.id]
       );
 
       // Cập nhật số dư tài khoản và ghi sổ quỹ nếu có chọn
-      if (depositAccountId) {
+      if (finalAccountId) {
         await query(
           `UPDATE bank_accounts SET balance = balance + $1 WHERE id = $2`,
-          [deposit, depositAccountId]
+          [deposit, finalAccountId]
         );
 
         // Lấy thông tin khách hàng
@@ -423,7 +436,7 @@ export async function POST(request: NextRequest) {
             transactionCode,
             deposit,
             depositMethod || 'CASH',
-            parseInt(depositAccountId),
+            parseInt(finalAccountId),
             categoryId,
             `Đặt cọc đơn hàng ${orderCode} - KH: ${customer.customer_name}`,
             currentUser.branchId,
