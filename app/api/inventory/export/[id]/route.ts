@@ -89,3 +89,80 @@ export async function GET(
     }, { status: 500 });
   }
 }
+
+
+// PUT - Cập nhật phiếu xuất kho (chỉ khi PENDING)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { hasPermission, user, error } = await requirePermission('inventory.export', 'edit');
+    if (!hasPermission) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: error || 'Không có quyền sửa phiếu xuất kho'
+      }, { status: 403 });
+    }
+
+    const resolvedParams = await params;
+    const transactionId = parseInt(resolvedParams.id);
+    const body = await request.json();
+    const { notes, items, fromWarehouseId } = body;
+
+    // Kiểm tra phiếu tồn tại và trạng thái PENDING
+    const checkResult = await query(
+      `SELECT id, status, from_warehouse_id as "fromWarehouseId" 
+       FROM inventory_transactions 
+       WHERE id = $1 AND transaction_type = 'XUAT'`,
+      [transactionId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy phiếu xuất'
+      }, { status: 404 });
+    }
+
+    if (checkResult.rows[0].status !== 'PENDING') {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Chỉ có thể sửa phiếu đang chờ duyệt'
+      }, { status: 400 });
+    }
+
+    // Cập nhật thông tin phiếu (bao gồm kho xuất nếu có)
+    await query(
+      `UPDATE inventory_transactions 
+       SET notes = $1, from_warehouse_id = $2, updated_at = NOW() 
+       WHERE id = $3`,
+      [notes || null, fromWarehouseId || checkResult.rows[0].fromWarehouseId, transactionId]
+    );
+
+    // Xóa chi tiết cũ
+    await query(`DELETE FROM inventory_transaction_details WHERE transaction_id = $1`, [transactionId]);
+
+    // Thêm chi tiết mới
+    for (const item of items) {
+      await query(
+        `INSERT INTO inventory_transaction_details 
+         (transaction_id, material_id, product_id, quantity)
+         VALUES ($1, $2, $3, $4)`,
+        [transactionId, item.materialId || null, item.productId || null, item.quantity]
+      );
+    }
+
+    return NextResponse.json<ApiResponse>({
+      success: true,
+      message: 'Cập nhật phiếu xuất thành công'
+    });
+
+  } catch (error) {
+    console.error('Update export error:', error);
+    return NextResponse.json<ApiResponse>({
+      success: false,
+      error: 'Lỗi server'
+    }, { status: 500 });
+  }
+}

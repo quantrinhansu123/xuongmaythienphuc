@@ -85,3 +85,90 @@ export async function GET(
     }, { status: 500 });
   }
 }
+
+
+// PUT - Cập nhật phiếu nhập kho (chỉ khi PENDING)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { hasPermission, user, error } = await requirePermission('inventory.import', 'edit');
+    if (!hasPermission) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: error || 'Không có quyền sửa phiếu nhập kho'
+      }, { status: 403 });
+    }
+
+    const resolvedParams = await params;
+    const transactionId = parseInt(resolvedParams.id);
+    const body = await request.json();
+    const { notes, items, toWarehouseId } = body;
+
+    // Kiểm tra phiếu tồn tại và trạng thái PENDING
+    const checkResult = await query(
+      `SELECT id, status, to_warehouse_id as "toWarehouseId" 
+       FROM inventory_transactions 
+       WHERE id = $1 AND transaction_type = 'NHAP'`,
+      [transactionId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Không tìm thấy phiếu nhập'
+      }, { status: 404 });
+    }
+
+    if (checkResult.rows[0].status !== 'PENDING') {
+      return NextResponse.json<ApiResponse>({
+        success: false,
+        error: 'Chỉ có thể sửa phiếu đang chờ duyệt'
+      }, { status: 400 });
+    }
+
+    // Cập nhật thông tin phiếu (bao gồm kho nhập nếu có)
+    await query(
+      `UPDATE inventory_transactions 
+       SET notes = $1, to_warehouse_id = $2, updated_at = NOW() 
+       WHERE id = $3`,
+      [notes || null, toWarehouseId || checkResult.rows[0].toWarehouseId, transactionId]
+    );
+
+    // Xóa chi tiết cũ
+    await query(`DELETE FROM inventory_transaction_details WHERE transaction_id = $1`, [transactionId]);
+
+    // Thêm chi tiết mới
+    let totalAmount = 0;
+    for (const item of items) {
+      const itemTotal = item.quantity * (item.unitPrice || 0);
+      totalAmount += itemTotal;
+
+      await query(
+        `INSERT INTO inventory_transaction_details 
+         (transaction_id, material_id, product_id, quantity, unit_price, total_amount)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [transactionId, item.materialId || null, item.productId || null, item.quantity, item.unitPrice || 0, itemTotal]
+      );
+    }
+
+    // Cập nhật tổng tiền
+    await query(
+      `UPDATE inventory_transactions SET total_amount = $1 WHERE id = $2`,
+      [totalAmount, transactionId]
+    );
+
+    return NextResponse.json<ApiResponse>({
+      success: true,
+      message: 'Cập nhật phiếu nhập thành công'
+    });
+
+  } catch (error) {
+    console.error('Update import error:', error);
+    return NextResponse.json<ApiResponse>({
+      success: false,
+      error: 'Lỗi server'
+    }, { status: 500 });
+  }
+}

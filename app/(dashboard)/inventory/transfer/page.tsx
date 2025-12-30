@@ -1,6 +1,7 @@
 "use client";
 
 import CommonTable from "@/components/CommonTable";
+import EditTransferForm from "@/components/inventory/EditTransferForm";
 import TransferForm from "@/components/inventory/TransferForm";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
@@ -10,21 +11,22 @@ import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
-    DownloadOutlined,
-    PlusOutlined,
-    UploadOutlined
+  DownloadOutlined,
+  EditOutlined,
+  PlusOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
 import {
-    App,
-    Button,
-    Descriptions,
-    Drawer,
-    Modal,
-    Select,
-    Tag,
-    message,
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Modal,
+  Select,
+  Tag,
+  message,
 } from "antd";
 import { useEffect, useState } from "react";
 
@@ -67,6 +69,8 @@ export default function Page() {
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransferTransaction | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<TransferTransaction | null>(null);
 
   // Lấy danh sách kho
   const { data: warehousesData = [] } = useQuery<Warehouse[]>({
@@ -182,21 +186,34 @@ export default function Page() {
     {
       title: "Thao tác",
       key: "action",
-      width: 120,
+      width: 150,
       fixed: "right",
       render: (_: unknown, record: TransferTransaction) => (
         <div className="flex gap-2">
           {record.status === "PENDING" && can("inventory.transfer", "edit") && (
-            <Button
-              type="link"
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleApprove(record.id);
-              }}
-            >
-              Duyệt
-            </Button>
+            <>
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEdit(record);
+                }}
+              >
+                Sửa
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleApprove(record.id);
+                }}
+              >
+                Duyệt
+              </Button>
+            </>
           )}
         </div>
       ),
@@ -229,6 +246,22 @@ export default function Page() {
   const handleView = (record: TransferTransaction) => {
     setSelectedTransaction(record);
     setDrawerOpen(true);
+  };
+
+  // Lấy chi tiết phiếu để edit
+  const { data: editTransactionData } = useQuery({
+    queryKey: ["inventory", "transfer", "edit", editingTransaction?.id],
+    enabled: !!editingTransaction?.id,
+    queryFn: async () => {
+      const res = await fetch(`/api/inventory/transfer/${editingTransaction?.id}`);
+      const body = await res.json();
+      return body.success ? body.data : null;
+    },
+  });
+
+  const handleEdit = (record: TransferTransaction) => {
+    setEditingTransaction(record);
+    setEditModalOpen(true);
   };
 
   const approveMutation = useMutation({
@@ -523,6 +556,41 @@ export default function Page() {
               });
             }}
             onCancel={() => setCreateModalOpen(false)}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        title="Sửa phiếu luân chuyển kho"
+        open={editModalOpen}
+        onCancel={() => {
+          setEditModalOpen(false);
+          setEditingTransaction(null);
+        }}
+        footer={null}
+        width={1000}
+        destroyOnHidden
+      >
+        {editingTransaction && editTransactionData && (
+          <EditTransferForm
+            transactionId={editingTransaction.id}
+            fromWarehouseId={editingTransaction.fromWarehouseId}
+            toWarehouseId={editingTransaction.toWarehouseId}
+            initialData={{
+              notes: editTransactionData.notes,
+              details: editTransactionData.details,
+            }}
+            onSuccess={() => {
+              setEditModalOpen(false);
+              setEditingTransaction(null);
+              queryClient.invalidateQueries({
+                queryKey: ["inventory", "transfer"],
+              });
+            }}
+            onCancel={() => {
+              setEditModalOpen(false);
+              setEditingTransaction(null);
+            }}
           />
         )}
       </Modal>
