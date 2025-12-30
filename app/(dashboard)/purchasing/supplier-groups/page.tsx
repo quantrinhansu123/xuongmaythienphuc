@@ -33,6 +33,7 @@ export default function SupplierGroupsPage() {
     const [suppliersInGroup, setSuppliersInGroup] = useState<Supplier[]>([]);
     const [suppliersLoading, setSuppliersLoading] = useState(false);
     const [pagination, setPagination] = useState({ current: 1, limit: 20 });
+    const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
     const [formData, setFormData] = useState({
         groupCode: '',
         groupName: '',
@@ -146,6 +147,21 @@ export default function SupplierGroupsPage() {
         }
     };
 
+    const handleBulkDelete = async (ids: React.Key[]) => {
+        try {
+            for (const id of ids) {
+                const res = await fetch(`/api/purchasing/supplier-groups/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+            }
+            alert(`Đã xóa ${ids.length} nhóm`);
+            fetchGroups();
+            setSelectedIds([]);
+        } catch (error: any) {
+            alert(error.message || 'Có lỗi xảy ra');
+        }
+    };
+
     const columns: TableColumnsType<SupplierGroup> = [
         {
             title: 'Mã nhóm',
@@ -174,7 +190,7 @@ export default function SupplierGroupsPage() {
             key: 'supplierCount',
             width: 120,
             align: 'center' as const,
-            render: (count: number) => <Tag color="blue">{count || 0}</Tag>,
+            render: (count: number | undefined) => <Tag color="blue">{count ?? 0}</Tag>,
         },
     ];
 
@@ -227,6 +243,15 @@ export default function SupplierGroupsPage() {
                             },
                         }}
                         total={groups.length}
+                        rowSelection={{
+                            selectedRowKeys: selectedIds,
+                            onChange: setSelectedIds,
+                        }}
+                        onBulkDelete={handleBulkDelete}
+                        bulkDeleteConfig={{
+                            confirmTitle: 'Xác nhận xóa nhóm',
+                            confirmMessage: 'Bạn có chắc muốn xóa {count} nhóm đã chọn?'
+                        }}
                     />
                 )}
             </WrapperContent>

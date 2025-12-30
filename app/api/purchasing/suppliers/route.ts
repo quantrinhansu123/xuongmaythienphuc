@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,8 +13,10 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
-    const result = await query(
-      `SELECT 
+    const { searchParams } = new URL(request.url);
+    const groupId = searchParams.get('groupId');
+
+    let queryText = `SELECT 
         s.id,
         s.supplier_code as "supplierCode",
         s.supplier_name as "supplierName",
@@ -27,10 +29,18 @@ export async function GET(request: NextRequest) {
         s.created_at as "createdAt"
        FROM suppliers s
        LEFT JOIN supplier_groups sg ON sg.id = s.supplier_group_id
-       WHERE s.branch_id = $1
-       ORDER BY s.created_at DESC`,
-      [currentUser.branchId]
-    );
+       WHERE s.branch_id = $1`;
+
+    const params: any[] = [currentUser.branchId];
+
+    if (groupId) {
+      queryText += ` AND s.supplier_group_id = $2`;
+      params.push(parseInt(groupId));
+    }
+
+    queryText += ` ORDER BY s.created_at DESC`;
+
+    const result = await query(queryText, params);
 
     return NextResponse.json<ApiResponse>({
       success: true,

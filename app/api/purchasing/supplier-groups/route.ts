@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
@@ -15,12 +15,15 @@ export async function GET() {
 
     const result = await query(
       `SELECT 
-        id,
-        group_code as "groupCode",
-        group_name as "groupName",
-        description
-       FROM supplier_groups
-       ORDER BY group_name`
+        sg.id,
+        sg.group_code as "groupCode",
+        sg.group_name as "groupName",
+        sg.description,
+        COUNT(s.id)::int as "supplierCount"
+       FROM supplier_groups sg
+       LEFT JOIN suppliers s ON s.supplier_group_id = sg.id
+       GROUP BY sg.id, sg.group_code, sg.group_name, sg.description
+       ORDER BY sg.group_name`
     );
 
     return NextResponse.json<ApiResponse>({
