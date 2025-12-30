@@ -4,7 +4,7 @@ import CommonTable from '@/components/CommonTable';
 import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency, formatQuantity } from '@/utils/format';
-import { CarOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, CreditCardOutlined, DownloadOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { CarOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, CreditCardOutlined, DownloadOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DatePicker, Select, TableColumnsType, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -656,12 +656,6 @@ export default function PurchaseOrdersPage() {
                 name: 'Xuất Excel',
                 onClick: handleExportExcel,
                 icon: <DownloadOutlined />,
-              },
-              {
-                type: 'default',
-                name: 'Nhập Excel',
-                onClick: handleImportExcel,
-                icon: <UploadOutlined />,
               },
             ]
             : [

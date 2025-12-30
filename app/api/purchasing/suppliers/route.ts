@@ -67,19 +67,69 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { supplierCode, supplierName, phone, email, address, supplierGroupId } = body;
+    let { supplierCode, supplierName, phone, email, address, supplierGroupId } = body;
 
-    const checkResult = await query(
-      'SELECT id FROM suppliers WHERE supplier_code = $1',
-      [supplierCode]
-    );
+    // Tự động tạo mã nhà cung cấp nếu không có HOẶC kiểm tra trùng
+    let finalSupplierCode = supplierCode;
 
-    if (checkResult.rows.length > 0) {
-      return NextResponse.json<ApiResponse>({
-        success: false,
-        error: 'Mã nhà cung cấp đã tồn tại'
-      }, { status: 400 });
+    if (supplierCode) {
+      const checkResult = await query(
+        'SELECT id FROM suppliers WHERE supplier_code = $1',
+        [supplierCode]
+      );
+      if (checkResult.rows.length > 0) {
+        finalSupplierCode = ''; // Trùng thì reset
+      }
     }
+
+    if (!finalSupplierCode) {
+      if (phone) {
+        // Tạo mã từ SĐT: NCC + 6 số cuối
+        const cleanPhone = phone.replace(/\s/g, '');
+        const last6Digits = cleanPhone.slice(-6);
+        const baseCode = `NCC${last6Digits}`;
+
+        // Tìm tất cả mã có dạng NCC654333 hoặc NCC654333_XX
+        const existingCodes = await query(
+          `SELECT supplier_code FROM suppliers 
+           WHERE supplier_code = $1 OR supplier_code LIKE $2
+           ORDER BY supplier_code`,
+          [baseCode, `${baseCode}_%`]
+        );
+
+        if (existingCodes.rows.length === 0) {
+          finalSupplierCode = baseCode;
+        } else {
+          let maxNum = 0;
+          for (const row of existingCodes.rows) {
+            const code = row.supplier_code;
+            if (code === baseCode) {
+              maxNum = Math.max(maxNum, 0);
+            } else if (code.startsWith(baseCode + '_')) {
+              const suffix = code.substring(baseCode.length + 1);
+              const num = parseInt(suffix);
+              if (!isNaN(num)) {
+                maxNum = Math.max(maxNum, num);
+              }
+            }
+          }
+          finalSupplierCode = `${baseCode}_${(maxNum + 1).toString().padStart(2, '0')}`;
+        }
+      } else {
+        // Không có SĐT, tạo mã tuần tự
+        const codeResult = await query(
+          `SELECT 'NCC' || LPAD((COALESCE(MAX(CASE 
+             WHEN supplier_code ~ '^NCC[0-9]+$' 
+             THEN SUBSTRING(supplier_code FROM 4)::INTEGER 
+             ELSE 0 
+           END), 0) + 1)::TEXT, 6, '0') as code
+           FROM suppliers`
+        );
+        finalSupplierCode = codeResult.rows[0].code;
+      }
+    }
+
+    supplierCode = finalSupplierCode;
 
     const result = await query(
       `INSERT INTO suppliers (

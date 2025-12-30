@@ -17,7 +17,6 @@ import {
   PlusOutlined,
   ReloadOutlined,
   ShoppingCartOutlined,
-  UploadOutlined,
   UserAddOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -2606,13 +2605,6 @@ export default function OrdersPage() {
               onClick: handleExportExcel,
               icon: <DownloadOutlined />,
               can: true,
-            },
-            {
-              type: "default",
-              name: "Nhập Excel",
-              onClick: handleImportExcel,
-              icon: <UploadOutlined />,
-              can: can("sales.orders", "create"),
             },
           ],
           columnSettings: {

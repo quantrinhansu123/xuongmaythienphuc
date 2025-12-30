@@ -4,6 +4,7 @@ import CommonTable from '@/components/CommonTable';
 import TableActions from '@/components/TableActions';
 import WrapperContent from '@/components/WrapperContent';
 import { useFileExport } from '@/hooks/useFileExport';
+import { useFileImport } from '@/hooks/useFileImport';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
@@ -176,19 +177,93 @@ export default function SuppliersPage() {
     { title: 'Trạng thái', dataIndex: 'isActive', key: 'isActive' },
   ];
   const { exportToXlsx } = useFileExport(exportColumns);
+  const { openFileDialog } = useFileImport();
 
   const handleExportExcel = () => {
+    // Xuất với giá trị thô để có thể nhập lại
     const dataToExport = filteredSuppliers.map(s => ({
-      ...s,
-      isActive: s.isActive ? 'Hoạt động' : 'Ngừng',
+      supplierCode: s.supplierCode || '',
+      supplierName: s.supplierName,
+      phone: s.phone || '',
+      email: s.email || '',
+      address: s.address || '',
+      groupName: s.groupName || '',
       debtAmount: s.debtAmount || 0,
-      groupName: s.groupName || ''
+      isActive: s.isActive ? 'Có' : 'Không',
     }));
     exportToXlsx(dataToExport, 'nha-cung-cap');
   };
 
   const handleImportExcel = () => {
-    alert('Chức năng nhập Excel đang được phát triển');
+    openFileDialog(
+      async (data: any[]) => {
+        try {
+          const validSuppliers = data.filter((row: any) => {
+            const supplierName = row['supplierName'] || row['Tên nhà cung cấp'];
+            return supplierName;
+          });
+
+          if (validSuppliers.length === 0) {
+            message.error('Không có dữ liệu hợp lệ trong file Excel');
+            return;
+          }
+
+          const suppliers = validSuppliers.map((row: any) => {
+            const isActive = row['isActive'] || row['Trạng thái'];
+
+            return {
+              supplierCode: row['supplierCode'] || row['Mã NCC'] || undefined,
+              supplierName: row['supplierName'] || row['Tên nhà cung cấp'],
+              phone: row['phone'] || row['Điện thoại'] || undefined,
+              email: row['email'] || row['Email'] || undefined,
+              address: row['address'] || row['Địa chỉ'] || undefined,
+              isActive: isActive === 'Có' || isActive === 'TRUE' || isActive === true || isActive === undefined,
+            };
+          });
+
+          message.loading({ content: `Đang import ${suppliers.length} nhà cung cấp...`, key: 'import' });
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const supplier of suppliers) {
+            try {
+              const res = await fetch('/api/purchasing/suppliers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(supplier),
+              });
+
+              const result = await res.json();
+              if (result.success) {
+                successCount++;
+              } else {
+                errorCount++;
+                console.error(`Lỗi import ${supplier.supplierName}:`, result.error);
+              }
+            } catch (error) {
+              errorCount++;
+              console.error(`Lỗi import ${supplier.supplierName}:`, error);
+            }
+          }
+
+          message.success({
+            content: `Import thành công ${successCount}/${suppliers.length} nhà cung cấp${errorCount > 0 ? `, ${errorCount} lỗi` : ''}`,
+            key: 'import',
+            duration: 3
+          });
+
+          fetchSuppliers();
+        } catch (error) {
+          message.error({ content: 'Có lỗi xảy ra khi import', key: 'import' });
+          console.error('Import error:', error);
+        }
+      },
+      (error: string) => {
+        message.error('Không thể đọc file Excel. Vui lòng kiểm tra định dạng file.');
+        console.error('File read error:', error);
+      }
+    );
   };
 
   const filteredSuppliers = suppliers.filter(s => {
