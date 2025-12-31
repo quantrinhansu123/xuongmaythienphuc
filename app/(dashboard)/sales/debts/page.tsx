@@ -42,7 +42,7 @@ interface Branch {
 export default function CustomerDebtsPage() {
   const { can, isAdmin } = usePermissions();
   const queryClient = useQueryClient();
-  const { query, updateQueries, reset } = useFilter();
+  const { query, pagination, updateQueries, reset, handlePageChange } = useFilter();
 
   const columns = [
     {
@@ -359,7 +359,11 @@ export default function CustomerDebtsPage() {
                 loading={
                   isLoading || branchesLoading || bankLoading || isFetching
                 }
-                paging={false}
+                total={filteredCustomerSummaries.length}
+                pagination={{
+                  ...pagination,
+                  onChange: handlePageChange,
+                }}
                 onRowClick={handleViewPartnerDetails}
                 mobileColumns={["customerName", "phone", "remainingAmount"]}
               />

@@ -5,33 +5,33 @@ import LoaderApp from "@/components/LoaderApp";
 import { IParams } from "@/hooks/useFilter";
 import { useSetTitlePage } from "@/hooks/useSetTitlePage";
 import {
-  BREAK_POINT_WIDTH,
-  BreakpointEnum,
-  useWindowBreakpoint,
+    BREAK_POINT_WIDTH,
+    BreakpointEnum,
+    useWindowBreakpoint,
 } from "@/hooks/useWindowBreakPoint";
 import { ColumnSetting, FilterField } from "@/types";
 import { queriesToInvalidate } from "@/utils/refetchData";
 import {
-  ArrowLeftOutlined,
-  DeleteOutlined,
-  FilterOutlined,
-  SearchOutlined,
-  SettingOutlined,
-  SyncOutlined
+    ArrowLeftOutlined,
+    DeleteOutlined,
+    FilterOutlined,
+    SearchOutlined,
+    SettingOutlined,
+    SyncOutlined
 } from "@ant-design/icons";
 import {
-  AutoComplete,
-  Button,
-  Checkbox,
-  DatePicker,
-  Divider,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Popover,
-  Select,
-  Tooltip
+    AutoComplete,
+    Button,
+    Checkbox,
+    DatePicker,
+    Divider,
+    Empty,
+    Form,
+    Input,
+    Modal,
+    Popover,
+    Select,
+    Tooltip
 } from "antd";
 import debounce from "lodash/debounce";
 import { useRouter } from "next/navigation";
@@ -643,10 +643,10 @@ function WrapperContent<T extends object>({
 
       {/* Mobile: Search bar + Filter button */}
       {isMobileView && (header.searchInput || header.customToolbar || (header.filters?.fields && header.filters.fields.length > 0)) && (
-        <div className="flex gap-2 items-center w-full">
+        <div className="flex gap-2 items-center w-full max-w-full overflow-hidden">
           {/* Search input - chiếm phần lớn */}
           {header.searchInput && (
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               {header.searchInput.suggestions ? (
                 <AutoComplete
                   className="w-full"
@@ -682,17 +682,7 @@ function WrapperContent<T extends object>({
               onClick={() => setIsMobileOptionsOpen(true)}
               type={hasActiveFilters || hasActiveColumnSettings ? "primary" : "default"}
               className="flex-shrink-0"
-            >
-              {hasActiveFilters && (
-                <span className="ml-1 bg-white text-blue-600 rounded-full px-1.5 text-xs font-bold">
-                  {Object.entries(header.filters?.query || {}).filter(([key, value]) => {
-                    if (typeof value === "string" && !key.includes("search")) return value.trim() !== "";
-                    if (Array.isArray(value)) return value.length > 0;
-                    return false;
-                  }).length}
-                </span>
-              )}
-            </Button>
+            />
           )}
         </div>
       )}

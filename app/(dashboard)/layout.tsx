@@ -11,25 +11,25 @@ import { useTheme } from "@/providers/AppThemeProvider";
 import { queryClient } from "@/providers/ReactQueryProvider";
 import { useSiteTitleStore } from "@/stores/setSiteTitle";
 import {
-  DashboardOutlined,
-  DesktopOutlined,
-  LogoutOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  UserOutlined
+    DashboardOutlined,
+    DesktopOutlined,
+    LogoutOutlined,
+    MenuFoldOutlined,
+    MenuUnfoldOutlined,
+    UserOutlined
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { MenuProps } from "antd";
 import {
-  Avatar,
-  Breadcrumb,
-  Button,
-  Drawer,
-  Dropdown,
-  Layout,
-  Menu,
-  Typography,
-  theme
+    Avatar,
+    Breadcrumb,
+    Button,
+    Drawer,
+    Dropdown,
+    Layout,
+    Menu,
+    Typography,
+    theme
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -84,8 +84,16 @@ export default function DashboardLayout({
   const { can, loading: permLoading } = usePermissions();
   const { themeName, setThemeName } = useTheme();
   const { token } = theme.useToken();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const isMobile = useIsMobile();
+  // Mobile mặc định đóng sidebar, desktop mặc định mở
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Khi chuyển từ mobile sang desktop, mở sidebar
+  useEffect(() => {
+    if (!isMobile) {
+      setSidebarOpen(true);
+    }
+  }, [isMobile]);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
   // Fetch current user
