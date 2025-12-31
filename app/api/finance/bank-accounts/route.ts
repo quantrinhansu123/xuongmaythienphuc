@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         ba.id,
         ba.account_number as "accountNumber",
+        ba.account_name as "accountName",
         ba.account_holder as "accountHolder",
         ba.bank_name as "bankName",
         ba.branch_name as "branchName",
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { accountNumber, accountHolder, bankName, branchName, balance, branchId, accountType } = body;
+    const { accountNumber, accountName, accountHolder, bankName, branchName, balance, branchId, accountType } = body;
 
     // Validate
     if (!accountNumber || !accountHolder) {
@@ -101,11 +102,12 @@ export async function POST(request: NextRequest) {
 
     const result = await query(
       `INSERT INTO bank_accounts 
-        (account_number, account_holder, bank_name, branch_name, balance, branch_id, account_type)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+        (account_number, account_name, account_holder, bank_name, branch_name, balance, branch_id, account_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING 
         id,
         account_number as "accountNumber",
+        account_name as "accountName",
         account_holder as "accountHolder",
         bank_name as "bankName",
         branch_name as "branchName",
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
         is_active as "isActive",
         account_type as "accountType",
         created_at as "createdAt"`,
-      [accountNumber, accountHolder, finalBankName, branchName || null, balance || 0, finalBranchId, accountType || 'BANK']
+      [accountNumber, accountName || null, accountHolder, finalBankName, branchName || null, balance || 0, finalBranchId, accountType || 'BANK']
     );
 
     return NextResponse.json({

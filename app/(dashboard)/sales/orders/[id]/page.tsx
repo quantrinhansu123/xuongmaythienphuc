@@ -8,6 +8,7 @@ import {
     CheckCircleOutlined,
     EditOutlined,
     PrinterOutlined,
+    QrcodeOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,6 +20,7 @@ import {
     Descriptions,
     Form,
     InputNumber,
+    Modal,
     Select,
     Space,
     Spin,
@@ -28,6 +30,40 @@ import {
 } from "antd";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// Mapping bank shortName to VietQR bin code
+const BANK_BIN_MAP: Record<string, string> = {
+    'VCB': '970436',
+    'TCB': '970407',
+    'MB': '970422',
+    'ACB': '970416',
+    'BIDV': '970418',
+    'VPB': '970432',
+    'TPB': '970423',
+    'STB': '970403',
+    'HDB': '970437',
+    'VIB': '970441',
+    'SHB': '970443',
+    'EIB': '970431',
+    'MSB': '970426',
+    'OCB': '970448',
+    'ABB': '970425',
+    'BAB': '970409',
+    'NAB': '970428',
+    'NCB': '970419',
+    'PGB': '970430',
+    'SCB': '970429',
+    'SEAB': '970440',
+    'VAB': '970427',
+    'LPB': '970449',
+    'KLB': '970452',
+    'CAKE': '546034',
+    'Ubank': '546035',
+    'TIMO': '963388',
+    'VTLMONEY': '971005',
+    'VNPTMONEY': '971011',
+    'VIETTEL': '963388',
+};
 
 export default function OrderDetailPage() {
     const params = useParams();
@@ -41,6 +77,207 @@ export default function OrderDetailPage() {
     const [paymentForm] = Form.useForm();
     const [stockByWarehouse, setStockByWarehouse] = useState<any[]>([]);
     const [needsProduction, setNeedsProduction] = useState<boolean | null>(null);
+    const [qrModalOpen, setQrModalOpen] = useState(false);
+    const [qrData, setQrData] = useState<{
+        qrUrl: string;
+        amount: number;
+        accountNumber: string;
+        bankName: string;
+        accountHolder: string;
+        description: string;
+    } | null>(null);
+
+    // Generate VietQR URL
+    const generateVietQR = (account: any, amount: number, orderCode: string) => {
+        const bankBin = BANK_BIN_MAP[account.bankName] || account.bankName;
+        const description = `TT ${orderCode}`;
+        const qrUrl = `https://img.vietqr.io/image/${bankBin}-${account.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(account.accountHolder)}`;
+        return {
+            qrUrl,
+            amount,
+            accountNumber: account.accountNumber,
+            bankName: account.bankName,
+            accountHolder: account.accountHolder,
+            description,
+        };
+    };
+
+    // Print thermal receipt (with or without QR)
+    const printThermalReceipt = (selectedAccount?: any, paymentAmount?: number, isDeposit: boolean = true) => {
+        if (!orderData) return;
+        
+        // Use passed params or fall back to qrData
+        const acc = selectedAccount || (qrData ? paymentAccounts.find((a: any) => a.accountNumber === qrData.accountNumber) : null);
+        const amount = paymentAmount || qrData?.amount || 0;
+        
+        if (!acc || !amount) return;
+        
+        const printWindow = window.open('', '_blank', 'width=300,height=800');
+        if (!printWindow) return;
+
+        const isBankPayment = acc.accountType === 'BANK';
+        const qrUrl = isBankPayment ? `https://img.vietqr.io/image/${BANK_BIN_MAP[acc.bankName] || acc.bankName}-${acc.accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(`TT ${orderData.orderCode}`)}&accountName=${encodeURIComponent(acc.accountHolder || '')}` : null;
+
+        // Payment type label
+        const paymentTypeLabel = isDeposit ? 'Đặt cọc' : 'Thanh toán';
+
+        // Build order items HTML using formatCurrency and formatQuantity
+        const itemsHtml = (orderData.details || []).map((item: any) => `
+            <div class="item-row">
+                <div class="item-name">${item.itemName}</div>
+                <div class="item-detail">
+                    <span>${formatQuantity(item.quantity)} x ${formatCurrency(item.unitPrice, '')}</span>
+                    <span class="item-total">${formatCurrency(item.totalAmount, '')}</span>
+                </div>
+            </div>
+        `).join('');
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Phiếu thanh toán - ${orderData.orderCode}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Courier New', monospace; 
+            width: 80mm; 
+            padding: 3mm;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 6px 0; }
+        .row { display: flex; justify-content: space-between; margin: 2px 0; }
+        .qr-container { text-align: center; margin: 8px 0; }
+        .qr-container img { max-width: 180px; height: auto; }
+        .title { font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+        .shop-name { font-size: 16px; font-weight: bold; }
+        .amount { font-size: 16px; font-weight: bold; }
+        .small { font-size: 9px; color: #666; }
+        .item-row { margin: 4px 0; }
+        .item-name { font-size: 11px; }
+        .item-detail { display: flex; justify-content: space-between; font-size: 10px; color: #333; }
+        .item-total { font-weight: bold; }
+        .summary-row { display: flex; justify-content: space-between; margin: 3px 0; }
+        .highlight { background: #f0f0f0; padding: 4px; margin: 4px 0; }
+        @media print {
+            body { width: 80mm; }
+            @page { size: 80mm auto; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="center shop-name">${orderData.branchName || 'CỬA HÀNG'}</div>
+    <div class="center small">Địa chỉ: ...</div>
+    <div class="center small">ĐT: ...</div>
+    
+    <div class="divider"></div>
+    <div class="center title">PHIẾU THANH TOÁN</div>
+    <div class="divider"></div>
+    
+    <div class="row">
+        <span>Mã đơn:</span>
+        <span class="bold">${orderData.orderCode}</span>
+    </div>
+    <div class="row">
+        <span>Ngày:</span>
+        <span>${new Date().toLocaleString('vi-VN')}</span>
+    </div>
+    <div class="row">
+        <span>Khách hàng:</span>
+        <span>${orderData.customerName}</span>
+    </div>
+    ${orderData.customerPhone ? `<div class="row"><span>SĐT:</span><span>${orderData.customerPhone}</span></div>` : ''}
+    <div class="row">
+        <span>Loại TT:</span>
+        <span class="bold">${paymentTypeLabel}</span>
+    </div>
+    <div class="row">
+        <span>Hình thức:</span>
+        <span>${isBankPayment ? 'Chuyển khoản' : 'Tiền mặt'}</span>
+    </div>
+    
+    <div class="divider"></div>
+    <div class="bold" style="margin-bottom: 4px;">CHI TIẾT ĐƠN HÀNG</div>
+    
+    ${itemsHtml}
+    
+    <div class="divider"></div>
+    
+    <div class="summary-row">
+        <span>Tổng tiền hàng:</span>
+        <span>${formatCurrency(orderData.finalAmount)}</span>
+    </div>
+    ${orderData.depositAmount > 0 ? `
+    <div class="summary-row">
+        <span>Đã cọc:</span>
+        <span>-${formatCurrency(orderData.depositAmount)}</span>
+    </div>` : ''}
+    ${orderData.paidAmount > 0 ? `
+    <div class="summary-row">
+        <span>Đã thanh toán:</span>
+        <span>-${formatCurrency(orderData.paidAmount)}</span>
+    </div>` : ''}
+    
+    <div class="highlight">
+        <div class="summary-row">
+            <span class="bold">${paymentTypeLabel.toUpperCase()}:</span>
+            <span class="amount">${formatCurrency(amount)}</span>
+        </div>
+    </div>
+    
+    ${qrUrl ? `
+    <div class="divider"></div>
+    <div class="center bold">QUÉT MÃ QR ĐỂ THANH TOÁN</div>
+    <div class="qr-container">
+        <img src="${qrUrl}" alt="QR Code" />
+    </div>
+    <div class="small">
+        <div class="row">
+            <span>Ngân hàng:</span>
+            <span>${acc.bankName}</span>
+        </div>
+        <div class="row">
+            <span>Số TK:</span>
+            <span>${acc.accountNumber}</span>
+        </div>
+        <div class="row">
+            <span>Chủ TK:</span>
+            <span>${acc.accountHolder || ''}</span>
+        </div>
+        <div class="row">
+            <span>Nội dung CK:</span>
+            <span>TT ${orderData.orderCode}</span>
+        </div>
+    </div>
+    ` : `
+    <div class="divider"></div>
+    <div class="small">
+        <div class="row">
+            <span>Quỹ tiền mặt:</span>
+            <span>${acc.accountName || acc.accountNumber}</span>
+        </div>
+    </div>
+    `}
+    
+    <div class="divider"></div>
+    <div class="center small">Cảm ơn quý khách!</div>
+    <div class="center small">Hẹn gặp lại</div>
+    
+    <script>
+        window.onload = function() { 
+            setTimeout(function() { window.print(); }, 300);
+        }
+    </script>
+</body>
+</html>`;
+        
+        printWindow.document.write(html);
+        printWindow.document.close();
+    };
 
     // Fetch order detail
     const {
@@ -376,6 +613,19 @@ export default function OrderDetailPage() {
                                                         }
                                                     });
                                                     paymentForm.resetFields();
+                                                    setQrData(null);
+                                                }}
+                                                onValuesChange={(changed, allValues) => {
+                                                    // Auto generate QR when bank account selected
+                                                    if (allValues.bankAccountId && allValues.paymentAmount) {
+                                                        const acc = paymentAccounts.find((a: any) => a.id === allValues.bankAccountId);
+                                                        if (acc && acc.accountType === 'BANK') {
+                                                            const qr = generateVietQR(acc, allValues.paymentAmount, data.orderCode);
+                                                            setQrData(qr);
+                                                        } else {
+                                                            setQrData(null);
+                                                        }
+                                                    }
                                                 }}
                                             >
                                                 <Form.Item name="paymentAmount" rules={[{ required: true }]} style={{ marginBottom: 6 }}>
@@ -392,10 +642,43 @@ export default function OrderDetailPage() {
                                                     <Select placeholder="Tài khoản" size="small">
                                                         {paymentAccounts.map((acc: any) => (
                                                             <Select.Option key={acc.id} value={acc.id}>
-                                                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountNumber}
+                                                                {acc.accountType === 'CASH' ? '💵' : '🏦'} {acc.accountName || acc.accountHolder} - {acc.accountNumber}
                                                             </Select.Option>
                                                         ))}
                                                     </Select>
+                                                </Form.Item>
+                                                
+                                                {/* QR Code for bank payment */}
+                                                {qrData && (
+                                                    <div className="mb-2 p-2 bg-gray-50 rounded text-center">
+                                                        <img 
+                                                            src={qrData.qrUrl} 
+                                                            alt="QR Payment" 
+                                                            className="mx-auto max-w-[120px] cursor-pointer"
+                                                            onClick={() => setQrModalOpen(true)}
+                                                        />
+                                                        <div className="text-xs text-gray-500 mt-1">Nhấn để phóng to</div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Print button - show for both cash and bank */}
+                                                <Form.Item noStyle shouldUpdate>
+                                                    {({ getFieldValue }) => {
+                                                        const accId = getFieldValue('bankAccountId');
+                                                        const amount = getFieldValue('paymentAmount');
+                                                        const acc = paymentAccounts.find((a: any) => a.id === accId);
+                                                        return accId && amount > 0 ? (
+                                                            <div className="mb-2 text-center">
+                                                                <Button 
+                                                                    size="small" 
+                                                                    icon={<PrinterOutlined />}
+                                                                    onClick={() => printThermalReceipt(acc, amount, true)}
+                                                                >
+                                                                    In phiếu
+                                                                </Button>
+                                                            </div>
+                                                        ) : null;
+                                                    }}
                                                 </Form.Item>
                                                 <Button type="primary" htmlType="submit" size="small" block loading={updateStatusMutation.isPending}>
                                                     Xác nhận cọc
@@ -574,6 +857,41 @@ export default function OrderDetailPage() {
                     </Button>
                 </div>
             )}
+
+            {/* QR Code Modal */}
+            <Modal
+                open={qrModalOpen}
+                onCancel={() => setQrModalOpen(false)}
+                footer={[
+                    <Button key="print" icon={<PrinterOutlined />} onClick={() => printThermalReceipt()}>
+                        In phiếu nhiệt
+                    </Button>,
+                    <Button key="close" onClick={() => setQrModalOpen(false)}>
+                        Đóng
+                    </Button>
+                ]}
+                title={<span><QrcodeOutlined /> Mã QR thanh toán</span>}
+                centered
+            >
+                {qrData && (
+                    <div className="text-center space-y-4">
+                        <img 
+                            src={qrData.qrUrl} 
+                            alt="QR Payment" 
+                            className="mx-auto max-w-[280px]"
+                        />
+                        <div className="text-2xl font-bold text-blue-600">
+                            {qrData.amount.toLocaleString('vi-VN')} đ
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded text-left text-sm space-y-1">
+                            <div><strong>Ngân hàng:</strong> {qrData.bankName}</div>
+                            <div><strong>Số TK:</strong> {qrData.accountNumber}</div>
+                            <div><strong>Chủ TK:</strong> {qrData.accountHolder}</div>
+                            <div><strong>Nội dung:</strong> {qrData.description}</div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }

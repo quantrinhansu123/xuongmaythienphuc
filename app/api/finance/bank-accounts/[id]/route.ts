@@ -21,6 +21,7 @@ export async function GET(
       `SELECT 
         ba.id,
         ba.account_number as "accountNumber",
+        ba.account_name as "accountName",
         ba.account_holder as "accountHolder",
         ba.bank_name as "bankName",
         ba.branch_name as "branchName",
@@ -112,7 +113,7 @@ export async function PUT(
     console.log('Updating bank account with ID:', id);
 
     const body = await request.json();
-    const { accountNumber, accountHolder, bankName, branchName, balance } = body;
+    const { accountNumber, accountName, accountHolder, bankName, branchName, balance } = body;
 
     if (!accountNumber || !accountHolder || !bankName) {
       return NextResponse.json(
@@ -124,20 +125,22 @@ export async function PUT(
     const result = await query(
       `UPDATE bank_accounts 
        SET account_number = $1,
-           account_holder = $2,
-           bank_name = $3,
-           branch_name = $4,
-           balance = $5
-       WHERE id = $6
+           account_name = $2,
+           account_holder = $3,
+           bank_name = $4,
+           branch_name = $5,
+           balance = $6
+       WHERE id = $7
        RETURNING 
          id,
          account_number as "accountNumber",
+         account_name as "accountName",
          account_holder as "accountHolder",
          bank_name as "bankName",
          branch_name as "branchName",
          balance,
          is_active as "isActive"`,
-      [accountNumber, accountHolder, bankName, branchName || null, balance, id]
+      [accountNumber, accountName || null, accountHolder, bankName, branchName || null, balance, id]
     );
 
     if (result.rows.length === 0) {

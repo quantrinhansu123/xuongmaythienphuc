@@ -10,6 +10,7 @@ import { useState } from 'react';
 interface BankAccount {
   id: number;
   accountNumber: string;
+  accountName?: string;
   accountHolder: string;
   bankName: string;
   branchName?: string;
@@ -150,6 +151,11 @@ export default function BankAccountSidePanel({ account, onClose, onUpdate }: Pro
         {!isEditing ? (
           <>
             <Descriptions column={1} size="small" labelStyle={{ color: '#666', width: 120 }}>
+              {account.accountName && (
+                <Descriptions.Item label="Tên tài khoản">
+                  <span className="font-medium">{account.accountName}</span>
+                </Descriptions.Item>
+              )}
               {!isCash && (
                 <>
                   <Descriptions.Item label="Ngân hàng">{account.bankName}</Descriptions.Item>
@@ -192,6 +198,7 @@ export default function BankAccountSidePanel({ account, onClose, onUpdate }: Pro
                   onClick={() => {
                     form.setFieldsValue({
                       accountNumber: account.accountNumber,
+                      accountName: account.accountName || '',
                       accountHolder: account.accountHolder,
                       bankName: account.bankName,
                       branchName: account.branchName || '',
@@ -244,6 +251,13 @@ export default function BankAccountSidePanel({ account, onClose, onUpdate }: Pro
               rules={[{ required: true, message: 'Bắt buộc' }]}
             >
               <Input />
+            </Form.Item>
+            <Form.Item
+              name="accountName"
+              label="Tên tài khoản"
+              tooltip="Tên hiển thị khi chọn tài khoản"
+            >
+              <Input placeholder="VD: TK Lương, TK Thu chi..." />
             </Form.Item>
             <Form.Item
               name="accountHolder"

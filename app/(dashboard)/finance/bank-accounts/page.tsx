@@ -2,7 +2,6 @@
 
 import BankAccountSidePanel from '@/components/BankAccountSidePanel';
 import CommonTable from '@/components/CommonTable';
-import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
 import useColumn from '@/hooks/useColumn';
 import { useFileExport } from '@/hooks/useFileExport';
@@ -11,12 +10,13 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
 import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
-import { App, Select, Tag } from 'antd';
+import { App, Form, Input, InputNumber, Modal, Select, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 
 interface BankAccount {
   id: number;
   accountNumber: string;
+  accountName?: string;
   accountHolder: string;
   bankName: string;
   branchName?: string;
@@ -41,6 +41,15 @@ interface User {
   branchId: number | null;
 }
 
+interface VietBank {
+  id: number;
+  name: string;
+  code: string;
+  bin: string;
+  shortName: string;
+  logo: string;
+}
+
 export default function BankAccountsPage() {
   const { can } = usePermissions();
   const { message } = App.useApp();
@@ -55,25 +64,21 @@ export default function BankAccountsPage() {
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [vietnamBanks, setVietnamBanks] = useState<VietBank[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
+  const [form] = Form.useForm();
 
-  const [formData, setFormData] = useState({
-    accountNumber: '',
-    accountHolder: '',
-    bankName: '',
-    branchName: '',
-    balance: '',
-    accountType: 'BANK' as 'BANK' | 'CASH',
-    branchId: '' as string,
-  });
+  const accountType = Form.useWatch('accountType', form);
 
   useEffect(() => {
     fetchCurrentUser();
     fetchBranches();
+    fetchVietnamBanks();
   }, []);
 
   useEffect(() => {
@@ -106,6 +111,18 @@ export default function BankAccountsPage() {
     }
   };
 
+  const fetchVietnamBanks = async () => {
+    try {
+      const res = await fetch('https://api.vietqr.io/v2/banks');
+      const data = await res.json();
+      if (data.code === '00' && data.data) {
+        setVietnamBanks(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching Vietnam banks:', error);
+    }
+  };
+
   const isAdmin = currentUser?.roleCode === 'ADMIN';
 
   const fetchAccounts = async () => {
@@ -125,53 +142,55 @@ export default function BankAccountsPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = async (values: {
+    accountType: 'BANK' | 'CASH';
+    accountNumber: string;
+    accountName?: string;
+    accountHolder: string;
+    bankName?: string;
+    branchName?: string;
+    balance?: number;
+    branchId?: number;
+  }) => {
+    setSubmitting(true);
     try {
       const res = await fetch('/api/finance/bank-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
-          balance: parseFloat(formData.balance || '0'),
-          bankName: formData.accountType === 'CASH' ? 'Tiền mặt' : formData.bankName,
-          branchId: formData.branchId ? parseInt(formData.branchId) : null,
+          ...values,
+          balance: values.balance || 0,
+          bankName: values.accountType === 'CASH' ? 'Tiền mặt' : values.bankName,
         }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        alert('Tạo tài khoản thành công!');
+        message.success('Tạo tài khoản thành công!');
         setShowModal(false);
-        resetForm();
+        form.resetFields();
         fetchAccounts();
       } else {
-        alert(data.error || 'Có lỗi xảy ra');
+        message.error(data.error || 'Có lỗi xảy ra');
       }
     } catch (error) {
       console.error('Error saving bank account:', error);
-      alert('Có lỗi xảy ra');
+      message.error('Có lỗi xảy ra');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      accountNumber: '',
-      accountHolder: '',
-      bankName: '',
-      branchName: '',
-      balance: '',
-      accountType: 'BANK',
-      branchId: '',
-    });
+    form.resetFields();
   };
 
 
 
   const exportColumns = [
     { title: 'Số tài khoản', dataIndex: 'accountNumber', key: 'accountNumber' },
+    { title: 'Tên tài khoản', dataIndex: 'accountName', key: 'accountName' },
     { title: 'Chủ tài khoản', dataIndex: 'accountHolder', key: 'accountHolder' },
     { title: 'Ngân hàng', dataIndex: 'bankName', key: 'bankName' },
     { title: 'Số dư', dataIndex: 'balance', key: 'balance' },
@@ -225,7 +244,15 @@ export default function BankAccountsPage() {
       title: 'Số TK / Tên quỹ',
       dataIndex: 'accountNumber',
       key: 'accountNumber',
-      width: 200,
+      width: 180,
+    },
+    {
+      title: 'Tên TK',
+      dataIndex: 'accountName',
+      key: 'accountName',
+      width: 150,
+      render: (name: string, record: BankAccount) =>
+        name || record.accountHolder || '-',
     },
     {
       title: 'Chủ TK',
@@ -397,135 +424,120 @@ export default function BankAccountsPage() {
 
       {/* Modal */}
       <Modal
-        isOpen={showModal}
-        onClose={() => {
+        open={showModal}
+        onCancel={() => {
           setShowModal(false);
           resetForm();
         }}
         title="Thêm tài khoản"
+        okText="Tạo mới"
+        cancelText="Hủy"
+        onOk={() => form.submit()}
+        confirmLoading={submitting}
+        destroyOnHidden
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Loại tài khoản *</label>
-            <select
-              value={formData.accountType}
-              onChange={(e) => setFormData({
-                ...formData,
-                accountType: e.target.value as 'BANK' | 'CASH',
-                bankName: e.target.value === 'CASH' ? 'Tiền mặt' : formData.bankName
-              })}
-              className="w-full px-3 py-2 border rounded"
-              required
-            >
-              <option value="BANK">🏦 Tài khoản ngân hàng</option>
-              <option value="CASH">💵 Quỹ tiền mặt</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              {formData.accountType === 'CASH' ? 'Tên quỹ *' : 'Số tài khoản *'}
-            </label>
-            <input
-              type="text"
-              value={formData.accountNumber}
-              onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-              placeholder={formData.accountType === 'CASH' ? 'VD: Quỹ tiền mặt chính' : 'VD: 0123456789'}
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{ accountType: 'BANK', balance: 0 }}
+        >
+          <Form.Item
+            name="accountType"
+            label="Loại tài khoản"
+            rules={[{ required: true, message: 'Vui lòng chọn loại tài khoản' }]}
+          >
+            <Select
+              options={[
+                { label: '🏦 Tài khoản ngân hàng', value: 'BANK' },
+                { label: '💵 Quỹ tiền mặt', value: 'CASH' },
+              ]}
             />
-          </div>
+          </Form.Item>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              {formData.accountType === 'CASH' ? 'Người quản lý *' : 'Chủ tài khoản *'}
-            </label>
-            <input
-              type="text"
-              value={formData.accountHolder}
-              onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-            />
-          </div>
+          <Form.Item
+            name="accountNumber"
+            label={accountType === 'CASH' ? 'Tên quỹ' : 'Số tài khoản'}
+            rules={[{ required: true, message: accountType === 'CASH' ? 'Vui lòng nhập tên quỹ' : 'Vui lòng nhập số tài khoản' }]}
+          >
+            <Input placeholder={accountType === 'CASH' ? 'VD: Quỹ tiền mặt chính' : 'VD: 0123456789'} />
+          </Form.Item>
 
-          {/* Chi nhánh công ty - hiển thị cho Admin */}
+          <Form.Item
+            name="accountName"
+            label="Tên tài khoản"
+            tooltip="Tên hiển thị khi chọn tài khoản"
+          >
+            <Input placeholder="VD: TK Lương, TK Thu chi..." />
+          </Form.Item>
+
+          <Form.Item
+            name="accountHolder"
+            label={accountType === 'CASH' ? 'Người quản lý' : 'Chủ tài khoản'}
+            rules={[{ required: true, message: 'Vui lòng nhập thông tin' }]}
+          >
+            <Input />
+          </Form.Item>
+
           {isAdmin && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Chi nhánh công ty *</label>
-              <select
-                value={formData.branchId}
-                onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                className="w-full px-3 py-2 border rounded"
-                required
-              >
-                <option value="">-- Chọn chi nhánh --</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.branchName}</option>
-                ))}
-              </select>
-            </div>
+            <Form.Item
+              name="branchId"
+              label="Chi nhánh công ty"
+              rules={[{ required: true, message: 'Vui lòng chọn chi nhánh' }]}
+            >
+              <Select
+                placeholder="-- Chọn chi nhánh --"
+                options={branches.map((b) => ({
+                  label: b.branchName,
+                  value: b.id,
+                }))}
+              />
+            </Form.Item>
           )}
 
-          {formData.accountType === 'BANK' && (
+          {accountType === 'BANK' && (
             <>
-              <div>
-                <label className="block text-sm font-medium mb-1">Ngân hàng *</label>
-                <input
-                  type="text"
-                  value={formData.bankName}
-                  onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                  required
-                  placeholder="VD: Vietcombank, Techcombank, BIDV..."
+              <Form.Item
+                name="bankName"
+                label="Ngân hàng"
+                rules={[{ required: true, message: 'Vui lòng chọn ngân hàng' }]}
+              >
+                <Select
+                  showSearch
+                  placeholder="Chọn ngân hàng"
+                  optionFilterProp="searchLabel"
+                  options={vietnamBanks.map((bank) => ({
+                    value: bank.shortName,
+                    label: (
+                      <div className="flex items-center gap-2">
+                        <img src={bank.logo} alt={bank.shortName} className="w-6 h-6 object-contain" />
+                        <span>{bank.shortName} - {bank.name}</span>
+                      </div>
+                    ),
+                    searchLabel: `${bank.shortName} ${bank.name} ${bank.code}`,
+                  }))}
+                  filterOption={(input, option) =>
+                    (option?.searchLabel as string || '').toLowerCase().includes(input.toLowerCase())
+                  }
                 />
-              </div>
+              </Form.Item>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Chi nhánh ngân hàng</label>
-                <input
-                  type="text"
-                  value={formData.branchName}
-                  onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
-                  className="w-full px-3 py-2 border rounded"
-                  placeholder="VD: Chi nhánh Hà Nội"
-                />
-              </div>
+              <Form.Item name="branchName" label="Chi nhánh ngân hàng">
+                <Input placeholder="VD: Chi nhánh Hà Nội" />
+              </Form.Item>
             </>
           )}
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Số dư ban đầu</label>
-            <input
-              type="number"
-              value={formData.balance}
-              onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              min="0"
-              step="0.01"
+          <Form.Item name="balance" label="Số dư ban đầu">
+            <InputNumber<number>
+              className="w-full"
+              min={0}
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => (value?.replace(/\$\s?|(,*)/g, '') || '0') as unknown as number}
               placeholder="0"
             />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowModal(false);
-                resetForm();
-              }}
-              className="px-4 py-2 border rounded hover:bg-gray-50"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Tạo mới
-            </button>
-          </div>
-        </form>
+          </Form.Item>
+        </Form>
       </Modal>
 
       {/* Side Panel */}
