@@ -91,6 +91,7 @@ interface LeftControlsProps {
   handleResetFilters: () => void;
   isFilterVisible: boolean;
   setIsFilterVisible: (value: boolean) => void;
+  filterListNode?: React.ReactNode;
 }
 
 const LeftControls: React.FC<LeftControlsProps> = ({
@@ -111,6 +112,7 @@ const LeftControls: React.FC<LeftControlsProps> = ({
   handleResetFilters,
   isFilterVisible,
   setIsFilterVisible,
+  filterListNode,
 }) => {
   if (isMobile) {
     return (
@@ -245,8 +247,12 @@ const LeftControls: React.FC<LeftControlsProps> = ({
         )}
       </div>
 
-      {header.customToolbarSecondRow && (
-        <div className="flex items-center gap-3 flex-wrap">{header.customToolbarSecondRow}</div>
+      {/* Filter fields + customToolbarSecondRow cùng hàng */}
+      {(header.customToolbarSecondRow || filterListNode) && (
+        <div className="flex items-center gap-3 flex-wrap">
+          {filterListNode}
+          {header.customToolbarSecondRow}
+        </div>
       )}
     </div>
   );
@@ -588,6 +594,16 @@ function WrapperContent<T extends object>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
+  // Tạo FilterList node để truyền vào LeftControls (chỉ desktop)
+  const filterListNode = !isMobileView && header.filters?.fields && header.filters.fields.length > 0 ? (
+    <FilterList
+      isMobile={false}
+      form={formFilter}
+      fields={header.filters.fields}
+      onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
+    />
+  ) : null;
+
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-center justify-between">
@@ -609,6 +625,7 @@ function WrapperContent<T extends object>({
           handleResetFilters={handleResetFilters}
           isFilterVisible={isFilterVisible}
           setIsFilterVisible={setIsFilterVisible}
+          filterListNode={filterListNode}
         />
         <RightControls
           isMobile={isMobileView}
@@ -678,20 +695,6 @@ function WrapperContent<T extends object>({
             </Button>
           )}
         </div>
-      )}
-
-      {/* Desktop inline toolbar */}
-      {!isMobileView && (header.filters?.fields && header.filters.fields.length > 0) && (
-        <FilterList
-          isMobile={false}
-          form={formFilter}
-          fields={header.filters.fields}
-          onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
-          onReset={() => {
-            header.filters?.onReset?.();
-            setSearchTerm("");
-          }}
-        />
       )}
 
       {/* Mobile bottom sheet for filters + column settings */}

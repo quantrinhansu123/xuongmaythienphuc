@@ -1,19 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FilterField } from "@/types";
-import { DeleteOutlined } from "@ant-design/icons";
 import {
-    Button,
     DatePicker,
     Form,
     Input,
-    Select,
+    Select
 } from "antd";
 import { FormInstance } from "antd/lib";
 
 interface FilterListProps {
   fields: FilterField[];
   onApplyFilter: (arr: { key: string; value: any }[]) => void;
-  onReset?: () => void;
   form: FormInstance<any>;
   isMobile: boolean;
 }
@@ -21,12 +18,11 @@ interface FilterListProps {
 export const FilterList: React.FC<FilterListProps> = ({
   fields,
   onApplyFilter,
-  onReset,
   isMobile,
   form,
 }) => {
   // Auto apply filter khi giá trị thay đổi
-  const handleValueChange = (changedValues: Record<string, any>) => {
+  const handleValueChange = () => {
     const payload: { key: string; value: any }[] = [];
     const allValues = form.getFieldsValue();
     
@@ -36,20 +32,6 @@ export const FilterList: React.FC<FilterListProps> = ({
     
     onApplyFilter(payload);
   };
-
-  const handleReset = () => {
-    form.resetFields();
-    if (onReset) {
-      onReset();
-    }
-  };
-
-  // Đếm số filter đang active
-  const activeCount = Object.values(form.getFieldsValue() || {}).filter(v => {
-    if (Array.isArray(v)) return v.length > 0;
-    if (typeof v === 'string') return v.trim() !== '';
-    return v !== undefined && v !== null;
-  }).length;
 
   const renderField = (field: FilterField) => {
     const size = "middle";
@@ -146,15 +128,6 @@ export const FilterList: React.FC<FilterListProps> = ({
         className="contents"
       >
         {fields.map((field) => renderField(field))}
-        {onReset && activeCount > 0 && (
-          <Button
-            onClick={handleReset}
-            icon={<DeleteOutlined />}
-            danger
-            type="text"
-            size="small"
-          />
-        )}
       </Form>
     );
   }
@@ -169,18 +142,6 @@ export const FilterList: React.FC<FilterListProps> = ({
     >
       <div className="flex gap-2 items-center flex-wrap">
         {fields.map((field) => renderField(field))}
-        
-        {onReset && activeCount > 0 && (
-          <Button
-            onClick={handleReset}
-            icon={<DeleteOutlined />}
-            danger
-            type="text"
-            size="middle"
-          >
-            Xóa lọc
-          </Button>
-        )}
       </div>
     </Form>
   );
