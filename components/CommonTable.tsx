@@ -4,7 +4,7 @@ import { PropRowDetails } from "@/types/table";
 import { DeleteOutlined } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
 import { App, Button, Card, Drawer, Empty, Pagination, Skeleton, Table, Tag } from "antd";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 
 interface ICommonTableProps<T> {
   sortable?: boolean;
@@ -58,6 +58,12 @@ const CommonTable = <T extends object>({
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { modal } = App.useApp();
+  
+  // Force re-check on mount để đảm bảo mobile detection đúng
+  const [mounted, setMounted] = useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const dataLength = total || dataSource?.length || 0;
 
@@ -153,7 +159,13 @@ const CommonTable = <T extends object>({
   };
 
   // Determine if should show cards - hiển thị card khi mobile (< 768px)
-  const shouldShowCards = showMobileCards && isMobile;
+  // Chỉ render sau khi mounted để tránh hydration mismatch
+  const shouldShowCards = mounted && showMobileCards && isMobile;
+
+  // Debug log - bật để kiểm tra trên thiết bị thật
+  // if (typeof window !== 'undefined') {
+  //   console.log('CommonTable Debug:', { isMobile, mounted, shouldShowCards, innerWidth: window.innerWidth });
+  // }
 
   // Default card render
   const defaultCardRender = (record: T, index: number) => {
