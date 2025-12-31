@@ -1,5 +1,5 @@
 import { IPagination } from "@/hooks/useFilter";
-import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIsMobile, useWindowWidth } from "@/hooks/useIsMobile";
 import { PropRowDetails } from "@/types/table";
 import { DeleteOutlined } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
@@ -54,16 +54,43 @@ const CommonTable = <T extends object>({
   mobileColumns,
   showMobileCards = true,
 }: ICommonTableProps<T>) => {
-  const isMobile = useIsMobile();
+  const isMobileHook = useIsMobile();
+  const windowWidth = useWindowWidth();
+  
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { modal } = App.useApp();
   
-  // Force re-check on mount để đảm bảo mobile detection đúng
+  // Force re-check on mount để đảm bảo mobile detection đúng trên thiết bị thật
   const [mounted, setMounted] = useState(false);
+  const [realWidth, setRealWidth] = useState<number>(1024);
+  
   React.useEffect(() => {
     setMounted(true);
+    // Check width ngay sau mount - quan trọng cho thiết bị thật
+    const checkWidth = () => {
+      if (typeof window !== 'undefined') {
+        // Dùng visualViewport nếu có (chính xác hơn trên mobile)
+        const vw = window.visualViewport?.width || window.innerWidth;
+        setRealWidth(vw);
+      }
+    };
+    
+    checkWidth();
+    
+    // Listen cho cả visualViewport (mobile) và window resize
+    window.visualViewport?.addEventListener('resize', checkWidth);
+    window.addEventListener('resize', checkWidth);
+    window.addEventListener('orientationchange', () => setTimeout(checkWidth, 150));
+    
+    return () => {
+      window.visualViewport?.removeEventListener('resize', checkWidth);
+      window.removeEventListener('resize', checkWidth);
+    };
   }, []);
+  
+  // Sử dụng nhiều nguồn để đảm bảo chính xác trên thiết bị thật
+  const isMobile = mounted && (isMobileHook || windowWidth < 768 || realWidth < 768);
 
   const dataLength = total || dataSource?.length || 0;
 

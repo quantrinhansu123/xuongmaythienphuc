@@ -7,11 +7,11 @@ import { useFileExport } from "@/hooks/useFileExport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-  CalendarOutlined,
-  DownloadOutlined,
-  MailOutlined,
-  PhoneOutlined,
-  ReloadOutlined
+    CalendarOutlined,
+    DownloadOutlined,
+    MailOutlined,
+    PhoneOutlined,
+    ReloadOutlined
 } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, DatePicker, Select, Statistic } from "antd";
@@ -361,6 +361,7 @@ export default function CustomerDebtsPage() {
                 }
                 paging={false}
                 onRowClick={handleViewPartnerDetails}
+                mobileColumns={["customerName", "phone", "remainingAmount"]}
               />
             </div>
           </div>

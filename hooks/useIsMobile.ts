@@ -1,51 +1,123 @@
-import * as React from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
-const MOBILE_BREAKPOINT = 768
+const MOBILE_BREAKPOINT = 768;
 
-export function useIsMobile() {
-  // Khởi tạo với giá trị dựa trên SSR-safe check
-  const [isMobile, setIsMobile] = React.useState<boolean>(() => {
-    // SSR: return false as default
+// Store để quản lý state mobile
+const mobileStore = {
+  listeners: new Set<() => void>(),
+  isMobile: false,
+  
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+  
+  getSnapshot() {
+    return this.isMobile;
+  },
+  
+  getServerSnapshot() {
+    return false; // Server luôn trả về false
+  },
+  
+  update() {
+    if (typeof window === 'undefined') return;
+    const newValue = window.innerWidth < MOBILE_BREAKPOINT;
+    if (this.isMobile !== newValue) {
+      this.isMobile = newValue;
+      this.listeners.forEach(listener => listener());
+    }
+  }
+};
+
+// Khởi tạo listeners một lần
+if (typeof window !== 'undefined') {
+  // Check ngay lập tức
+  mobileStore.isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+  
+  // Listeners
+  const handleChange = () => mobileStore.update();
+  
+  window.addEventListener('resize', handleChange);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(handleChange, 100);
+  });
+  
+  // MediaQuery listener
+  const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+  mql.addEventListener('change', handleChange);
+}
+
+/**
+ * Hook để detect mobile device
+ * Sử dụng useSyncExternalStore để tránh hydration mismatch
+ */
+export function useIsMobile(): boolean {
+  const isMobile = useSyncExternalStore(
+    (callback) => mobileStore.subscribe(callback),
+    () => mobileStore.getSnapshot(),
+    () => mobileStore.getServerSnapshot()
+  );
+  
+  // Force update sau khi mount để đảm bảo giá trị đúng
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    mobileStore.update();
+    forceUpdate(n => n + 1);
+  }, []);
+  
+  return isMobile;
+}
+
+/**
+ * Hook alternative - dùng CSS media query qua matchMedia
+ * Đáng tin cậy hơn trên một số thiết bị
+ */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined') return false;
-    // Client: check immediately
-    return window.innerWidth < MOBILE_BREAKPOINT;
+    return window.matchMedia(query).matches;
   });
 
-  React.useEffect(() => {
-    // Double check on mount
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    };
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
     
-    // Check immediately
-    checkMobile();
+    // Set initial value
+    setMatches(mql.matches);
     
-    // Also check after a small delay (for some mobile browsers)
-    const timeoutId = setTimeout(checkMobile, 100);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, [query]);
 
-    // Listen for resize
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+  return matches;
+}
+
+/**
+ * Hook đơn giản hơn - check trực tiếp window.innerWidth
+ * Dùng khi cần giá trị chính xác nhất
+ */
+export function useWindowWidth(): number {
+  const [width, setWidth] = useState(() => {
+    if (typeof window === 'undefined') return 1024;
+    return window.innerWidth;
+  });
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
     
-    const onChange = () => {
-      checkMobile();
-    };
+    // Set initial
+    handleResize();
     
-    mql.addEventListener("change", onChange);
-    window.addEventListener("resize", onChange);
-    
-    // Also listen for orientation change (important for mobile)
-    window.addEventListener("orientationchange", () => {
-      // Delay check after orientation change
-      setTimeout(checkMobile, 100);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleResize, 100);
     });
-
+    
     return () => {
-      clearTimeout(timeoutId);
-      mql.removeEventListener("change", onChange);
-      window.removeEventListener("resize", onChange);
-      window.removeEventListener("orientationchange", onChange);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
-  return isMobile;
+  return width;
 }
