@@ -1,3 +1,4 @@
+import { formatCurrency, formatQuantity } from "@/utils/format";
 import { ExclamationCircleOutlined, HistoryOutlined, PrinterOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -138,6 +139,17 @@ export default function PartnerDebtSidePanel({
   const { message, modal } = App.useApp();
   const [form] = Form.useForm();
   const [paymentType, setPaymentType] = useState<"all" | "order">("all");
+
+  // Fetch company info for receipt
+  const { data: companyInfo } = useQuery({
+    queryKey: ["company-info-public"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/company-info");
+      const data = await res.json();
+      return data.success ? data.data : { companyName: 'CỬA HÀNG', address: '', phone: '' };
+    },
+    staleTime: 60 * 60 * 1000, // Cache 1 hour
+  });
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrData, setQrData] = useState<{
@@ -162,216 +174,6 @@ export default function PartnerDebtSidePanel({
       accountHolder: account.accountHolder || '',
       description,
     };
-  };
-
-  // Print thermal receipt (with or without QR)
-  const printThermalReceipt = () => {
-    const formValues = form.getFieldsValue();
-    const amount = parseFloat(formValues.paymentAmount || '0');
-    const selectedAcc = bankAccounts.find(a => a.id === Number(formValues.bankAccountId));
-    
-    if (!amount || !selectedAcc) return;
-    
-    const printWindow = window.open('', '_blank', 'width=300,height=800');
-    if (!printWindow) return;
-
-    const isBankPayment = selectedAcc.accountType === 'BANK';
-    const qrUrl = isBankPayment && qrData ? qrData.qrUrl : null;
-    
-    // Get selected order details if paying by order
-    const selectedOrder = paymentType === 'order' && selectedOrderId 
-      ? unpaidOrdersList.find(o => o.id === selectedOrderId) 
-      : null;
-    
-    // Payment type label
-    const paymentTypeLabel = paymentType === 'order' ? 'Thanh toán đơn hàng' : 'Trả công nợ';
-
-    // Pre-format values for template
-    const formattedAmount = formatCurrency(amount, 'đ');
-    const formattedTotalAmount = formatCurrency(totalAmount || 0, 'đ');
-    const formattedPaidAmount = formatCurrency(paidAmount || 0, 'đ');
-    const formattedRemainingAmount = formatCurrency(remainingAmount || 0, 'đ');
-    const formattedOrderTotal = selectedOrder ? formatCurrency(selectedOrder.totalAmount, 'đ') : '';
-    const formattedOrderPaid = selectedOrder ? formatCurrency(selectedOrder.paidAmount, 'đ') : '';
-    const formattedOrderRemaining = selectedOrder ? formatCurrency(selectedOrder.remainingAmount, 'đ') : '';
-
-    // Build order items HTML if paying by order
-    const itemsHtml = selectedOrder?.details?.map((item) => {
-      const qty = formatQuantity(item.quantity);
-      const price = formatCurrency(item.unitPrice, '');
-      const total = formatCurrency(item.totalAmount, '');
-      return `
-      <div class="item-row">
-        <div class="item-name">${item.itemName}</div>
-        <div class="item-detail">
-          <span>${qty} x ${price}</span>
-          <span class="item-total">${total}</span>
-        </div>
-      </div>
-    `;
-    }).join('') || '';
-
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Phiếu thu công nợ - ${partnerName}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Courier New', monospace; 
-            width: 80mm; 
-            padding: 3mm;
-            font-size: 11px;
-            line-height: 1.3;
-        }
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .divider { border-top: 1px dashed #000; margin: 6px 0; }
-        .row { display: flex; justify-content: space-between; margin: 2px 0; }
-        .qr-container { text-align: center; margin: 8px 0; }
-        .qr-container img { max-width: 180px; height: auto; }
-        .title { font-size: 14px; font-weight: bold; margin-bottom: 6px; }
-        .amount { font-size: 16px; font-weight: bold; }
-        .small { font-size: 9px; color: #666; }
-        .highlight { background: #f0f0f0; padding: 4px; margin: 4px 0; }
-        .item-row { margin: 4px 0; }
-        .item-name { font-size: 11px; }
-        .item-detail { display: flex; justify-content: space-between; font-size: 10px; color: #333; }
-        .item-total { font-weight: bold; }
-        .summary-row { display: flex; justify-content: space-between; margin: 3px 0; }
-        @media print {
-            body { width: 80mm; }
-            @page { size: 80mm auto; margin: 0; }
-        }
-    </style>
-</head>
-<body>
-    <div class="center title">PHIẾU THU CÔNG NỢ</div>
-    <div class="divider"></div>
-    
-    <div class="row">
-        <span>Khách hàng:</span>
-        <span class="bold">${partnerName}</span>
-    </div>
-    <div class="row">
-        <span>Mã KH:</span>
-        <span>${partnerCode || '-'}</span>
-    </div>
-    <div class="row">
-        <span>Ngày:</span>
-        <span>${new Date().toLocaleString('vi-VN')}</span>
-    </div>
-    <div class="row">
-        <span>Loại TT:</span>
-        <span class="bold">${paymentTypeLabel}</span>
-    </div>
-    <div class="row">
-        <span>Hình thức:</span>
-        <span>${isBankPayment ? 'Chuyển khoản' : 'Tiền mặt'}</span>
-    </div>
-    
-    ${selectedOrder ? `
-    <div class="divider"></div>
-    <div class="row">
-        <span>Mã đơn:</span>
-        <span class="bold">${selectedOrder.orderCode}</span>
-    </div>
-    <div class="row">
-        <span>Ngày đặt:</span>
-        <span>${dayjs(selectedOrder.orderDate).format('DD/MM/YYYY')}</span>
-    </div>
-    
-    ${itemsHtml ? `
-    <div class="divider"></div>
-    <div class="bold" style="margin-bottom: 4px;">CHI TIẾT ĐƠN HÀNG</div>
-    ${itemsHtml}
-    ` : ''}
-    
-    <div class="divider"></div>
-    <div class="summary-row">
-        <span>Tổng tiền đơn:</span>
-        <span>${formattedOrderTotal}</span>
-    </div>
-    <div class="summary-row">
-        <span>Đã thanh toán:</span>
-        <span>${formattedOrderPaid}</span>
-    </div>
-    <div class="summary-row">
-        <span>Còn lại:</span>
-        <span>${formattedOrderRemaining}</span>
-    </div>
-    ` : `
-    <div class="divider"></div>
-    <div class="summary-row">
-        <span>Tổng công nợ:</span>
-        <span>${formattedTotalAmount}</span>
-    </div>
-    <div class="summary-row">
-        <span>Đã thanh toán:</span>
-        <span>${formattedPaidAmount}</span>
-    </div>
-    <div class="summary-row">
-        <span>Còn nợ:</span>
-        <span>${formattedRemainingAmount}</span>
-    </div>
-    `}
-    
-    <div class="highlight">
-        <div class="row">
-            <span class="bold">SỐ TIỀN THU:</span>
-            <span class="amount">${formattedAmount}</span>
-        </div>
-    </div>
-    
-    ${qrUrl ? `
-    <div class="divider"></div>
-    <div class="center bold">QUÉT MÃ QR ĐỂ THANH TOÁN</div>
-    <div class="qr-container">
-        <img src="${qrUrl}" alt="QR Code" />
-    </div>
-    <div class="small">
-        <div class="row">
-            <span>Ngân hàng:</span>
-            <span>${selectedAcc.bankName}</span>
-        </div>
-        <div class="row">
-            <span>Số TK:</span>
-            <span>${selectedAcc.accountNumber}</span>
-        </div>
-        <div class="row">
-            <span>Chủ TK:</span>
-            <span>${selectedAcc.accountHolder || ''}</span>
-        </div>
-        <div class="row">
-            <span>Nội dung CK:</span>
-            <span>TT CN ${partnerCode || partnerName}</span>
-        </div>
-    </div>
-    ` : `
-    <div class="divider"></div>
-    <div class="small">
-        <div class="row">
-            <span>Quỹ tiền mặt:</span>
-            <span>${selectedAcc.accountName || selectedAcc.accountNumber}</span>
-        </div>
-    </div>
-    `}
-    
-    <div class="divider"></div>
-    <div class="center small">Cảm ơn quý khách!</div>
-    
-    <script>
-        window.onload = function() { 
-            setTimeout(function() { window.print(); }, 300);
-        }
-    </script>
-</body>
-</html>`;
-    
-    printWindow.document.write(html);
-    printWindow.document.close();
   };
 
   // Handle form value changes to generate QR
@@ -423,6 +225,145 @@ export default function PartnerDebtSidePanel({
     },
     enabled: open && !!partnerId && paymentType === "order",
   });
+
+  // Print thermal receipt (with or without QR) - moved after hooks
+  const printThermalReceipt = () => {
+    try {
+      const formValues = form.getFieldsValue();
+      const amount = parseFloat(formValues.paymentAmount || '0');
+      const selectedAcc = bankAccounts.find(a => a.id === Number(formValues.bankAccountId));
+      
+      if (!amount || !selectedAcc) {
+        console.log('Missing amount or account');
+        return;
+      }
+      
+      const printWindow = window.open('', '_blank', 'width=300,height=800');
+      if (!printWindow) {
+        console.log('Cannot open print window');
+        return;
+      }
+
+      const isBankPayment = selectedAcc.accountType === 'BANK';
+      const qrUrl = isBankPayment && qrData ? qrData.qrUrl : null;
+      
+      // Get selected order details if paying by order
+      const selectedOrder = paymentType === 'order' && selectedOrderId 
+        ? unpaidOrdersList.find(o => o.id === selectedOrderId) 
+        : null;
+      
+      // Payment type label
+      const paymentTypeLabel = paymentType === 'order' ? 'Thanh toán đơn hàng' : 'Trả công nợ';
+
+      // Pre-format values for template
+      const formattedAmount = formatCurrency(amount, 'đ');
+      const formattedTotalAmount = formatCurrency(totalAmount || 0, 'đ');
+      const formattedPaidAmount = formatCurrency(paidAmount || 0, 'đ');
+      const formattedRemainingAmount = formatCurrency(remainingAmount || 0, 'đ');
+      
+      // Company info
+      const shopName = companyInfo?.companyName || 'CỬA HÀNG';
+      const shopAddress = companyInfo?.address || '';
+      const shopPhone = companyInfo?.phone || '';
+
+      // Build order section HTML
+      let orderSectionHtml = '';
+      if (selectedOrder) {
+        const formattedOrderTotal = formatCurrency(selectedOrder.totalAmount, 'đ');
+        const formattedOrderPaid = formatCurrency(selectedOrder.paidAmount, 'đ');
+        const formattedOrderRemaining = formatCurrency(selectedOrder.remainingAmount, 'đ');
+        const orderDateStr = dayjs(selectedOrder.orderDate).format('DD/MM/YYYY');
+        
+        // Build items HTML
+        let itemsHtml = '';
+        if (selectedOrder.details && selectedOrder.details.length > 0) {
+          itemsHtml = selectedOrder.details.map((item) => {
+            const qty = formatQuantity(item.quantity);
+            const price = formatCurrency(item.unitPrice, '');
+            const total = formatCurrency(item.totalAmount, '');
+            return '<div class="item-row"><div class="item-name">' + item.itemName + '</div><div class="item-detail"><span>' + qty + ' x ' + price + '</span><span class="item-total">' + total + '</span></div></div>';
+          }).join('');
+        }
+        
+        orderSectionHtml = '<div class="divider"></div>' +
+          '<div class="row"><span>Mã đơn:</span><span class="bold">' + selectedOrder.orderCode + '</span></div>' +
+          '<div class="row"><span>Ngày đặt:</span><span>' + orderDateStr + '</span></div>' +
+          (itemsHtml ? '<div class="divider"></div><div class="bold" style="margin-bottom: 4px;">CHI TIẾT ĐƠN HÀNG</div>' + itemsHtml : '') +
+          '<div class="divider"></div>' +
+          '<div class="summary-row"><span>Tổng tiền đơn:</span><span>' + formattedOrderTotal + '</span></div>' +
+          '<div class="summary-row"><span>Đã thanh toán:</span><span>' + formattedOrderPaid + '</span></div>' +
+          '<div class="summary-row"><span>Còn lại:</span><span>' + formattedOrderRemaining + '</span></div>';
+      } else {
+        orderSectionHtml = '<div class="divider"></div>' +
+          '<div class="summary-row"><span>Tổng công nợ:</span><span>' + formattedTotalAmount + '</span></div>' +
+          '<div class="summary-row"><span>Đã thanh toán:</span><span>' + formattedPaidAmount + '</span></div>' +
+          '<div class="summary-row"><span>Còn nợ:</span><span>' + formattedRemainingAmount + '</span></div>';
+      }
+
+      // Build QR/Cash section
+      let paymentInfoHtml = '';
+      if (qrUrl) {
+        paymentInfoHtml = '<div class="divider"></div>' +
+          '<div class="center bold">QUÉT MÃ QR ĐỂ THANH TOÁN</div>' +
+          '<div class="qr-container"><img src="' + qrUrl + '" alt="QR Code" /></div>' +
+          '<div class="small">' +
+          '<div class="row"><span>Ngân hàng:</span><span>' + selectedAcc.bankName + '</span></div>' +
+          '<div class="row"><span>Số TK:</span><span>' + selectedAcc.accountNumber + '</span></div>' +
+          '<div class="row"><span>Chủ TK:</span><span>' + (selectedAcc.accountHolder || '') + '</span></div>' +
+          '<div class="row"><span>Nội dung CK:</span><span>TT CN ' + (partnerCode || partnerName) + '</span></div>' +
+          '</div>';
+      } else {
+        paymentInfoHtml = '<div class="divider"></div>' +
+          '<div class="small"><div class="row"><span>Quỹ tiền mặt:</span><span>' + (selectedAcc.accountName || selectedAcc.accountNumber) + '</span></div></div>';
+      }
+
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Phiếu thu công nợ</title>' +
+        '<style>' +
+        '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+        'body { font-family: "Courier New", monospace; width: 80mm; padding: 3mm; font-size: 11px; line-height: 1.3; }' +
+        '.center { text-align: center; }' +
+        '.bold { font-weight: bold; }' +
+        '.divider { border-top: 1px dashed #000; margin: 6px 0; }' +
+        '.row { display: flex; justify-content: space-between; margin: 2px 0; }' +
+        '.qr-container { text-align: center; margin: 8px 0; }' +
+        '.qr-container img { max-width: 180px; height: auto; }' +
+        '.title { font-size: 14px; font-weight: bold; margin-bottom: 6px; }' +
+        '.shop-name { font-size: 16px; font-weight: bold; }' +
+        '.amount { font-size: 16px; font-weight: bold; }' +
+        '.small { font-size: 9px; color: #666; }' +
+        '.highlight { background: #f0f0f0; padding: 4px; margin: 4px 0; }' +
+        '.item-row { margin: 4px 0; }' +
+        '.item-name { font-size: 11px; }' +
+        '.item-detail { display: flex; justify-content: space-between; font-size: 10px; color: #333; }' +
+        '.item-total { font-weight: bold; }' +
+        '.summary-row { display: flex; justify-content: space-between; margin: 3px 0; }' +
+        '@media print { body { width: 80mm; } @page { size: 80mm auto; margin: 0; } }' +
+        '</style></head><body>' +
+        '<div class="center shop-name">' + shopName + '</div>' +
+        (shopAddress ? '<div class="center small">' + shopAddress + '</div>' : '') +
+        (shopPhone ? '<div class="center small">ĐT: ' + shopPhone + '</div>' : '') +
+        '<div class="divider"></div>' +
+        '<div class="center title">PHIẾU THU CÔNG NỢ</div>' +
+        '<div class="divider"></div>' +
+        '<div class="row"><span>Khách hàng:</span><span class="bold">' + partnerName + '</span></div>' +
+        '<div class="row"><span>Mã KH:</span><span>' + (partnerCode || '-') + '</span></div>' +
+        '<div class="row"><span>Ngày:</span><span>' + new Date().toLocaleString('vi-VN') + '</span></div>' +
+        '<div class="row"><span>Loại TT:</span><span class="bold">' + paymentTypeLabel + '</span></div>' +
+        '<div class="row"><span>Hình thức:</span><span>' + (isBankPayment ? 'Chuyển khoản' : 'Tiền mặt') + '</span></div>' +
+        orderSectionHtml +
+        '<div class="highlight"><div class="row"><span class="bold">SỐ TIỀN THU:</span><span class="amount">' + formattedAmount + '</span></div></div>' +
+        paymentInfoHtml +
+        '<div class="divider"></div>' +
+        '<div class="center small">Cảm ơn quý khách!</div>' +
+        '<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }<\/script>' +
+        '</body></html>';
+      
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } catch (error) {
+      console.error('Print error:', error);
+    }
+  };
 
   const handlePaymentTypeChange = (type: "all" | "order") => {
     setPaymentType(type);
@@ -611,7 +552,7 @@ export default function PartnerDebtSidePanel({
                         label: (
                           <div className="flex justify-between">
                             <span>{order.orderCode} - {dayjs(order.orderDate).format("DD/MM/YYYY")}</span>
-                            <span className="text-orange-600">{(order.remainingAmount || 0).toLocaleString("vi-VN")} đ</span>
+                            <span className="text-orange-600">{formatCurrency(order.remainingAmount || 0, 'đ')}</span>
                           </div>
                         ),
                         value: order.id,
@@ -635,11 +576,11 @@ export default function PartnerDebtSidePanel({
                   }
                   step={0.01}
                   suffix="đ"
-                  placeholder={`Tối đa: ${(
+                  placeholder={`Tối đa: ${formatCurrency(
                     paymentType === "order" && selectedOrderId
                       ? unpaidOrdersList.find(o => o.id === selectedOrderId)?.remainingAmount || 0
                       : remainingAmount || 0
-                  ).toLocaleString("vi-VN")} đ`}
+                  , 'đ')}`}
                 />
               </Form.Item>
 
@@ -770,7 +711,7 @@ export default function PartnerDebtSidePanel({
                   align: "right" as const,
                   render: (amount: number) => (
                     <span className="text-green-600 font-medium">
-                      {amount.toLocaleString("vi-VN")} đ
+                      {formatCurrency(amount, 'đ')}
                     </span>
                   ),
                 },
@@ -866,7 +807,7 @@ export default function PartnerDebtSidePanel({
                 className="mx-auto max-w-[280px]"
               />
               <div className="text-2xl font-bold text-blue-600">
-                {qrData.amount.toLocaleString('vi-VN')} đ
+                {formatCurrency(qrData.amount, 'đ')}
               </div>
               <div className="bg-gray-50 p-3 rounded text-left text-sm space-y-1">
                 <div><strong>Khách hàng:</strong> {partnerName}</div>
@@ -882,11 +823,3 @@ export default function PartnerDebtSidePanel({
     </Drawer>
   );
 }
-function formatQuantity(quantity: number) {
-  throw new Error("Function not implemented.");
-}
-
-function formatCurrency(unitPrice: number, arg1: string) {
-  throw new Error("Function not implemented.");
-}
-

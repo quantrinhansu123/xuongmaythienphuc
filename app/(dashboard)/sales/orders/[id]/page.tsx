@@ -87,6 +87,17 @@ export default function OrderDetailPage() {
         description: string;
     } | null>(null);
 
+    // Fetch company info for receipt
+    const { data: companyInfo } = useQuery({
+        queryKey: ["company-info-public"],
+        queryFn: async () => {
+            const res = await fetch("/api/public/company-info");
+            const data = await res.json();
+            return data.success ? data.data : { companyName: 'CỬA HÀNG', address: '', phone: '' };
+        },
+        staleTime: 60 * 60 * 1000, // Cache 1 hour
+    });
+
     // Generate VietQR URL
     const generateVietQR = (account: any, amount: number, orderCode: string) => {
         const bankBin = BANK_BIN_MAP[account.bankName] || account.bankName;
@@ -170,9 +181,9 @@ export default function OrderDetailPage() {
     </style>
 </head>
 <body>
-    <div class="center shop-name">${orderData.branchName || 'CỬA HÀNG'}</div>
-    <div class="center small">Địa chỉ: ...</div>
-    <div class="center small">ĐT: ...</div>
+    <div class="center shop-name">${companyInfo?.companyName || orderData.branchName || 'CỬA HÀNG'}</div>
+    ${companyInfo?.address ? `<div class="center small">${companyInfo.address}</div>` : ''}
+    ${companyInfo?.phone ? `<div class="center small">ĐT: ${companyInfo.phone}</div>` : ''}
     
     <div class="divider"></div>
     <div class="center title">PHIẾU THANH TOÁN</div>
@@ -881,7 +892,7 @@ export default function OrderDetailPage() {
                             className="mx-auto max-w-[280px]"
                         />
                         <div className="text-2xl font-bold text-blue-600">
-                            {qrData.amount.toLocaleString('vi-VN')} đ
+                            {formatCurrency(qrData.amount, 'đ')}
                         </div>
                         <div className="bg-gray-50 p-3 rounded text-left text-sm space-y-1">
                             <div><strong>Ngân hàng:</strong> {qrData.bankName}</div>
