@@ -1,5 +1,8 @@
+'use client';
 
-import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons';
+import { formatCurrency } from '@/utils/format';
+import { ArrowDownOutlined, ArrowUpOutlined, CloseOutlined, PrinterOutlined } from '@ant-design/icons';
+import { Button, Card, Descriptions, Space, Tag, Typography } from 'antd';
 
 interface CashBook {
   id: number;
@@ -20,145 +23,108 @@ interface CashBook {
   createdAt: string;
 }
 
-interface FinancialCategory {
-  id: number;
-  categoryCode: string;
-  categoryName: string;
-  type: 'THU' | 'CHI';
-}
-
-interface BankAccount {
-  id: number;
-  accountNumber: string;
-  bankName: string;
-  balance: number;
-}
-
 interface Props {
   cashbook: CashBook;
   onClose: () => void;
 }
 
-export default function CashbookSidePanel({
-  cashbook,
-  onClose,
-}: Props) {
-
+export default function CashbookSidePanel({ cashbook, onClose }: Props) {
   const handlePrint = () => {
     window.open(`/api/finance/cashbooks/${cashbook.id}/pdf`, '_blank', 'noopener,noreferrer');
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[600px] bg-white shadow-2xl border-l border-gray-200 overflow-y-auto z-40">
+    <div className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl border-l border-gray-200 overflow-y-auto z-40">
       {/* Header */}
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
-        <div>
-          <h2 className="text-xl font-bold">
+      <div className="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center z-10">
+        <div className="flex items-center gap-3">
+          <Typography.Title level={5} style={{ margin: 0 }}>
             {cashbook.transactionType === 'THU' ? 'Phiếu thu' : 'Phiếu chi'}
-          </h2>
-          <p className="text-sm text-gray-600">{cashbook.transactionCode}</p>
+          </Typography.Title>
+          <Tag color={cashbook.transactionType === 'THU' ? 'green' : 'red'}>
+            {cashbook.transactionType === 'THU' ? <ArrowDownOutlined /> : <ArrowUpOutlined />} {cashbook.transactionType}
+          </Tag>
         </div>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-        >
-          ×
-        </button>
+        <Button type="text" icon={<CloseOutlined />} onClick={onClose} />
       </div>
 
       {/* Content */}
-      <div className="p-6 space-y-6">
-        {/* View Mode */}
-        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Ngày giao dịch:</span>
-            <span className="font-medium">
+      <div className="p-4 space-y-4">
+        {/* Thông tin giao dịch */}
+        <Card title="Thông tin giao dịch" size="small">
+          <Descriptions column={1} size="small" labelStyle={{ fontWeight: 500 }}>
+            <Descriptions.Item label="Mã giao dịch">
+              <Typography.Text code>{cashbook.transactionCode}</Typography.Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Ngày giao dịch">
               {new Date(cashbook.transactionDate).toLocaleDateString('vi-VN')}
-            </span>
+            </Descriptions.Item>
+            <Descriptions.Item label="Sổ quỹ">
+              <Typography.Text strong>{cashbook.categoryName}</Typography.Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Phương thức">
+              <Tag>
+                {cashbook.paymentMethod === 'CASH' ? 'Tiền mặt' :
+                  cashbook.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
+              </Tag>
+            </Descriptions.Item>
+            {cashbook.bankAccountNumber && (
+              <Descriptions.Item label="Tài khoản">
+                <Typography.Text type="secondary">
+                  {cashbook.bankName} - {cashbook.bankAccountNumber}
+                </Typography.Text>
+              </Descriptions.Item>
+            )}
+            {cashbook.description && (
+              <Descriptions.Item label="Mô tả">{cashbook.description}</Descriptions.Item>
+            )}
+          </Descriptions>
+        </Card>
+
+        {/* Số tiền */}
+        <Card size="small" className="bg-blue-50/50">
+          <div className="text-center">
+            <Typography.Text type="secondary">Số tiền</Typography.Text>
+            <Typography.Title
+              level={3}
+              style={{ margin: '8px 0 0', color: cashbook.transactionType === 'THU' ? '#52c41a' : '#ff4d4f' }}
+            >
+              {cashbook.transactionType === 'THU' ? '+' : '-'}{formatCurrency(cashbook.amount)}
+            </Typography.Title>
           </div>
+        </Card>
 
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Loại:</span>
-            <span className={`px-2 py-1 rounded text-xs ${cashbook.transactionType === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}>
-              {cashbook.transactionType === 'THU' ? <ArrowDownOutlined /> : <ArrowUpOutlined />} {cashbook.transactionType}
-            </span>
-          </div>
-
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Sổ quỹ:</span>
-            <span className="font-medium">{cashbook.categoryName}</span>
-          </div>
-
-          <div className="flex justify-between items-center pt-2 border-t">
-            <span className="text-sm text-gray-600">Số tiền:</span>
-            <span className="text-xl font-bold text-blue-600">
-              {parseFloat(cashbook.amount.toString()).toLocaleString('vi-VN')} đ
-            </span>
-          </div>
-
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Phương thức:</span>
-            <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-              {cashbook.paymentMethod === 'CASH' ? 'Tiền mặt' :
-                cashbook.paymentMethod === 'BANK' ? 'Ngân hàng' : 'Chuyển khoản'}
-            </span>
-          </div>
-
-          {cashbook.bankAccountNumber && (
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Tài khoản:</span>
-              <span className="text-sm">
-                {cashbook.bankName} - {cashbook.bankAccountNumber}
-              </span>
-            </div>
-          )}
-
-          {cashbook.description && (
-            <div className="pt-2 border-t">
-              <span className="text-sm text-gray-600">Mô tả:</span>
-              <p className="mt-1 text-sm">{cashbook.description}</p>
-            </div>
-          )}
-
-          <div className="flex justify-between pt-2 border-t">
-            <span className="text-sm text-gray-600">Chi nhánh:</span>
-            <span className="text-sm">{cashbook.branchName}</span>
-          </div>
-
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Người tạo:</span>
-            <span className="text-sm">{cashbook.createdByName}</span>
-          </div>
-
-          <div className="flex justify-between">
-            <span className="text-sm text-gray-600">Ngày tạo:</span>
-            <span className="text-sm">
+        {/* Thông tin khác */}
+        <Card title="Thông tin khác" size="small">
+          <Descriptions column={1} size="small" labelStyle={{ fontWeight: 500 }}>
+            <Descriptions.Item label="Chi nhánh">{cashbook.branchName || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Người tạo">{cashbook.createdByName}</Descriptions.Item>
+            <Descriptions.Item label="Ngày tạo">
               {new Date(cashbook.createdAt).toLocaleString('vi-VN')}
-            </span>
-          </div>
-        </div>
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
 
         {/* Actions */}
-        <div className="flex gap-2">
-          <button
-            onClick={handlePrint}
-            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
-          >
-            🖨️ In phiếu
-          </button>
-        </div>
+        <Card size="small">
+          <Space className="w-full" direction="vertical">
+            <Button
+              type="primary"
+              icon={<PrinterOutlined />}
+              onClick={handlePrint}
+              block
+            >
+              In phiếu
+            </Button>
+          </Space>
+        </Card>
 
         {/* Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="text-sm text-blue-800">
-            <div className="font-medium mb-2">💡 Lưu ý:</div>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Phiếu thu/chi không thể chỉnh sửa hoặc xóa sau khi tạo</li>
-              <li>Click "In phiếu" để in hoặc lưu PDF</li>
-            </ul>
-          </div>
-        </div>
+        <Card size="small" className="bg-blue-50 border-blue-200">
+          <Typography.Text type="secondary" className="text-sm">
+            💡 Phiếu thu/chi không thể chỉnh sửa hoặc xóa sau khi tạo. Click "In phiếu" để in hoặc lưu PDF.
+          </Typography.Text>
+        </Card>
       </div>
     </div>
   );

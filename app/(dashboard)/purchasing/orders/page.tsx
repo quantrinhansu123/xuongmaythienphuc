@@ -5,7 +5,7 @@ import WrapperContent from '@/components/WrapperContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency, formatQuantity } from '@/utils/format';
 import { CarOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, CreditCardOutlined, DownloadOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined } from '@ant-design/icons';
-import { DatePicker, Select, TableColumnsType, Tag } from 'antd';
+import { Button, Card, DatePicker, Descriptions, Select, Space, Table, TableColumnsType, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 
@@ -787,153 +787,180 @@ export default function PurchaseOrdersPage() {
 
           {showDetail && selectedOrder && (
             <div className="w-1/2 bg-white border-l shadow-xl overflow-y-auto fixed right-0 top-0 h-screen z-40">
-              <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
-                <h3 className="text-xl font-bold">Chi tiết đơn đặt hàng</h3>
-                <button onClick={() => setShowDetail(false)} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center z-10">
+                <div className="flex items-center gap-3">
+                  <Typography.Title level={5} style={{ margin: 0 }}>
+                    {selectedOrder.poCode}
+                  </Typography.Title>
+                  {getStatusTag(selectedOrder.status)}
+                </div>
+                <Button type="text" onClick={() => setShowDetail(false)} className="text-xl">×</Button>
               </div>
 
-              <div className="p-6 space-y-6">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><span className="text-gray-600">Mã đơn:</span> <span className="font-mono font-medium">{selectedOrder.poCode}</span></div>
-                    <div><span className="text-gray-600">Trạng thái:</span> {getStatusTag(selectedOrder.status)}</div>
-                    <div><span className="text-gray-600">Nhà cung cấp:</span> {selectedOrder.supplierName}</div>
-                    <div><span className="text-gray-600">Ngày đặt:</span> {new Date(selectedOrder.orderDate).toLocaleDateString('vi-VN')}</div>
+              <div className="p-4 space-y-4">
+                {/* Thông tin đơn hàng */}
+                <Card title="Thông tin đơn hàng" size="small">
+                  <Descriptions column={2} size="small" labelStyle={{ fontWeight: 500 }}>
+                    <Descriptions.Item label="Mã đơn">
+                      <Typography.Text code>{selectedOrder.poCode}</Typography.Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Trạng thái">
+                      {getStatusTag(selectedOrder.status)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Nhà cung cấp">
+                      <Typography.Text strong>{selectedOrder.supplierName}</Typography.Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Ngày đặt">
+                      {new Date(selectedOrder.orderDate).toLocaleDateString('vi-VN')}
+                    </Descriptions.Item>
                     {selectedOrder.expectedDate && (
-                      <div><span className="text-gray-600">Ngày dự kiến:</span> {new Date(selectedOrder.expectedDate).toLocaleDateString('vi-VN')}</div>
+                      <Descriptions.Item label="Ngày dự kiến">
+                        {new Date(selectedOrder.expectedDate).toLocaleDateString('vi-VN')}
+                      </Descriptions.Item>
                     )}
-                    <div><span className="text-gray-600">Người tạo:</span> {selectedOrder.createdBy}</div>
-                  </div>
-
-                  {/* Payment Info in Detail */}
-                  <div className="mt-4 border-t pt-4 grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <div className="text-xs text-gray-500">Tổng tiền</div>
-                      <div className="font-bold text-blue-600">{formatCurrency(selectedOrder.totalAmount)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Đã thanh toán</div>
-                      <div className="font-bold text-green-600">{formatCurrency(selectedOrder.paidAmount || 0)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Còn nợ</div>
-                      <div className="font-bold text-red-600">{formatCurrency(selectedOrder.totalAmount - (selectedOrder.paidAmount || 0))}</div>
-                    </div>
-                  </div>
-
-                  {selectedOrder.notes && (
-                    <div className="mt-3 text-sm"><span className="text-gray-600">Ghi chú:</span> {selectedOrder.notes}</div>
-                  )}
-                </div>
-
-                <div>
-                  <h4 className="font-semibold mb-3">Danh sách nguyên liệu</h4>
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left">STT</th>
-                        <th className="px-3 py-2 text-left">Nguyên liệu</th>
-                        <th className="px-3 py-2 text-right">SL</th>
-                        <th className="px-3 py-2 text-right">Đơn giá</th>
-                        <th className="px-3 py-2 text-right">Thành tiền</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {selectedOrder.details?.map((item: any, idx: number) => (
-                        <tr key={idx}>
-                          <td className="px-3 py-2">{idx + 1}</td>
-                          <td className="px-3 py-2">{item.materialName}</td>
-                          <td className="px-3 py-2 text-right">{formatQuantity(item.quantity)} {item.unit}</td>
-                          <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                          <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.totalAmount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="mt-4 text-right">
-                    <div className="text-lg font-bold text-blue-600">
-                      Tổng tiền: {formatCurrency(selectedOrder.totalAmount)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment History Section with Translation - HIDDEN AS REQUESTED */}
-                {/* {paymentHistory.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold mb-3">Lịch sử thanh toán</h4>
-                    <div className="bg-gray-50 rounded p-4 space-y-3">
-                      {paymentHistory.map((ph, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0">
-                          <div>
-                            <div className="font-medium">
-                              {new Date(ph.transactionDate).toLocaleDateString('vi-VN')} - {ph.transactionCode}
-                            </div>
-                            <div className="text-gray-500 text-xs">
-                              {ph.categoryName || ph.description}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-green-600">{formatCurrency(ph.amount)}</div>
-                            <div className="text-xs text-gray-500">{ph.paymentMethod === 'BANK' ? 'Chuyển khoản' : 'Tiền mặt'}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )} */}
-
-                {/* Button Section */}
-                <div className="flex gap-2 justify-end border-t pt-4">
-                  <button
-                    onClick={() => window.open(`/api/purchasing/orders/${selectedOrder.id}/pdf`, '_blank', 'noopener,noreferrer')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                  >
-                    <PrinterOutlined /> In PDF
-                  </button>
-
-                  {/* Payment Button */}
-                  {(selectedOrder.status === 'CONFIRMED' || selectedOrder.status === 'DELIVERED') &&
-                    selectedOrder.paymentStatus !== 'PAID' && can('finance.cashbooks', 'create') && (
-                      <button
-                        onClick={() => {
-                          setPaymentForm({
-                            ...paymentForm,
-                            amount: selectedOrder.totalAmount - (selectedOrder.paidAmount || 0),
-                            paymentMethod: 'CASH' // Default, will change based on account
-                          });
-                          setShowPaymentModal(true);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                      >
-                        <CreditCardOutlined /> Thanh toán
-                      </button>
+                    <Descriptions.Item label="Người tạo">{selectedOrder.createdBy}</Descriptions.Item>
+                    {selectedOrder.notes && (
+                      <Descriptions.Item label="Ghi chú" span={2}>{selectedOrder.notes}</Descriptions.Item>
                     )}
+                  </Descriptions>
+                </Card>
 
-                  {selectedOrder.status === 'PENDING' && can('purchasing.orders', 'edit') && (
-                    <>
-                      <button
-                        onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                      >
-                        <CloseOutlined /> Hủy đơn
-                      </button>
-                      <button
-                        onClick={() => updateStatus(selectedOrder.id, 'CONFIRMED')}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        <CheckOutlined /> Xác nhận
-                      </button>
-                    </>
-                  )}
-                  {selectedOrder.status === 'CONFIRMED' && can('purchasing.orders', 'edit') && (
-                    <button
-                      onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                {/* Tổng quan chi phí */}
+                <Card title="Tổng quan chi phí" size="small" className="bg-blue-50/30">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Typography.Text type="secondary">Tổng tiền hàng:</Typography.Text>
+                      <Typography.Text strong className="text-lg" style={{ color: '#1890ff' }}>
+                        {formatCurrency(selectedOrder.totalAmount)}
+                      </Typography.Text>
+                    </div>
+                    <div className="bg-white p-3 rounded border mt-3 space-y-1">
+                      <div className="flex justify-between">
+                        <Typography.Text type="secondary">Đã thanh toán:</Typography.Text>
+                        <Typography.Text style={{ color: '#52c41a' }}>
+                          {formatCurrency(selectedOrder.paidAmount || 0)}
+                        </Typography.Text>
+                      </div>
+                      <div className="border-t pt-1 flex justify-between">
+                        <Typography.Text strong>Còn nợ:</Typography.Text>
+                        <Typography.Text strong style={{ color: (selectedOrder.totalAmount - (selectedOrder.paidAmount || 0)) > 0 ? '#ff4d4f' : '#52c41a' }}>
+                          {formatCurrency(selectedOrder.totalAmount - (selectedOrder.paidAmount || 0))}
+                        </Typography.Text>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Danh sách nguyên liệu */}
+                <Card title="Danh sách nguyên liệu" size="small">
+                  <Table
+                    dataSource={selectedOrder.details?.map((item: any, idx: number) => ({ ...item, key: idx, stt: idx + 1 }))}
+                    columns={[
+                      { title: 'STT', dataIndex: 'stt', key: 'stt', width: 50, align: 'center' as const },
+                      { title: 'Nguyên liệu', dataIndex: 'materialName', key: 'materialName' },
+                      { 
+                        title: 'SL', 
+                        dataIndex: 'quantity', 
+                        key: 'quantity', 
+                        width: 100, 
+                        align: 'right' as const,
+                        render: (qty: number, record: any) => `${formatQuantity(qty)} ${record.unit || ''}`
+                      },
+                      { 
+                        title: 'Đơn giá', 
+                        dataIndex: 'unitPrice', 
+                        key: 'unitPrice', 
+                        width: 120, 
+                        align: 'right' as const,
+                        render: (price: number) => formatCurrency(price)
+                      },
+                      { 
+                        title: 'Thành tiền', 
+                        dataIndex: 'totalAmount', 
+                        key: 'totalAmount', 
+                        width: 130, 
+                        align: 'right' as const,
+                        render: (amount: number) => <Typography.Text strong>{formatCurrency(amount)}</Typography.Text>
+                      },
+                    ]}
+                    pagination={false}
+                    size="small"
+                    summary={() => (
+                      <Table.Summary.Row>
+                        <Table.Summary.Cell index={0} colSpan={4} align="right">
+                          <Typography.Text strong>Tổng tiền:</Typography.Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={1} align="right">
+                          <Typography.Text strong style={{ color: '#1890ff', fontSize: 16 }}>
+                            {formatCurrency(selectedOrder.totalAmount)}
+                          </Typography.Text>
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    )}
+                  />
+                </Card>
+
+                {/* Action Buttons */}
+                <Card size="small">
+                  <Space wrap>
+                    <Button
+                      icon={<PrinterOutlined />}
+                      onClick={() => window.open(`/api/purchasing/orders/${selectedOrder.id}/pdf`, '_blank', 'noopener,noreferrer')}
                     >
-                      <CheckOutlined /> Đã giao hàng
-                    </button>
-                  )}
-                </div>
+                      In PDF
+                    </Button>
+
+                    {(selectedOrder.status === 'CONFIRMED' || selectedOrder.status === 'DELIVERED') &&
+                      selectedOrder.paymentStatus !== 'PAID' && can('finance.cashbooks', 'create') && (
+                        <Button
+                          type="primary"
+                          icon={<CreditCardOutlined />}
+                          style={{ backgroundColor: '#722ed1' }}
+                          onClick={() => {
+                            setPaymentForm({
+                              ...paymentForm,
+                              amount: selectedOrder.totalAmount - (selectedOrder.paidAmount || 0),
+                              paymentMethod: 'CASH'
+                            });
+                            setShowPaymentModal(true);
+                          }}
+                        >
+                          Thanh toán
+                        </Button>
+                      )}
+
+                    {selectedOrder.status === 'PENDING' && can('purchasing.orders', 'edit') && (
+                      <>
+                        <Button
+                          danger
+                          icon={<CloseOutlined />}
+                          onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')}
+                        >
+                          Hủy đơn
+                        </Button>
+                        <Button
+                          type="primary"
+                          icon={<CheckOutlined />}
+                          onClick={() => updateStatus(selectedOrder.id, 'CONFIRMED')}
+                        >
+                          Xác nhận
+                        </Button>
+                      </>
+                    )}
+
+                    {selectedOrder.status === 'CONFIRMED' && can('purchasing.orders', 'edit') && (
+                      <Button
+                        type="primary"
+                        icon={<CarOutlined />}
+                        style={{ backgroundColor: '#52c41a' }}
+                        onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')}
+                      >
+                        Đã giao hàng
+                      </Button>
+                    )}
+                  </Space>
+                </Card>
               </div>
             </div>
           )}

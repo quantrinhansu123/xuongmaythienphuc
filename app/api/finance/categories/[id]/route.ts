@@ -2,6 +2,58 @@ import { query } from '@/lib/db';
 import { requirePermission } from '@/lib/permissions';
 import { NextRequest, NextResponse } from 'next/server';
 
+// GET - Lấy chi tiết danh mục tài chính
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { hasPermission, error } = await requirePermission('finance.categories', 'view');
+
+  if (!hasPermission) {
+    return NextResponse.json({ success: false, error }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const result = await query(
+      `SELECT 
+        fc.id,
+        fc.category_code as "categoryCode",
+        fc.category_name as "categoryName",
+        fc.type,
+        fc.description,
+        fc.is_active as "isActive",
+        fc.created_at as "createdAt",
+        fc.bank_account_id as "bankAccountId",
+        ba.bank_name as "bankName",
+        ba.account_number as "bankAccountNumber"
+      FROM financial_categories fc
+      LEFT JOIN bank_accounts ba ON fc.bank_account_id = ba.id
+      WHERE fc.id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Không tìm thấy danh mục' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: result.rows[0],
+    });
+  } catch (error: any) {
+    console.error('Error fetching financial category:', error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
 // PUT - Cập nhật danh mục tài chính
 export async function PUT(
   request: NextRequest,

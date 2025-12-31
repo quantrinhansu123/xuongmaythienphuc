@@ -1,6 +1,5 @@
 'use client';
 
-import CategorySidePanel from '@/components/CategorySidePanel';
 import CommonTable from '@/components/CommonTable';
 import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
@@ -10,13 +9,14 @@ import useFilter from '@/hooks/useFilter';
 import { usePermissions } from '@/hooks/usePermissions';
 import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Select, TableColumnsType, Tag } from 'antd';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface FinancialCategory {
   id: number;
   categoryCode: string;
   categoryName: string;
-  type: 'THU' | 'CHI';
+  type: 'THU' | 'CHI' | 'BOTH';
   description: string;
   isActive: boolean;
   createdAt: string;
@@ -37,12 +37,12 @@ interface BankAccount {
 
 export default function FinancialCategoriesPage() {
   const { can } = usePermissions();
+  const router = useRouter();
   const [categories, setCategories] = useState<FinancialCategory[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FinancialCategory | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<FinancialCategory | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferData, setTransferData] = useState({
     sourceCategoryId: '',
@@ -63,7 +63,7 @@ export default function FinancialCategoriesPage() {
   const [formData, setFormData] = useState({
     categoryCode: '',
     categoryName: '',
-    type: 'THU' as 'THU' | 'CHI',
+    type: 'THU' as 'THU' | 'CHI' | 'BOTH',
     description: '',
     bankAccountId: undefined as number | undefined,
   });
@@ -375,6 +375,7 @@ export default function FinancialCategoriesPage() {
                   { label: 'Tất cả', value: 'ALL' },
                   { label: 'Thu', value: 'THU' },
                   { label: 'Chi', value: 'CHI' },
+                  { label: 'Thu & Chi', value: 'BOTH' },
                 ]}
               />
               <Select
@@ -402,7 +403,7 @@ export default function FinancialCategoriesPage() {
           columns={getVisibleColumns()}
           dataSource={filteredCategories as FinancialCategory[]}
           loading={loading}
-          onRowClick={(record: FinancialCategory) => setSelectedCategory(record)}
+          onRowClick={(record: FinancialCategory) => router.push(`/finance/categories/${record.id}`)}
           paging={true}
           pagination={{
             ...pagination,
@@ -466,6 +467,7 @@ export default function FinancialCategoriesPage() {
             >
               <option value="THU">Thu</option>
               <option value="CHI">Chi</option>
+              <option value="BOTH">Thu & Chi</option>
             </select>
           </div>
 
@@ -596,15 +598,6 @@ export default function FinancialCategoriesPage() {
           </div>
         </form>
       </Modal>
-
-      {/* Side Panel */}
-      {selectedCategory && (
-        <CategorySidePanel
-          category={selectedCategory}
-          onClose={() => setSelectedCategory(null)}
-          onUpdate={fetchCategories}
-        />
-      )}
     </>
   );
 }

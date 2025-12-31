@@ -2,13 +2,12 @@
 
 import CashbookSidePanel from '@/components/CashbookSidePanel';
 import CommonTable from '@/components/CommonTable';
-import Modal from '@/components/Modal';
 import WrapperContent from '@/components/WrapperContent';
 import { useFileExport } from '@/hooks/useFileExport';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
 import { ArrowDownOutlined, ArrowUpOutlined, CalendarOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { App, DatePicker, Segmented, Select, TableColumnsType, Tag } from 'antd';
+import { Modal as AntModal, App, Button, DatePicker, Form, Input, InputNumber, Segmented, Select, TableColumnsType, Tag } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 
@@ -51,7 +50,7 @@ interface FinancialCategory {
   id: number;
   categoryCode: string;
   categoryName: string;
-  type: 'THU' | 'CHI';
+  type: 'THU' | 'CHI' | 'BOTH';
 }
 
 interface BankAccount {
@@ -83,17 +82,8 @@ export default function CashBooksPage() {
   const [filterQueries, setFilterQueries] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
-
-  const [formData, setFormData] = useState({
-    transactionCode: '',
-    transactionDate: new Date().toISOString().split('T')[0],
-    financialCategoryId: '',
-    amount: '',
-    transactionType: 'THU' as 'THU' | 'CHI',
-    paymentMethod: 'CASH' as 'CASH' | 'BANK' | 'TRANSFER',
-    bankAccountId: '',
-    description: '',
-  });
+  const [submitting, setSubmitting] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     fetchCurrentUser();
@@ -177,50 +167,46 @@ export default function CashBooksPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = async (values: any) => {
+    setSubmitting(true);
     try {
       const res = await fetch('/api/finance/cashbooks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
-          amount: parseFloat(formData.amount),
-          financialCategoryId: parseInt(formData.financialCategoryId),
-          bankAccountId: formData.bankAccountId ? parseInt(formData.bankAccountId) : null,
+          transactionDate: values.transactionDate.format('YYYY-MM-DD'),
+          transactionType: values.transactionType,
+          financialCategoryId: values.financialCategoryId,
+          amount: values.amount,
+          bankAccountId: values.bankAccountId,
+          description: values.description,
         }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        alert('Tạo phiếu thu/chi thành công!');
+        message.success('Tạo phiếu thu/chi thành công!');
         setShowModal(false);
-        resetForm();
+        form.resetFields();
         fetchCashbooks();
-        fetchBankAccounts(); // Refresh để cập nhật số dư
+        fetchBankAccounts();
       } else {
-        alert(data.error || 'Có lỗi xảy ra');
+        message.error(data.error || 'Có lỗi xảy ra');
       }
     } catch (error) {
       console.error('Error saving cashbook:', error);
-      alert('Có lỗi xảy ra');
+      message.error('Có lỗi xảy ra');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-
-
   const resetForm = () => {
-    setFormData({
-      transactionCode: '',
-      transactionDate: new Date().toISOString().split('T')[0],
-      financialCategoryId: '',
-      amount: '',
+    form.resetFields();
+    form.setFieldsValue({
+      transactionDate: dayjs(),
       transactionType: 'THU',
-      paymentMethod: 'CASH',
-      bankAccountId: '',
-      description: '',
     });
   };
 
@@ -373,7 +359,8 @@ export default function CashBooksPage() {
     .filter(cb => cb.transactionType === 'CHI')
     .reduce((sum, cb) => sum + parseFloat(cb.amount.toString()), 0);
 
-  const filteredCategories = categories.filter(cat => cat.type === formData.transactionType);
+  const transactionType = Form.useWatch('transactionType', form);
+  const filteredCategories = categories.filter(cat => cat.type === transactionType || cat.type === 'BOTH');
 
   return (
     <>
@@ -554,117 +541,108 @@ export default function CashBooksPage() {
         </div>
       </WrapperContent>
 
-      {/* Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          resetForm();
-        }}
+      {/* Modal Ant Design */}
+      <AntModal
         title="Thêm phiếu thu/chi"
+        open={showModal}
+        onCancel={() => {
+          setShowModal(false);
+          form.resetFields();
+        }}
+        footer={null}
+        width={500}
+        destroyOnClose
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Ngày giao dịch *</label>
-            <input
-              type="date"
-              value={formData.transactionDate}
-              onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-            />
-          </div>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            transactionDate: dayjs(),
+            transactionType: 'THU',
+          }}
+        >
+          <Form.Item
+            name="transactionDate"
+            label="Ngày giao dịch"
+            rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
+          >
+            <DatePicker className="w-full" format="DD/MM/YYYY" />
+          </Form.Item>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Loại *</label>
+          <Form.Item
+            name="transactionType"
+            label="Loại"
+            rules={[{ required: true }]}
+          >
             <Segmented
               options={[
                 { label: (<span><ArrowDownOutlined className="text-green-600" /> Thu</span>), value: 'THU' },
                 { label: (<span><ArrowUpOutlined className="text-red-600" /> Chi</span>), value: 'CHI' },
               ]}
-              value={formData.transactionType}
-              onChange={(value) => setFormData({ ...formData, transactionType: value as 'THU' | 'CHI', financialCategoryId: '' })}
               block
+              onChange={() => form.setFieldValue('financialCategoryId', undefined)}
             />
-          </div>
+          </Form.Item>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Sổ quỹ *</label>
-            <select
-              value={formData.financialCategoryId}
-              onChange={(e) => setFormData({ ...formData, financialCategoryId: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-            >
-              <option value="">-- Chọn sổ quỹ --</option>
-              {filteredCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.categoryName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Số tiền *</label>
-            <input
-              type="number"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-              min="0"
-              step="0.01"
+          <Form.Item
+            name="financialCategoryId"
+            label="Sổ quỹ"
+            rules={[{ required: true, message: 'Vui lòng chọn sổ quỹ' }]}
+          >
+            <Select
+              placeholder="-- Chọn sổ quỹ --"
+              options={filteredCategories.map((cat) => ({
+                label: cat.categoryName,
+                value: cat.id,
+              }))}
             />
-          </div>
+          </Form.Item>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Tài khoản *</label>
-            <select
-              value={formData.bankAccountId}
-              onChange={(e) => setFormData({ ...formData, bankAccountId: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              required
-            >
-              <option value="">-- Chọn tài khoản --</option>
-              {bankAccounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.bankName} - {acc.accountNumber} (Số dư: {acc.balance.toLocaleString('vi-VN')} đ)
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Mô tả</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border rounded"
-              rows={3}
+          <Form.Item
+            name="amount"
+            label="Số tiền"
+            rules={[{ required: true, message: 'Vui lòng nhập số tiền' }]}
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as unknown as 0}
+              placeholder="Nhập số tiền"
             />
-          </div>
+          </Form.Item>
 
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowModal(false);
-                resetForm();
-              }}
-              className="px-4 py-2 border rounded hover:bg-gray-50"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Tạo mới
-            </button>
-          </div>
-        </form>
-      </Modal>
+          <Form.Item
+            name="bankAccountId"
+            label="Tài khoản"
+            rules={[{ required: true, message: 'Vui lòng chọn tài khoản' }]}
+          >
+            <Select
+              placeholder="-- Chọn tài khoản --"
+              options={bankAccounts.map((acc) => ({
+                label: `${acc.bankName} - ${acc.accountNumber} (Số dư: ${acc.balance.toLocaleString('vi-VN')} đ)`,
+                value: acc.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea rows={3} placeholder="Nhập mô tả..." />
+          </Form.Item>
+
+          <Form.Item className="mb-0 flex justify-end">
+            <div className="flex gap-2">
+              <Button onClick={() => { setShowModal(false); form.resetFields(); }}>
+                Hủy
+              </Button>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                Tạo mới
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </AntModal>
 
       {/* Side Panel */}
       {selectedCashbook && (

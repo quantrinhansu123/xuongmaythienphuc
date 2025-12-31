@@ -1,12 +1,16 @@
+'use client';
+
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatCurrency } from '@/utils/format';
-import React, { useEffect, useState } from 'react';
+import { CloseOutlined, DeleteOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
+import { Button, Card, Descriptions, Form, Input, Select, Space, Statistic, Table, Tag, Typography } from 'antd';
+import { useEffect, useState } from 'react';
 
 interface FinancialCategory {
   id: number;
   categoryCode: string;
   categoryName: string;
-  type: 'THU' | 'CHI';
+  type: 'THU' | 'CHI' | 'BOTH';
   description: string;
   isActive: boolean;
   createdAt: string;
@@ -24,13 +28,7 @@ interface Props {
 export default function CategorySidePanel({ category, onClose, onUpdate }: Props) {
   const { can } = usePermissions();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    categoryCode: category.categoryCode,
-    categoryName: category.categoryName,
-    type: category.type,
-    description: category.description,
-    bankAccountId: category.bankAccountId,
-  });
+  const [form] = Form.useForm();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
@@ -38,6 +36,20 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
   useEffect(() => {
     fetchBankAccounts();
   }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [category.id]);
+
+  useEffect(() => {
+    form.setFieldsValue({
+      categoryCode: category.categoryCode,
+      categoryName: category.categoryName,
+      type: category.type,
+      description: category.description,
+      bankAccountId: category.bankAccountId,
+    });
+  }, [category, form]);
 
   const fetchBankAccounts = async () => {
     try {
@@ -51,17 +63,10 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     }
   };
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [category.id]);
-
   const fetchTransactions = async () => {
     setLoadingTransactions(true);
     try {
-      // Fetch relevant transactions based on category type
-      const endpoint = `/api/finance/cashbooks?categoryId=${category.id}`;
-
-      const res = await fetch(endpoint);
+      const res = await fetch(`/api/finance/cashbooks?categoryId=${category.id}`);
       const data = await res.json();
       if (data.success) {
         setTransactions(data.data);
@@ -76,13 +81,12 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (values: any) => {
     try {
       const res = await fetch(`/api/finance/categories/${category.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (data.success) {
@@ -116,221 +120,191 @@ export default function CategorySidePanel({ category, onClose, onUpdate }: Props
     }
   };
 
+  const totalThu = transactions.filter(t => t.transactionType === 'THU').reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalChi = transactions.filter(t => t.transactionType === 'CHI').reduce((sum, t) => sum + Number(t.amount), 0);
+  const balance = totalThu - totalChi;
+
+  const transactionColumns = [
+    {
+      title: 'Ngày',
+      dataIndex: 'transactionDate',
+      key: 'transactionDate',
+      width: 100,
+      render: (date: string) => new Date(date).toLocaleDateString('vi-VN'),
+    },
+    {
+      title: 'Mã GD',
+      dataIndex: 'transactionCode',
+      key: 'transactionCode',
+      width: 110,
+      render: (code: string) => <Typography.Text code className="text-xs">{code}</Typography.Text>,
+    },
+    {
+      title: 'Số tiền',
+      dataIndex: 'amount',
+      key: 'amount',
+      width: 120,
+      align: 'right' as const,
+      render: (amount: number, record: any) => (
+        <Typography.Text strong style={{ color: record.transactionType === 'THU' ? '#52c41a' : '#ff4d4f' }}>
+          {record.transactionType === 'THU' ? '+' : '-'}{formatCurrency(amount)}
+        </Typography.Text>
+      ),
+    },
+  ];
+
+  const getTypeTag = (type: string) => {
+    if (type === 'THU') return <Tag color="green">Thu</Tag>;
+    if (type === 'CHI') return <Tag color="red">Chi</Tag>;
+    return <Tag color="blue">Thu & Chi</Tag>;
+  };
+
   return (
-    <div className="fixed right-0 top-0 h-full w-[600px] bg-white shadow-2xl border-l border-gray-200 overflow-y-auto z-40">
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
-        <div>
-          <h2 className="text-xl font-bold">Chi tiết sổ quỹ</h2>
-          <p className="text-sm text-gray-600">{category.categoryCode}</p>
+    <div className="fixed right-0 top-0 h-full w-[550px] bg-white shadow-2xl border-l border-gray-200 overflow-y-auto z-40">
+      {/* Header */}
+      <div className="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center z-10">
+        <div className="flex items-center gap-3">
+          <Typography.Title level={5} style={{ margin: 0 }}>
+            Chi tiết sổ quỹ
+          </Typography.Title>
+          {getTypeTag(category.type)}
         </div>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-        >
-          ×
-        </button>
+        <Button type="text" icon={<CloseOutlined />} onClick={onClose} />
       </div>
 
-      <div className="p-6 space-y-6">
+      {/* Content */}
+      <div className="p-4 space-y-4">
         {!isEditing ? (
           <>
-            <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Mã sổ quỹ:</span>
-                <span className="font-medium">{category.categoryCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Tên sổ quỹ:</span>
-                <span className="font-medium">{category.categoryName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Loại:</span>
-                <span className={`px-2 py-1 rounded text-xs ${category.type === 'THU' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                  {category.type}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Mô tả:</span>
-                <span className="font-medium">{category.description || '-'}</span>
-              </div>
-              {category.bankName && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">TK liên kết:</span>
-                  <span className="font-medium text-blue-600">
-                    {category.bankName} - {category.bankAccountNumber}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Trạng thái:</span>
-                <span className={`px-2 py-1 rounded text-xs ${category.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                  {category.isActive ? 'Hoạt động' : 'Ngừng'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Ngày tạo:</span>
-                <span className="font-medium">
+            {/* Thông tin sổ quỹ */}
+            <Card title="Thông tin sổ quỹ" size="small">
+              <Descriptions column={1} size="small" labelStyle={{ fontWeight: 500 }}>
+                <Descriptions.Item label="Mã sổ quỹ">
+                  <Typography.Text code>{category.categoryCode}</Typography.Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên sổ quỹ">
+                  <Typography.Text strong>{category.categoryName}</Typography.Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Loại">
+                  {getTypeTag(category.type)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Mô tả">{category.description || '-'}</Descriptions.Item>
+                {category.bankName && (
+                  <Descriptions.Item label="TK liên kết">
+                    <Typography.Text type="secondary">
+                      {category.bankName} - {category.bankAccountNumber}
+                    </Typography.Text>
+                  </Descriptions.Item>
+                )}
+                <Descriptions.Item label="Trạng thái">
+                  <Tag color={category.isActive ? 'green' : 'default'}>
+                    {category.isActive ? 'Hoạt động' : 'Ngừng'}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày tạo">
                   {new Date(category.createdAt).toLocaleString('vi-VN')}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Ngày tạo:</span>
-                <span className="font-medium">
-                  {new Date(category.createdAt).toLocaleString('vi-VN')}
-                </span>
-              </div>
-            </div>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
 
-            {/* Fund Metrics */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <div className="text-gray-500 mb-1 text-xs">Tổng thu</div>
-                <div className="text-lg font-bold text-green-600">
-                  {formatCurrency(transactions.filter(t => t.transactionType === 'THU').reduce((sum, t) => sum + Number(t.amount), 0))}
-                </div>
+            {/* Thống kê */}
+            <Card size="small">
+              <div className="grid grid-cols-3 gap-4">
+                <Statistic
+                  title="Tổng thu"
+                  value={totalThu}
+                  precision={0}
+                  valueStyle={{ color: '#52c41a', fontSize: 16 }}
+                  suffix="đ"
+                  formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
+                />
+                <Statistic
+                  title="Tổng chi"
+                  value={totalChi}
+                  precision={0}
+                  valueStyle={{ color: '#ff4d4f', fontSize: 16 }}
+                  suffix="đ"
+                  formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
+                />
+                <Statistic
+                  title="Số dư"
+                  value={balance}
+                  precision={0}
+                  valueStyle={{ color: '#1890ff', fontSize: 16 }}
+                  suffix="đ"
+                  formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
+                />
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <div className="text-gray-500 mb-1 text-xs">Tổng chi</div>
-                <div className="text-lg font-bold text-red-600">
-                  {formatCurrency(transactions.filter(t => t.transactionType === 'CHI').reduce((sum, t) => sum + Number(t.amount), 0))}
-                </div>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <div className="text-gray-500 mb-1 text-xs">Số dư</div>
-                <div className="text-lg font-bold text-blue-600">
-                  {formatCurrency(
-                    transactions.reduce((sum, t) => sum + (t.transactionType === 'THU' ? Number(t.amount) : -Number(t.amount)), 0)
-                  )}
-                </div>
-              </div>
-            </div>
+            </Card>
 
-            {/* Transaction History */}
-            <div className="mt-6">
-              <h3 className="font-semibold mb-3">Lịch sử giao dịch</h3>
-              {loadingTransactions ? (
-                <div className="text-center py-4">Đang tải...</div>
-              ) : transactions.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed rounded text-gray-500">
-                  Chưa có giao dịch
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {transactions.map(t => (
-                    <div key={t.id} className="flex justify-between items-center text-sm border-b pb-2">
-                      <div>
-                        <div className="font-medium">
-                          {new Date(t.transactionDate).toLocaleDateString('vi-VN')} - {t.transactionCode}
-                        </div>
-                        <div className="text-gray-500 text-xs truncate max-w-[200px]">
-                          {t.description}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`font-bold ${t.transactionType === 'THU' ? 'text-green-600' : 'text-red-600'}`}>
-                          {t.transactionType === 'THU' ? '+' : '-'}{formatCurrency(t.amount)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Lịch sử giao dịch */}
+            <Card title="Lịch sử giao dịch" size="small">
+              <Table
+                dataSource={transactions.map((t, idx) => ({ ...t, key: idx }))}
+                columns={transactionColumns}
+                loading={loadingTransactions}
+                pagination={{ pageSize: 5, size: 'small' }}
+                size="small"
+                locale={{ emptyText: 'Chưa có giao dịch' }}
+              />
+            </Card>
 
-            <div className="flex gap-2">
-              {can('finance.categories', 'edit') && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Sửa
-                </button>
-              )}
-              {can('finance.categories', 'delete') && (
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                >
-                  Xóa
-                </button>
-              )}
-            </div>
+            {/* Actions */}
+            <Card size="small">
+              <Space>
+                {can('finance.categories', 'edit') && (
+                  <Button type="primary" icon={<EditOutlined />} onClick={() => setIsEditing(true)}>
+                    Sửa
+                  </Button>
+                )}
+                {can('finance.categories', 'delete') && (
+                  <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
+                    Xóa
+                  </Button>
+                )}
+              </Space>
+            </Card>
           </>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Mã sổ quỹ</label>
-              <input
-                type="text"
-                value={formData.categoryCode}
-                onChange={(e) => setFormData({ ...formData, categoryCode: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Tên sổ quỹ</label>
-              <input
-                type="text"
-                value={formData.categoryName}
-                onChange={(e) => setFormData({ ...formData, categoryName: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Loại</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'THU' | 'CHI' })}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="THU">THU</option>
-                <option value="CHI">CHI</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Mô tả</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Tài khoản mặc định</label>
-              <select
-                value={formData.bankAccountId || ''}
-                onChange={(e) => setFormData({ ...formData, bankAccountId: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="">-- Không chọn --</option>
-                {bankAccounts.map((acc: any) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.bankName} - {acc.accountNumber}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Lưu
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-              >
-                Hủy
-              </button>
-            </div>
-          </form>
+          /* Edit Form */
+          <Card title="Chỉnh sửa sổ quỹ" size="small">
+            <Form form={form} layout="vertical" onFinish={handleSubmit}>
+              <Form.Item name="categoryCode" label="Mã sổ quỹ" rules={[{ required: true }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="categoryName" label="Tên sổ quỹ" rules={[{ required: true }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="type" label="Loại" rules={[{ required: true }]}>
+                <Select
+                  options={[
+                    { label: 'Thu', value: 'THU' },
+                    { label: 'Chi', value: 'CHI' },
+                    { label: 'Thu & Chi', value: 'BOTH' },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item name="description" label="Mô tả">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+              <Form.Item name="bankAccountId" label="Tài khoản mặc định">
+                <Select
+                  allowClear
+                  placeholder="-- Không chọn --"
+                  options={bankAccounts.map((acc: any) => ({
+                    label: `${acc.bankName} - ${acc.accountNumber}`,
+                    value: acc.id,
+                  }))}
+                />
+              </Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit" icon={<SaveOutlined />}>
+                  Lưu
+                </Button>
+                <Button onClick={() => setIsEditing(false)}>Hủy</Button>
+              </Space>
+            </Form>
+          </Card>
         )}
       </div>
     </div>
