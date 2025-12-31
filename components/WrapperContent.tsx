@@ -5,33 +5,33 @@ import LoaderApp from "@/components/LoaderApp";
 import { IParams } from "@/hooks/useFilter";
 import { useSetTitlePage } from "@/hooks/useSetTitlePage";
 import {
-    BREAK_POINT_WIDTH,
-    BreakpointEnum,
-    useWindowBreakpoint,
+  BREAK_POINT_WIDTH,
+  BreakpointEnum,
+  useWindowBreakpoint,
 } from "@/hooks/useWindowBreakPoint";
 import { ColumnSetting, FilterField } from "@/types";
 import { queriesToInvalidate } from "@/utils/refetchData";
 import {
-    ArrowLeftOutlined,
-    DeleteOutlined,
-    FilterOutlined,
-    SearchOutlined,
-    SettingOutlined,
-    SyncOutlined
+  ArrowLeftOutlined,
+  DeleteOutlined,
+  FilterOutlined,
+  SearchOutlined,
+  SettingOutlined,
+  SyncOutlined
 } from "@ant-design/icons";
 import {
-    AutoComplete,
-    Button,
-    Checkbox,
-    DatePicker,
-    Divider,
-    Empty,
-    Form,
-    Input,
-    Modal,
-    Popover,
-    Select,
-    Tooltip
+  AutoComplete,
+  Button,
+  Checkbox,
+  DatePicker,
+  Divider,
+  Empty,
+  Form,
+  Input,
+  Modal,
+  Popover,
+  Select,
+  Tooltip
 } from "antd";
 import debounce from "lodash/debounce";
 import { useRouter } from "next/navigation";
@@ -47,368 +47,15 @@ interface SearchSuggestion {
 interface SearchInputConfig {
   placeholder: string;
   filterKeys: (keyof any)[];
-  // Cấu hình suggestions (optional)
   suggestions?: {
-    apiEndpoint: string;           // API endpoint để fetch gợi ý
-    labelKey: string;              // Field hiển thị (vd: "customerName")
-    valueKey?: string;             // Field giá trị (vd: "customerCode")
-    descriptionKey?: string;       // Field mô tả phụ (vd: "phone")
-    minChars?: number;             // Số ký tự tối thiểu để bắt đầu search (default: 2)
-    maxResults?: number;           // Số kết quả tối đa (default: 10)
+    apiEndpoint: string;
+    labelKey: string;
+    valueKey?: string;
+    descriptionKey?: string;
+    minChars?: number;
+    maxResults?: number;
   };
 }
-
-interface LeftControlsProps {
-  isMobile: boolean;
-  header: {
-    buttonBackTo?: string;
-    customToolbar?: React.ReactNode;
-    customToolbarSecondRow?: React.ReactNode;
-    searchInput?: SearchInputConfig;
-    columnSettings?: {
-      columns: ColumnSetting[];
-      onReset?: () => void;
-      onChange: (columns: ColumnSetting[]) => void;
-    };
-    filters?: {
-      fields?: FilterField[];
-      showFiltersInline?: boolean;  // Hiển thị bộ lọc sẵn không cần ấn nút
-      onReset?: () => void;
-    };
-  };
-  isLoading: boolean;
-  isRefetching: boolean;
-  router: ReturnType<typeof useRouter>;
-  searchTerm: string;
-  setSearchTerm: (value: string) => void;
-  suggestions: SearchSuggestion[];
-  onSearchSuggestions: (value: string) => void;
-  isOpenColumnSettings: boolean;
-  setIsOpenColumnSettings: (value: boolean) => void;
-  hasActiveColumnSettings: boolean;
-  hasFilters: boolean;
-  hasActiveFilters: boolean;
-  handleResetFilters: () => void;
-  isFilterVisible: boolean;
-  setIsFilterVisible: (value: boolean) => void;
-  filterListNode?: React.ReactNode;
-}
-
-const LeftControls: React.FC<LeftControlsProps> = ({
-  isMobile,
-  header,
-  isLoading,
-  isRefetching,
-  router,
-  searchTerm,
-  setSearchTerm,
-  suggestions,
-  onSearchSuggestions,
-  isOpenColumnSettings,
-  setIsOpenColumnSettings,
-  hasActiveColumnSettings,
-  hasFilters,
-  hasActiveFilters,
-  handleResetFilters,
-  isFilterVisible,
-  setIsFilterVisible,
-  filterListNode,
-}) => {
-  if (isMobile) {
-    return (
-      <div className="flex-1 min-w-0">
-        {header.buttonBackTo && (
-          <Button
-            disabled={isLoading || isRefetching}
-            type="default"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => router.push(header.buttonBackTo!)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3 w-full">
-      <div className="flex items-center gap-3">
-        {header.buttonBackTo && (
-          <Button
-            disabled={isLoading || isRefetching}
-            type="default"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => router.push(header.buttonBackTo!)}
-          >
-            Quay lại
-          </Button>
-        )}
-
-        {header.searchInput && (
-          header.searchInput.suggestions ? (
-            <AutoComplete
-              style={{ minWidth: 200, maxWidth: 350, flex: '1 1 auto' }}
-              options={suggestions}
-              onSearch={onSearchSuggestions}
-              onSelect={(value) => setSearchTerm(value)}
-              value={searchTerm}
-              onChange={(value) => setSearchTerm(value)}
-              placeholder={header.searchInput.placeholder}
-            >
-              <Input prefix={<SearchOutlined />} allowClear />
-            </AutoComplete>
-          ) : (
-            <Input
-              style={{ minWidth: 200, maxWidth: 350, flex: '1 1 auto' }}
-              value={searchTerm}
-              placeholder={header.searchInput.placeholder}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              prefix={<SearchOutlined />}
-              allowClear
-            />
-          )
-        )}
-
-        {header.customToolbar && (
-          <div className="flex items-center gap-3 flex-wrap">{header.customToolbar}</div>
-        )}
-
-        {header.columnSettings && (
-          <Popover
-            trigger="click"
-            placement="bottomLeft"
-            content={
-              <div>
-                <div className=" flex  justify-between  items-center">
-                  <h3 className=" font-medium  mb-0">Cài đặt cột</h3>
-                  {header.columnSettings.onReset && (
-                    <Button
-                      disabled={isLoading || isRefetching}
-                      type="link"
-                      size="small"
-                      onClick={() => {
-                        if (header.columnSettings?.onReset) {
-                          header.columnSettings.onReset();
-                        }
-                      }}
-                    >
-                      Đặt lại
-                    </Button>
-                  )}
-                </div>
-                <Divider className=" my-2" />
-
-                <div className="grid grid-rows-5 grid-cols-3 gap-4">
-                  {header.columnSettings.columns.map((column) => (
-                    <Checkbox
-                      key={column.key}
-                      checked={column.visible}
-                      onChange={(e) => {
-                        const newColumns = header.columnSettings!.columns.map(
-                          (col) =>
-                            col.key === column.key
-                              ? { ...col, visible: e.target.checked }
-                              : col
-                        );
-                        header.columnSettings!.onChange(newColumns);
-                      }}
-                    >
-                      {column.title}
-                    </Checkbox>
-                  ))}
-                </div>
-              </div>
-            }
-            open={isOpenColumnSettings}
-            onOpenChange={setIsOpenColumnSettings}
-          >
-            <Tooltip title="Cài đặt cột">
-              <span>
-                <Button
-                  disabled={isLoading || isRefetching}
-                  type={hasActiveColumnSettings ? "primary" : "default"}
-                  icon={<SettingOutlined />}
-                />
-              </span>
-            </Tooltip>
-          </Popover>
-        )}
-
-        {hasFilters && header.filters?.onReset && (
-          <Tooltip title="Đặt lại bộ lọc">
-            <span>
-              <Button
-                disabled={isLoading || isRefetching}
-                onClick={handleResetFilters}
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </span>
-          </Tooltip>
-        )}
-      </div>
-
-      {/* Filter fields + customToolbarSecondRow cùng hàng */}
-      {(header.customToolbarSecondRow || filterListNode) && (
-        <div className="flex items-center gap-3 flex-wrap">
-          {filterListNode}
-          {header.customToolbarSecondRow}
-        </div>
-      )}
-    </div>
-  );
-};
-
-interface RightControlsProps {
-  isMobile: boolean;
-  header: {
-    refetchDataWithKeys?: string[] | readonly string[];
-    filters?: {
-      fields?: FilterField[];
-      onReset?: () => void;
-    };
-    customToolbar?: React.ReactNode;
-    buttonEnds?: {
-      can?: boolean;
-      danger?: boolean;
-      isLoading?: boolean;
-      type?: "link" | "default" | "text" | "primary" | "dashed" | undefined;
-      className?: string;
-      onClick?: () => void;
-      name: string;
-      icon: React.ReactNode;
-    }[];
-    searchInput?: SearchInputConfig;
-    columnSettings?: {
-      columns: ColumnSetting[];
-      onChange: (columns: ColumnSetting[]) => void;
-      onReset?: () => void;
-    };
-  };
-  isLoading: boolean;
-  isRefetching: boolean;
-  hasFilters: boolean;
-  handleResetFilters: () => void;
-  hasActiveFilters: boolean;
-  hasActiveColumnSettings: boolean;
-  setIsMobileOptionsOpen: (value: boolean) => void;
-  queriesToInvalidate: (keys: string[] | readonly string[]) => void;
-}
-
-const RightControls: React.FC<RightControlsProps> = ({
-  isMobile,
-  header,
-  isLoading,
-  isRefetching,
-  hasFilters,
-  handleResetFilters,
-  hasActiveColumnSettings,
-  setIsMobileOptionsOpen,
-  queriesToInvalidate,
-  hasActiveFilters,
-}) => {
-  const sortedEnds = (header.buttonEnds || []).slice().sort((a, b) => {
-    if (a.type === "primary" && b.type !== "primary") return 1;
-    if (a.type !== "primary" && b.type === "primary") return -1;
-    return 0;
-  });
-
-  if (isMobile) {
-    return (
-      <div className="flex gap-2 items-center">
-        {header.refetchDataWithKeys && (
-          <Tooltip title="Tải lại dữ liệu">
-            <span>
-              <Button
-                disabled={isLoading || isRefetching}
-                type="default"
-                icon={<SyncOutlined spin={isLoading || isRefetching} />}
-                onClick={() => {
-                  if (header.refetchDataWithKeys) {
-                    queriesToInvalidate(header.refetchDataWithKeys);
-                  }
-                }}
-              />
-            </span>
-          </Tooltip>
-        )}
-
-        {hasFilters && header.filters?.onReset && (
-          <Tooltip title="Đặt lại bộ lọc">
-            <span>
-              <Button
-                onClick={handleResetFilters}
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </span>
-          </Tooltip>
-        )}
-
-        {sortedEnds.map((buttonEnd, index) => {
-          if (!buttonEnd.can) return null;
-          return (
-            <Tooltip key={index} title={buttonEnd.name}>
-              <span>
-                <Button
-                  disabled={buttonEnd.isLoading}
-                  loading={buttonEnd.isLoading}
-                  danger={buttonEnd.danger}
-                  type={buttonEnd.type}
-                  className={buttonEnd.className}
-                  onClick={buttonEnd.onClick}
-                  icon={buttonEnd.icon}
-                />
-              </span>
-            </Tooltip>
-          );
-        })}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex gap-3 items-center">
-      {header.refetchDataWithKeys && (
-        <Tooltip title="Tải lại dữ liệu">
-          <span>
-            <Button
-              disabled={isLoading || isRefetching}
-              type="default"
-              icon={<SyncOutlined spin={isLoading || isRefetching} />}
-              onClick={() => {
-                if (header.refetchDataWithKeys) {
-                  queriesToInvalidate(header.refetchDataWithKeys);
-                }
-              }}
-            />
-          </span>
-        </Tooltip>
-      )}
-
-      {sortedEnds.map((buttonEnd, index) => (
-        <Tooltip key={index} title={buttonEnd.name}>
-          <span>
-            <Button
-              disabled={
-                isLoading || buttonEnd.type === "primary"
-                  ? isLoading
-                  : isRefetching
-              }
-              loading={buttonEnd.isLoading}
-              danger={buttonEnd.danger}
-              type={buttonEnd.type}
-              className={buttonEnd.className}
-              onClick={buttonEnd.onClick}
-              icon={buttonEnd.icon}
-            >
-              {buttonEnd.name}
-            </Button>
-          </span>
-        </Tooltip>
-      ))}
-    </div>
-  );
-};
 
 interface WrapperContentProps<T extends object> {
   title?: string;
@@ -437,7 +84,7 @@ interface WrapperContentProps<T extends object> {
     filters?: {
       fields?: FilterField[];
       query?: IParams;
-      showFiltersInline?: boolean;  // Hiển thị bộ lọc sẵn không cần ấn nút
+      showFiltersInline?: boolean;
       onApplyFilter: (arr: { key: string; value: any }[]) => void;
       onReset?: () => void;
     };
@@ -464,203 +111,355 @@ function WrapperContent<T extends object>({
   const [formFilter] = Form.useForm();
 
   useSetTitlePage(title || "");
-  // desktop filter visibility is controlled by toggle button
   const [isOpenColumnSettings, setIsOpenColumnSettings] = useState(false);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
-  const [isFilterVisible, setIsFilterVisible] = useState(
-    () => header.filters?.showFiltersInline ?? false
-  );
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const breakpoint = useWindowBreakpoint();
-  const isMobileView =
-    BREAK_POINT_WIDTH[breakpoint] <= BREAK_POINT_WIDTH[BreakpointEnum.LG];
+  const isMobile = BREAK_POINT_WIDTH[breakpoint] <= BREAK_POINT_WIDTH[BreakpointEnum.LG];
+
   const [searchTerm, setSearchTerm] = useState(() => {
-    if (header.searchInput && header.filters && header.filters.query) {
+    if (header.searchInput && header.filters?.query) {
       const keys = ["search", ...header.searchInput.filterKeys].join(",");
-      const query = header.filters.query;
-      const term = query[keys];
-      return term;
+      return header.filters.query[keys] || "";
     }
     return "";
   });
 
-  // Fetch suggestions từ API
+  // Fetch suggestions
   const fetchSuggestions = useCallback(
     debounce(async (value: string) => {
-      const suggestionsConfig = header.searchInput?.suggestions;
-      if (!suggestionsConfig) return;
+      const config = header.searchInput?.suggestions;
+      if (!config) return;
 
-      const minChars = suggestionsConfig.minChars ?? 2;
+      const minChars = config.minChars ?? 2;
       if (!value || value.length < minChars) {
         setSuggestions([]);
         return;
       }
 
       try {
-        const maxResults = suggestionsConfig.maxResults ?? 10;
-        const separator = suggestionsConfig.apiEndpoint.includes('?') ? '&' : '?';
-        const url = `${suggestionsConfig.apiEndpoint}${separator}search=${encodeURIComponent(value)}&limit=${maxResults}`;
+        const maxResults = config.maxResults ?? 10;
+        const separator = config.apiEndpoint.includes('?') ? '&' : '?';
+        const url = `${config.apiEndpoint}${separator}search=${encodeURIComponent(value)}&limit=${maxResults}`;
 
         const res = await fetch(url);
         const data = await res.json();
 
         if (data.success && Array.isArray(data.data)) {
-          const options: SearchSuggestion[] = data.data.map((item: any) => {
-            const label = item[suggestionsConfig.labelKey] || '';
-            const valueField = suggestionsConfig.valueKey
-              ? item[suggestionsConfig.valueKey]
-              : label;
-            const description = suggestionsConfig.descriptionKey
-              ? item[suggestionsConfig.descriptionKey]
-              : null;
+          setSuggestions(data.data.map((item: any) => {
+            const label = item[config.labelKey] || '';
+            const valueField = config.valueKey ? item[config.valueKey] : label;
+            const description = config.descriptionKey ? item[config.descriptionKey] : null;
 
             return {
               value: String(valueField),
               label: (
                 <div className="flex flex-col py-1">
                   <span className="font-medium">{label}</span>
-                  {description && (
-                    <span className="text-xs text-gray-500">{description}</span>
-                  )}
+                  {description && <span className="text-xs text-gray-500">{description}</span>}
                 </div>
               ),
               data: item,
             };
-          });
-          setSuggestions(options);
+          }));
         } else {
           setSuggestions([]);
         }
-      } catch (error) {
-        console.error('Error fetching suggestions:', error);
+      } catch {
         setSuggestions([]);
       }
     }, 300),
     [header.searchInput?.suggestions]
   );
 
-  const handleSearchSuggestions = (value: string) => {
-    if (header.searchInput?.suggestions) {
-      fetchSuggestions(value);
-    }
-  };
-
+  // Computed states
   const hasActiveFilters = Boolean(
     header.filters &&
     Object.entries(header.filters.query || {}).some(([key, value]) => {
-      if (typeof value === "string" && !key.includes("search"))
-        return value.trim() !== "";
+      if (typeof value === "string" && !key.includes("search")) return value.trim() !== "";
       if (Array.isArray(value)) return value.length > 0;
       return false;
     })
   );
-  const hasFilters = Boolean(
-    header.filters && Object.values(header.filters.query || {}).length > 0
-  );
+
+  const hasFilters = Boolean(header.filters && Object.values(header.filters.query || {}).length > 0);
+
   const hasActiveColumnSettings = Boolean(
-    header.columnSettings &&
-    header.columnSettings.columns.some((c) => c.visible === false)
+    header.columnSettings?.columns.some((c) => c.visible === false)
   );
 
   const handleResetFilters = () => {
-    if (header.filters?.onReset) {
-      header.filters.onReset();
-    }
+    header.filters?.onReset?.();
     formFilter.resetFields();
     setSearchTerm("");
   };
 
+  // Search debounce effect
   useEffect(() => {
-    if (!header.filters || typeof header.filters.onApplyFilter !== "function")
-      return;
-    const getSearchKey = () => {
-      if (header.searchInput && header.filters && header.filters.query) {
-        const keys = ["search", ...header.searchInput.filterKeys].join(",");
-        return keys;
-      }
-      return "search";
-    };
-    const searchKey = getSearchKey();
+    if (!header.filters?.onApplyFilter) return;
+
+    const searchKey = header.searchInput
+      ? ["search", ...header.searchInput.filterKeys].join(",")
+      : "search";
 
     const debounced = debounce((value: string) => {
-      header.filters!.onApplyFilter([{ key: searchKey, value: value }]);
+      header.filters!.onApplyFilter([{ key: searchKey, value }]);
     }, 500);
 
     debounced(searchTerm);
-
-    return () => {
-      debounced.cancel();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => debounced.cancel();
   }, [searchTerm]);
 
-  // Tạo FilterList node để truyền vào LeftControls (chỉ desktop)
-  const filterListNode = !isMobileView && header.filters?.fields && header.filters.fields.length > 0 ? (
-    <FilterList
-      isMobile={false}
-      form={formFilter}
-      fields={header.filters.fields}
-      onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
-    />
-  ) : null;
+  // Sort buttons: primary buttons last
+  const sortedButtons = (header.buttonEnds || []).slice().sort((a, b) => {
+    if (a.type === "primary" && b.type !== "primary") return 1;
+    if (a.type !== "primary" && b.type === "primary") return -1;
+    return 0;
+  });
 
-  return (
-    <div className={`space-y-4 w-full box-border ${className}`}>
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <LeftControls
-          isMobile={isMobileView}
-          header={header}
-          isLoading={isLoading}
-          isRefetching={isRefetching}
-          router={router}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          suggestions={suggestions}
-          onSearchSuggestions={handleSearchSuggestions}
-          isOpenColumnSettings={isOpenColumnSettings}
-          setIsOpenColumnSettings={setIsOpenColumnSettings}
-          hasActiveColumnSettings={hasActiveColumnSettings}
-          hasFilters={hasFilters}
-          hasActiveFilters={hasActiveFilters}
-          handleResetFilters={handleResetFilters}
-          isFilterVisible={isFilterVisible}
-          setIsFilterVisible={setIsFilterVisible}
-          filterListNode={filterListNode}
-        />
-        <RightControls
-          isMobile={isMobileView}
-          header={header}
-          isLoading={isLoading}
-          isRefetching={isRefetching}
-          hasFilters={hasFilters}
-          handleResetFilters={handleResetFilters}
-          hasActiveFilters={hasActiveFilters}
-          hasActiveColumnSettings={hasActiveColumnSettings}
-          setIsMobileOptionsOpen={setIsMobileOptionsOpen}
-          queriesToInvalidate={queriesToInvalidate}
-        />
-      </div>
+  const hasFilterFields = header.filters?.fields && header.filters.fields.length > 0;
 
-      {/* Mobile: Search bar + Filter button */}
-      {isMobileView && (header.searchInput || header.customToolbar || (header.filters?.fields && header.filters.fields.length > 0)) && (
-        <div className="flex gap-2 items-center w-full max-w-full overflow-hidden">
-          {/* Search input - chiếm phần lớn */}
-          {header.searchInput && (
-            <div className="flex-1 min-w-0 overflow-hidden">
-              {header.searchInput.suggestions ? (
+  // ========== DESKTOP LAYOUT ==========
+  if (!isMobile) {
+    const needsRow2 = hasFilterFields || header.customToolbarSecondRow;
+
+    return (
+      <div className={`space-y-3 w-full box-border ${className}`}>
+        {/* Row 1: Back + Search + ColumnSettings + customToolbar | Refresh + Buttons */}
+        <div className="flex items-center gap-3">
+          {/* LEFT */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {header.buttonBackTo && (
+              <Button
+                disabled={isLoading || isRefetching}
+                type="default"
+                icon={<ArrowLeftOutlined />}
+                onClick={() => router.push(header.buttonBackTo!)}
+              >
+                Quay lại
+              </Button>
+            )}
+
+            {header.searchInput && (
+              header.searchInput.suggestions ? (
                 <AutoComplete
-                  className="w-full"
+                  style={{ minWidth: 200, maxWidth: 300 }}
                   options={suggestions}
-                  onSearch={handleSearchSuggestions}
+                  onSearch={fetchSuggestions}
                   onSelect={(value) => setSearchTerm(value)}
                   value={searchTerm}
                   onChange={(value) => setSearchTerm(value)}
                   placeholder={header.searchInput.placeholder}
                 >
-                  <Input 
-                    prefix={<SearchOutlined />} 
-                    allowClear 
+                  <Input prefix={<SearchOutlined />} allowClear />
+                </AutoComplete>
+              ) : (
+                <Input
+                  style={{ minWidth: 200, maxWidth: 300 }}
+                  value={searchTerm}
+                  placeholder={header.searchInput.placeholder}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  prefix={<SearchOutlined />}
+                  allowClear
+                />
+              )
+            )}
+
+            {header.columnSettings && (
+              <Popover
+                trigger="click"
+                placement="bottomLeft"
+                open={isOpenColumnSettings}
+                onOpenChange={setIsOpenColumnSettings}
+                content={
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium mb-0">Cài đặt cột</h3>
+                      {header.columnSettings.onReset && (
+                        <Button type="link" size="small" onClick={header.columnSettings.onReset}>
+                          Đặt lại
+                        </Button>
+                      )}
+                    </div>
+                    <Divider className="my-2" />
+                    <div className="grid grid-rows-5 grid-cols-3 gap-4">
+                      {header.columnSettings.columns.map((column) => (
+                        <Checkbox
+                          key={column.key}
+                          checked={column.visible}
+                          onChange={(e) => {
+                            const newColumns = header.columnSettings!.columns.map((col) =>
+                              col.key === column.key ? { ...col, visible: e.target.checked } : col
+                            );
+                            header.columnSettings!.onChange(newColumns);
+                          }}
+                        >
+                          {column.title}
+                        </Checkbox>
+                      ))}
+                    </div>
+                  </div>
+                }
+              >
+                <Tooltip title="Cài đặt cột">
+                  <Button
+                    disabled={isLoading || isRefetching}
+                    type={hasActiveColumnSettings ? "primary" : "default"}
+                    icon={<SettingOutlined />}
                   />
+                </Tooltip>
+              </Popover>
+            )}
+
+            {header.customToolbar}
+          </div>
+
+          {/* RIGHT */}
+          <div className="flex items-center gap-3 flex-shrink-0 ml-6">
+            {header.refetchDataWithKeys && (
+              <Tooltip title="Tải lại dữ liệu">
+                <Button
+                  disabled={isLoading || isRefetching}
+                  type="default"
+                  icon={<SyncOutlined spin={isLoading || isRefetching} />}
+                  onClick={() => queriesToInvalidate(header.refetchDataWithKeys!)}
+                />
+              </Tooltip>
+            )}
+
+            {sortedButtons.map((btn, idx) => (
+              btn.can !== false && (
+                <Tooltip key={idx} title={btn.name}>
+                  <Button
+                    disabled={isLoading || (btn.type === "primary" ? isLoading : isRefetching)}
+                    loading={btn.isLoading}
+                    danger={btn.danger}
+                    type={btn.type}
+                    className={btn.className}
+                    onClick={btn.onClick}
+                    icon={btn.icon}
+                  >
+                    {btn.name}
+                  </Button>
+                </Tooltip>
+              )
+            ))}
+          </div>
+        </div>
+
+        {/* Row 2 (chỉ hiện khi có filter hoặc customToolbarSecondRow): FilterList | Reset */}
+        {needsRow2 && (
+          <div className="flex items-center gap-3">
+            {/* LEFT */}
+            <div className="flex items-center gap-3 flex-1 min-w-0 overflow-x-auto">
+              {hasFilterFields && (
+                <FilterList
+                  isMobile={false}
+                  form={formFilter}
+                  fields={header.filters!.fields!}
+                  onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
+                />
+              )}
+              {header.customToolbarSecondRow}
+            </div>
+
+            {/* RIGHT */}
+            {hasFilters && header.filters?.onReset && (
+              <div className="flex items-center gap-3 flex-shrink-0 ml-6">
+                <Tooltip title="Đặt lại bộ lọc">
+                  <Button
+                    disabled={isLoading || isRefetching}
+                    onClick={handleResetFilters}
+                    danger
+                    icon={<DeleteOutlined />}
+                  />
+                </Tooltip>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Content */}
+        {isNotAccessible && !isLoading && <AccessDenied />}
+        {isEmpty && !isNotAccessible && !isLoading && !isRefetching && (
+          <div className="flex min-h-[400px] items-center justify-center">
+            <Empty description="Không có dữ liệu" />
+          </div>
+        )}
+        {isLoading && !isRefetching && (
+          <div className="flex min-h-[400px] items-center justify-center">
+            <LoaderApp />
+          </div>
+        )}
+        {!isLoading && !isNotAccessible && !isEmpty && children}
+      </div>
+    );
+  }
+
+  // ========== MOBILE LAYOUT ==========
+  return (
+    <div className={`space-y-4 w-full box-border ${className}`}>
+      {/* Row 1: Back button | Refresh + Action Buttons */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          {header.buttonBackTo && (
+            <Button
+              disabled={isLoading || isRefetching}
+              type="default"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => router.push(header.buttonBackTo!)}
+            />
+          )}
+        </div>
+
+        <div className="flex gap-2 items-center">
+          {header.refetchDataWithKeys && (
+            <Button
+              disabled={isLoading || isRefetching}
+              type="default"
+              icon={<SyncOutlined spin={isLoading || isRefetching} />}
+              onClick={() => queriesToInvalidate(header.refetchDataWithKeys!)}
+            />
+          )}
+
+          {hasFilters && header.filters?.onReset && (
+            <Button onClick={handleResetFilters} danger icon={<DeleteOutlined />} />
+          )}
+
+          {sortedButtons.map((btn, idx) => (
+            btn.can !== false && (
+              <Tooltip key={idx} title={btn.name}>
+                <Button
+                  disabled={btn.isLoading}
+                  loading={btn.isLoading}
+                  danger={btn.danger}
+                  type={btn.type}
+                  className={btn.className}
+                  onClick={btn.onClick}
+                  icon={btn.icon}
+                />
+              </Tooltip>
+            )
+          ))}
+        </div>
+      </div>
+
+      {/* Row 2: Search + Filter button */}
+      {(header.searchInput || header.customToolbar || hasFilterFields || header.columnSettings) && (
+        <div className="flex gap-2 items-center w-full">
+          {header.searchInput && (
+            <div className="flex-1 min-w-0">
+              {header.searchInput.suggestions ? (
+                <AutoComplete
+                  className="w-full"
+                  options={suggestions}
+                  onSearch={fetchSuggestions}
+                  onSelect={(value) => setSearchTerm(value)}
+                  value={searchTerm}
+                  onChange={(value) => setSearchTerm(value)}
+                  placeholder={header.searchInput.placeholder}
+                >
+                  <Input prefix={<SearchOutlined />} allowClear />
                 </AutoComplete>
               ) : (
                 <Input
@@ -674,9 +473,8 @@ function WrapperContent<T extends object>({
               )}
             </div>
           )}
-          
-          {/* Nút mở filter - chỉ hiện khi có filter hoặc columnSettings */}
-          {(header.customToolbar || (header.filters?.fields && header.filters.fields.length > 0) || header.columnSettings) && (
+
+          {(header.customToolbar || hasFilterFields || header.columnSettings) && (
             <Button
               icon={<FilterOutlined />}
               onClick={() => setIsMobileOptionsOpen(true)}
@@ -687,7 +485,7 @@ function WrapperContent<T extends object>({
         </div>
       )}
 
-      {/* Mobile bottom sheet for filters + column settings */}
+      {/* Mobile Filter Modal */}
       <Modal
         title={null}
         open={isMobileOptionsOpen}
@@ -695,21 +493,8 @@ function WrapperContent<T extends object>({
         footer={null}
         destroyOnHidden
         closable={false}
-        styles={{
-          body: {
-            padding: 0,
-          },
-          mask: {
-            background: 'rgba(0, 0, 0, 0.45)',
-          },
-        }}
-        style={{
-          top: 'auto',
-          bottom: 0,
-          margin: 0,
-          maxWidth: '100vw',
-          paddingBottom: 0,
-        }}
+        styles={{ body: { padding: 0 }, mask: { background: 'rgba(0, 0, 0, 0.45)' } }}
+        style={{ top: 'auto', bottom: 0, margin: 0, maxWidth: '100vw', paddingBottom: 0 }}
         width="100%"
       >
         <div className="flex flex-col max-h-[80vh]">
@@ -718,7 +503,7 @@ function WrapperContent<T extends object>({
             <h3 className="font-semibold text-lg m-0">Bộ lọc</h3>
             <div className="flex gap-2">
               {(header.filters?.onReset || header.customToolbar) && (
-                <Button 
+                <Button
                   type="text"
                   danger
                   onClick={() => {
@@ -730,10 +515,7 @@ function WrapperContent<T extends object>({
                   Xóa lọc
                 </Button>
               )}
-              <Button 
-                type="primary"
-                onClick={() => setIsMobileOptionsOpen(false)}
-              >
+              <Button type="primary" onClick={() => setIsMobileOptionsOpen(false)}>
                 Xong
               </Button>
             </div>
@@ -741,28 +523,20 @@ function WrapperContent<T extends object>({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Custom toolbar filters (Select từ page) */}
-            {header.customToolbar && (
-              <div className="space-y-3">
-                {header.customToolbar}
-              </div>
-            )}
+            {header.customToolbar && <div className="space-y-3">{header.customToolbar}</div>}
 
-            {/* Filter fields */}
-            {header.filters?.fields && header.filters.fields.length > 0 && (
+            {hasFilterFields && (
               <Form form={formFilter} layout="vertical" className="space-y-3">
-                {header.filters.fields.map((field) => {
+                {header.filters!.fields!.map((field) => {
                   switch (field.type) {
                     case "input":
                       return (
                         <Form.Item key={field.name} name={field.name} label={field.label} className="mb-0">
-                          <Input 
-                            placeholder={field.placeholder || field.label} 
-                            allowClear 
+                          <Input
+                            placeholder={field.placeholder || field.label}
+                            allowClear
                             size="large"
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                              header.filters?.onApplyFilter([{ key: field.name, value: e.target.value }]);
-                            }}
+                            onChange={(e) => header.filters?.onApplyFilter([{ key: field.name, value: e.target.value }])}
                           />
                         </Form.Item>
                       );
@@ -776,12 +550,10 @@ function WrapperContent<T extends object>({
                             allowClear
                             size="large"
                             showSearch
-                            filterOption={(input: string, option: { label?: string } | undefined) =>
+                            filterOption={(input, option) =>
                               (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
                             }
-                            onChange={(value: string | string[] | undefined) => {
-                              header.filters?.onApplyFilter([{ key: field.name, value: value ?? "" }]);
-                            }}
+                            onChange={(value) => header.filters?.onApplyFilter([{ key: field.name, value: value ?? "" }])}
                           />
                         </Form.Item>
                       );
@@ -793,23 +565,19 @@ function WrapperContent<T extends object>({
                             placeholder={field.placeholder || field.label}
                             size="large"
                             inputReadOnly
-                            onChange={(date: unknown) => {
-                              header.filters?.onApplyFilter([{ key: field.name, value: date }]);
-                            }}
+                            onChange={(date) => header.filters?.onApplyFilter([{ key: field.name, value: date }])}
                           />
                         </Form.Item>
                       );
                     case "dateRange":
                       return (
                         <Form.Item key={field.name} name={field.name} label={field.label} className="mb-0">
-                          <DatePicker.RangePicker 
+                          <DatePicker.RangePicker
                             className="w-full"
                             size="large"
                             inputReadOnly
                             placeholder={["Từ ngày", "Đến ngày"]}
-                            onChange={(dates: unknown) => {
-                              header.filters?.onApplyFilter([{ key: field.name, value: dates }]);
-                            }}
+                            onChange={(dates) => header.filters?.onApplyFilter([{ key: field.name, value: dates }])}
                           />
                         </Form.Item>
                       );
@@ -820,7 +588,6 @@ function WrapperContent<T extends object>({
               </Form>
             )}
 
-            {/* Column Settings */}
             {header.columnSettings && (
               <div className="space-y-3 pt-4 border-t">
                 <div className="flex justify-between items-center">
@@ -829,35 +596,24 @@ function WrapperContent<T extends object>({
                     <span className="font-medium">Hiển thị cột</span>
                   </div>
                   {header.columnSettings.onReset && (
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={() => header.columnSettings?.onReset?.()}
-                      className="text-gray-500 p-0"
-                    >
+                    <Button type="link" size="small" onClick={header.columnSettings.onReset} className="text-gray-500 p-0">
                       Đặt lại
                     </Button>
                   )}
                 </div>
-                
                 <div className="grid grid-cols-2 gap-2">
                   {header.columnSettings.columns.map((column) => (
                     <label
                       key={column.key}
                       className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        column.visible 
-                          ? 'bg-blue-50 border-blue-200' 
-                          : 'bg-gray-50 border-gray-200'
+                        column.visible ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
                       }`}
                     >
                       <Checkbox
                         checked={column.visible}
                         onChange={(e) => {
-                          const newColumns = header.columnSettings!.columns.map(
-                            (col) =>
-                              col.key === column.key
-                                ? { ...col, visible: e.target.checked }
-                                : col
+                          const newColumns = header.columnSettings!.columns.map((col) =>
+                            col.key === column.key ? { ...col, visible: e.target.checked } : col
                           );
                           header.columnSettings!.onChange(newColumns);
                         }}
@@ -871,6 +627,8 @@ function WrapperContent<T extends object>({
           </div>
         </div>
       </Modal>
+
+      {/* Content */}
       {isNotAccessible && !isLoading && <AccessDenied />}
       {isEmpty && !isNotAccessible && !isLoading && !isRefetching && (
         <div className="flex min-h-[400px] items-center justify-center">

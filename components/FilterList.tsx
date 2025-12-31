@@ -138,9 +138,8 @@ export const FilterList: React.FC<FilterListProps> = ({
       form={form} 
       layout="inline" 
       onValuesChange={handleValueChange}
-      className="w-full"
     >
-      <div className="flex gap-2 items-center flex-wrap">
+      <div className="flex gap-2 items-center">
         {fields.map((field) => renderField(field))}
       </div>
     </Form>
