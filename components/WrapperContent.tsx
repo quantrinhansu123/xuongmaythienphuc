@@ -14,10 +14,9 @@ import { queriesToInvalidate } from "@/utils/refetchData";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
-  FilterOutlined,
   SearchOutlined,
   SettingOutlined,
-  SyncOutlined,
+  SyncOutlined
 } from "@ant-design/icons";
 import {
   AutoComplete,
@@ -112,7 +111,7 @@ const LeftControls: React.FC<LeftControlsProps> = ({
 }) => {
   if (isMobile) {
     return (
-      <div>
+      <div className="flex-1 min-w-0">
         {header.buttonBackTo && (
           <Button
             disabled={isLoading || isRefetching}
@@ -166,17 +165,6 @@ const LeftControls: React.FC<LeftControlsProps> = ({
 
         {header.customToolbar && (
           <div className="flex items-center gap-3 flex-wrap">{header.customToolbar}</div>
-        )}
-
-        {header.filters && header.filters.fields && !header.filters.showFiltersInline && (
-          <Tooltip title={isFilterVisible ? "Ẩn bộ lọc" : "Hiển thị bộ lọc"}>
-            <Button
-              disabled={isLoading || isRefetching}
-              type={isFilterVisible ? "primary" : "default"}
-              icon={<FilterOutlined />}
-              onClick={() => setIsFilterVisible(!isFilterVisible)}
-            />
-          </Tooltip>
         )}
 
         {header.columnSettings && (
@@ -266,6 +254,7 @@ interface RightControlsProps {
   header: {
     refetchDataWithKeys?: string[] | readonly string[];
     filters?: {
+      fields?: FilterField[];
       onReset?: () => void;
     };
     buttonEnds?: {
@@ -322,7 +311,7 @@ const RightControls: React.FC<RightControlsProps> = ({
               <Button
                 disabled={isLoading || isRefetching}
                 type="default"
-                icon={<SyncOutlined spin={isLoading} />}
+                icon={<SyncOutlined spin={isLoading || isRefetching} />}
                 onClick={() => {
                   if (header.refetchDataWithKeys) {
                     queriesToInvalidate(header.refetchDataWithKeys);
@@ -337,7 +326,6 @@ const RightControls: React.FC<RightControlsProps> = ({
           <Tooltip title="Đặt lại bộ lọc">
             <span>
               <Button
-                disabled={isLoading || isRefetching}
                 onClick={handleResetFilters}
                 danger
                 icon={<DeleteOutlined />}
@@ -352,7 +340,7 @@ const RightControls: React.FC<RightControlsProps> = ({
             <Tooltip key={index} title={buttonEnd.name}>
               <span>
                 <Button
-                  disabled={isLoading || isRefetching || buttonEnd.can}
+                  disabled={buttonEnd.isLoading}
                   loading={buttonEnd.isLoading}
                   danger={buttonEnd.danger}
                   type={buttonEnd.type}
@@ -365,19 +353,12 @@ const RightControls: React.FC<RightControlsProps> = ({
           );
         })}
 
-        {(header.searchInput || header.filters || header.columnSettings) && (
-          <Tooltip title="Tùy chọn">
-            <Button
-              disabled={isLoading || isRefetching}
-              type={
-                hasActiveFilters || hasActiveColumnSettings
-                  ? "primary"
-                  : "default"
-              }
-              icon={<FilterOutlined />}
-              onClick={() => setIsMobileOptionsOpen(true)}
-            />
-          </Tooltip>
+        {header.columnSettings && (
+          <Button
+            type={hasActiveColumnSettings ? "primary" : "default"}
+            icon={<SettingOutlined />}
+            onClick={() => setIsMobileOptionsOpen(true)}
+          />
         )}
       </div>
     );
@@ -647,33 +628,10 @@ function WrapperContent<T extends object>({
         />
       </div>
 
-      {/* Desktop inline filter panel (always visible on desktop) */}
-      {!isMobileView &&
-        header.filters &&
-        header.filters.fields &&
-        isFilterVisible && (
-          <div className="mt-4">
-            <FilterList
-              isMobile={isMobileView}
-              form={formFilter}
-              fields={header.filters?.fields || []}
-              onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
-              onReset={() =>
-                header.filters?.onReset && header.filters.onReset()
-              }
-            />
-          </div>
-        )}
-
-      {/* Mobile modal for filters / settings */}
-      <Modal
-        title="Tùy chọn"
-        open={isMobileOptionsOpen}
-        onCancel={() => setIsMobileOptionsOpen(false)}
-        footer={null}
-        destroyOnHidden
-      >
-        <div className="space-y-4">
+      {/* Mobile inline toolbar (search + custom filters + filter fields) */}
+      {isMobileView && (header.searchInput || header.customToolbar || (header.filters?.fields && header.filters.fields.length > 0)) && (
+        <div className="space-y-3">
+          {/* Search input */}
           {header.searchInput && (
             header.searchInput.suggestions ? (
               <AutoComplete
@@ -685,7 +643,11 @@ function WrapperContent<T extends object>({
                 onChange={(value) => setSearchTerm(value)}
                 placeholder={header.searchInput.placeholder}
               >
-                <Input prefix={<SearchOutlined />} allowClear />
+                <Input 
+                  prefix={<SearchOutlined />} 
+                  allowClear 
+                  size="large"
+                />
               </AutoComplete>
             ) : (
               <Input
@@ -694,64 +656,136 @@ function WrapperContent<T extends object>({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 prefix={<SearchOutlined />}
                 allowClear
+                size="large"
               />
             )
           )}
-
-          {header.filters && header.filters.fields && (
-            <FilterList
-              isMobile={isMobileView}
-              form={formFilter}
-              onCancel={() => setIsMobileOptionsOpen(false)}
-              fields={header.filters?.fields || []}
-              onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
-              onReset={() =>
-                header.filters?.onReset && header.filters.onReset()
-              }
-            />
-          )}
-          <Divider className=" my-2" />
-
-          {header.columnSettings && (
-            <div>
-              <div className=" flex  justify-between  items-center">
-                <h3 className=" font-medium  mb-0">Cài đặt cột</h3>
-                {header.columnSettings.onReset && (
-                  <Button
-                    disabled={isLoading || isRefetching}
-                    type="link"
-                    size="small"
-                    onClick={() =>
-                      header.columnSettings?.onReset &&
-                      header.columnSettings.onReset()
-                    }
-                  >
-                    Đặt lại
-                  </Button>
-                )}
-              </div>
-              <Divider className=" my-2" />
-              <div className="grid grid-rows-5 grid-cols-2 justify-between gap-4">
-                {header.columnSettings.columns.map((column) => (
-                  <Checkbox
-                    key={column.key}
-                    checked={column.visible}
-                    onChange={(e) => {
-                      const newColumns = header.columnSettings!.columns.map(
-                        (col) =>
-                          col.key === column.key
-                            ? { ...col, visible: e.target.checked }
-                            : col
-                      );
-                      header.columnSettings!.onChange(newColumns);
-                    }}
-                  >
-                    {column.title}
-                  </Checkbox>
-                ))}
-              </div>
+          
+          {/* Custom toolbar (inline filters) */}
+          {header.customToolbar && (
+            <div className="flex gap-2 items-center overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+              {header.customToolbar}
             </div>
           )}
+
+          {/* Filter fields inline */}
+          {header.filters?.fields && header.filters.fields.length > 0 && (
+            <FilterList
+              isMobile={true}
+              form={formFilter}
+              fields={header.filters.fields}
+              onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
+              onReset={() => {
+                header.filters?.onReset?.();
+                setSearchTerm("");
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Desktop inline toolbar */}
+      {!isMobileView && (header.filters?.fields && header.filters.fields.length > 0) && (
+        <FilterList
+          isMobile={false}
+          form={formFilter}
+          fields={header.filters.fields}
+          onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
+          onReset={() => {
+            header.filters?.onReset?.();
+            setSearchTerm("");
+          }}
+        />
+      )}
+
+      {/* Mobile bottom sheet for column settings only */}
+      <Modal
+        title={null}
+        open={isMobileOptionsOpen}
+        onCancel={() => setIsMobileOptionsOpen(false)}
+        footer={null}
+        destroyOnHidden
+        closable={false}
+        styles={{
+          body: {
+            padding: 0,
+          },
+          mask: {
+            background: 'rgba(0, 0, 0, 0.45)',
+          },
+        }}
+        style={{
+          top: 'auto',
+          bottom: 0,
+          margin: 0,
+          maxWidth: '100vw',
+          paddingBottom: 0,
+        }}
+        width="100%"
+      >
+        <div className="flex flex-col max-h-[70vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
+            <h3 className="font-semibold text-lg m-0">Cài đặt hiển thị</h3>
+            <Button 
+              type="text" 
+              onClick={() => setIsMobileOptionsOpen(false)}
+              className="text-gray-500"
+            >
+              Đóng
+            </Button>
+          </div>
+
+          {/* Content - Column Settings only */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {header.columnSettings && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <SettingOutlined className="text-gray-500" />
+                    <span className="font-medium">Hiển thị cột</span>
+                  </div>
+                  {header.columnSettings.onReset && (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => header.columnSettings?.onReset?.()}
+                      className="text-gray-500 p-0"
+                    >
+                      Đặt lại
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {header.columnSettings.columns.map((column) => (
+                    <label
+                      key={column.key}
+                      className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        column.visible 
+                          ? 'bg-blue-50 border-blue-200' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={column.visible}
+                        onChange={(e) => {
+                          const newColumns = header.columnSettings!.columns.map(
+                            (col) =>
+                              col.key === column.key
+                                ? { ...col, visible: e.target.checked }
+                                : col
+                          );
+                          header.columnSettings!.onChange(newColumns);
+                        }}
+                      />
+                      <span className="text-sm truncate">{column.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
       {isNotAccessible && !isLoading && <AccessDenied />}

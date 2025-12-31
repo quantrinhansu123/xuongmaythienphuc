@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FilterField } from "@/types";
+import { DeleteOutlined } from "@ant-design/icons";
 import {
   Button,
-  Card,
   DatePicker,
-  Divider,
-  Empty,
   Form,
   Input,
   Select,
@@ -16,7 +14,6 @@ interface FilterListProps {
   fields: FilterField[];
   onApplyFilter: (arr: { key: string; value: any }[]) => void;
   onReset?: () => void;
-  onCancel?: () => void;
   form: FormInstance<any>;
   isMobile: boolean;
 }
@@ -25,10 +22,21 @@ export const FilterList: React.FC<FilterListProps> = ({
   fields,
   onApplyFilter,
   onReset,
-  onCancel = () => { },
   isMobile,
   form,
 }) => {
+  // Auto apply filter khi giá trị thay đổi
+  const handleValueChange = (changedValues: Record<string, any>) => {
+    const payload: { key: string; value: any }[] = [];
+    const allValues = form.getFieldsValue();
+    
+    Object.entries(allValues).forEach(([key, value]) => {
+      payload.push({ key, value: value ?? "" });
+    });
+    
+    onApplyFilter(payload);
+  };
+
   const handleReset = () => {
     form.resetFields();
     if (onReset) {
@@ -36,31 +44,31 @@ export const FilterList: React.FC<FilterListProps> = ({
     }
   };
 
-  const handleFinish = (values: Record<string, any>) => {
-    const payload: {
-      key: string;
-      value: any;
-    }[] = [];
-    Object.entries(values).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        payload.push({ key, value });
-      }
-    });
-    onApplyFilter(payload);
-    onCancel();
-  };
+  // Đếm số filter đang active
+  const activeCount = Object.values(form.getFieldsValue() || {}).filter(v => {
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === 'string') return v.trim() !== '';
+    return v !== undefined && v !== null;
+  }).length;
 
   const renderField = (field: FilterField) => {
+    const size = isMobile ? "middle" : "middle";
+    const style = { minWidth: isMobile ? 140 : 160 };
+
     switch (field.type) {
       case "input":
         return (
           <Form.Item
             key={field.name}
             name={field.name}
-            label={field.label}
-            className=" mb-4"
+            className="mb-0"
           >
-            <Input placeholder={field.placeholder || field.label} allowClear />
+            <Input 
+              placeholder={field.placeholder || field.label} 
+              allowClear 
+              size={size}
+              style={style}
+            />
           </Form.Item>
         );
 
@@ -69,14 +77,20 @@ export const FilterList: React.FC<FilterListProps> = ({
           <Form.Item
             key={field.name}
             name={field.name}
-            label={field.label}
-            className=" mb-4"
+            className="mb-0"
           >
             <Select
               mode={field.isMultiple ? "multiple" : undefined}
               options={field.options || []}
-              placeholder={field.placeholder || `Chọn ${field.label}`}
+              placeholder={field.placeholder || field.label}
               allowClear
+              size={size}
+              style={style}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+              maxTagCount={1}
             />
           </Form.Item>
         );
@@ -86,12 +100,13 @@ export const FilterList: React.FC<FilterListProps> = ({
           <Form.Item
             key={field.name}
             name={field.name}
-            label={field.label}
-            className=" mb-4"
+            className="mb-0"
           >
             <DatePicker
-              className=" w-full"
               placeholder={field.placeholder || field.label}
+              size={size}
+              style={style}
+              inputReadOnly={isMobile}
             />
           </Form.Item>
         );
@@ -101,10 +116,14 @@ export const FilterList: React.FC<FilterListProps> = ({
           <Form.Item
             key={field.name}
             name={field.name}
-            label={field.label}
-            className=" mb-4"
+            className="mb-0"
           >
-            <DatePicker.RangePicker className=" w-full" />
+            <DatePicker.RangePicker 
+              size={size}
+              style={{ minWidth: isMobile ? 200 : 240 }}
+              inputReadOnly={isMobile}
+              placeholder={["Từ ngày", "Đến ngày"]}
+            />
           </Form.Item>
         );
 
@@ -114,35 +133,31 @@ export const FilterList: React.FC<FilterListProps> = ({
   };
 
   if (fields.length === 0) {
-    return <Empty description="Không có bộ lọc nào" />;
+    return null;
   }
 
   return (
-    <Card>
-      <div className=" flex  justify-between  items-center">
-        <h3 className=" font-medium  mb-0">Bộ lọc</h3>
-        {isMobile && (
+    <Form 
+      form={form} 
+      layout="inline" 
+      onValuesChange={handleValueChange}
+      className="w-full"
+    >
+      <div className={`flex gap-2 items-center ${isMobile ? 'overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin' : 'flex-wrap'}`}>
+        {fields.map((field) => renderField(field))}
+        
+        {onReset && activeCount > 0 && (
           <Button
-            type="link"
             onClick={handleReset}
-            className="text-blue-600 hover:text-blue-800 p-0 h-auto"
+            icon={<DeleteOutlined />}
+            danger
+            type="text"
+            size="middle"
           >
-            Đặt lại
+            {!isMobile && "Xóa lọc"}
           </Button>
         )}
       </div>
-      <Divider className=" my-2" />
-      <Form layout="vertical" form={form} onFinish={handleFinish}>
-        <div className={isMobile ? "" : "grid grid-cols-2 gap-x-4 w"}>
-          {fields.map((field) => renderField(field))}
-        </div>
-
-        <div className="flex justify-end gap-2 mt-2">
-          <Button type="primary" htmlType="submit">
-            Áp dụng
-          </Button>
-        </div>
-      </Form>
-    </Card>
+    </Form>
   );
 };
