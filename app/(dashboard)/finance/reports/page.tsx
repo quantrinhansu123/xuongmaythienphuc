@@ -8,21 +8,21 @@ import { DatePicker, Select } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from 'recharts';
 
 const { RangePicker } = DatePicker;
@@ -253,37 +253,37 @@ export default function FinanceReportsPage() {
         <div className="space-y-6">
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-              <div className="text-sm text-green-600 mb-1">Tổng thu</div>
-              <div className="text-2xl font-bold text-green-700">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-4 border border-green-200">
+              <div className="text-xs sm:text-sm text-green-600 mb-1">Tổng thu</div>
+              <div className="text-lg sm:text-2xl font-bold text-green-700 truncate">
                 {formatCurrency(summary.totalRevenue)}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
-              <div className="text-sm text-red-600 mb-1">Tổng chi</div>
-              <div className="text-2xl font-bold text-red-700">
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-3 sm:p-4 border border-red-200">
+              <div className="text-xs sm:text-sm text-red-600 mb-1">Tổng chi</div>
+              <div className="text-lg sm:text-2xl font-bold text-red-700 truncate">
                 {formatCurrency(summary.totalExpense)}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-              <div className="text-sm text-blue-600 mb-1">Lợi nhuận</div>
-              <div className={`text-2xl font-bold ${summary.netProfit >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
+              <div className="text-xs sm:text-sm text-blue-600 mb-1">Lợi nhuận</div>
+              <div className={`text-lg sm:text-2xl font-bold truncate ${summary.netProfit >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
                 {formatCurrency(summary.netProfit)}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-              <div className="text-sm text-purple-600 mb-1">Tổng tiền mặt & NH</div>
-              <div className="text-2xl font-bold text-purple-700">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 sm:p-4 border border-purple-200">
+              <div className="text-xs sm:text-sm text-purple-600 mb-1">Tổng tiền mặt & NH</div>
+              <div className="text-lg sm:text-2xl font-bold text-purple-700 truncate">
                 {formatCurrency(summary.cashBalance + summary.bankBalance)}
               </div>
             </div>
           </div>
 
           {/* Monthly Trend Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Xu hướng thu chi theo tháng</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-4">Xu hướng thu chi theo tháng</h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
               <LineChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
@@ -298,9 +298,9 @@ export default function FinanceReportsPage() {
           </div>
 
           {/* Revenue vs Expense Bar Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">So sánh thu chi</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-4">So sánh thu chi</h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
@@ -314,10 +314,10 @@ export default function FinanceReportsPage() {
           </div>
 
           {/* Category Breakdown - Pie Charts */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Cơ cấu thu nhập</h3>
-              <ResponsiveContainer width="100%" height={300}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Cơ cấu thu nhập</h3>
+              <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
                 <PieChart>
                   <Pie
                     data={revenueCategories}
@@ -338,9 +338,9 @@ export default function FinanceReportsPage() {
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Cơ cấu chi phí</h3>
-              <ResponsiveContainer width="100%" height={300}>
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Cơ cấu chi phí</h3>
+              <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
                 <PieChart>
                   <Pie
                     data={expenseCategories}
@@ -363,9 +363,9 @@ export default function FinanceReportsPage() {
           </div>
 
           {/* Cash Flow Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Dòng tiền</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-4">Dòng tiền</h3>
+            <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
               <AreaChart data={cashFlowData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
@@ -380,49 +380,49 @@ export default function FinanceReportsPage() {
           </div>
 
           {/* Debt Summary */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Công nợ phải thu</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Công nợ phải thu</h3>
               <div className="text-center">
-                <div className="text-4xl font-bold text-orange-600 mb-2">
+                <div className="text-2xl sm:text-4xl font-bold text-orange-600 mb-2 truncate">
                   {formatCurrency(summary.totalReceivable)}
                 </div>
-                <div className="text-sm text-gray-600">Tổng công nợ khách hàng</div>
+                <div className="text-xs sm:text-sm text-gray-600">Tổng công nợ khách hàng</div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Công nợ phải trả</h3>
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Công nợ phải trả</h3>
               <div className="text-center">
-                <div className="text-4xl font-bold text-red-600 mb-2">
+                <div className="text-2xl sm:text-4xl font-bold text-red-600 mb-2 truncate">
                   {formatCurrency(summary.totalPayable)}
                 </div>
-                <div className="text-sm text-gray-600">Tổng công nợ nhà cung cấp</div>
+                <div className="text-xs sm:text-sm text-gray-600">Tổng công nợ nhà cung cấp</div>
               </div>
             </div>
           </div>
 
           {/* Financial Health Indicators */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Chỉ số tài chính</h3>
-            <div className="grid grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-gray-50 rounded">
-                <div className="text-sm text-gray-600 mb-2">Tỷ suất lợi nhuận</div>
-                <div className="text-2xl font-bold text-blue-600">
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-4">Chỉ số tài chính</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+              <div className="text-center p-3 sm:p-4 bg-gray-50 rounded">
+                <div className="text-xs sm:text-sm text-gray-600 mb-2">Tỷ suất lợi nhuận</div>
+                <div className="text-xl sm:text-2xl font-bold text-blue-600">
                   {summary.totalRevenue > 0 
                     ? ((summary.netProfit / summary.totalRevenue) * 100).toFixed(1) 
                     : 0}%
                 </div>
               </div>
-              <div className="text-center p-4 bg-gray-50 rounded">
-                <div className="text-sm text-gray-600 mb-2">Tiền mặt</div>
-                <div className="text-2xl font-bold text-green-600">
+              <div className="text-center p-3 sm:p-4 bg-gray-50 rounded">
+                <div className="text-xs sm:text-sm text-gray-600 mb-2">Tiền mặt</div>
+                <div className="text-xl sm:text-2xl font-bold text-green-600 truncate">
                   {formatCurrency(summary.cashBalance)}
                 </div>
               </div>
-              <div className="text-center p-4 bg-gray-50 rounded">
-                <div className="text-sm text-gray-600 mb-2">Tiền ngân hàng</div>
-                <div className="text-2xl font-bold text-purple-600">
+              <div className="text-center p-3 sm:p-4 bg-gray-50 rounded">
+                <div className="text-xs sm:text-sm text-gray-600 mb-2">Tiền ngân hàng</div>
+                <div className="text-xl sm:text-2xl font-bold text-purple-600 truncate">
                   {formatCurrency(summary.bankBalance)}
                 </div>
               </div>

@@ -215,8 +215,8 @@ const CommonTable = <T extends object>({
     });
   };
 
-  // Determine if should show cards
-  const shouldShowCards = showMobileCards && (breakpoint === 'xs' || breakpoint === 'sm');
+  // Determine if should show cards - hiển thị card khi mobile (< 768px)
+  const shouldShowCards = showMobileCards && isMobile;
 
   // Default card render
   const defaultCardRender = (record: T, index: number) => {

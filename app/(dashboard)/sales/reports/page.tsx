@@ -8,19 +8,19 @@ import { DatePicker, Select, Table } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from 'recharts';
 
 const { RangePicker } = DatePicker;
@@ -382,40 +382,40 @@ export default function SalesReportsPage() {
           {viewMode === 'summary' ? (
             <>
               {/* Summary Cards */}
-              <div className="grid grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-                  <div className="text-sm text-blue-600 mb-1">Tổng đơn hàng</div>
-                  <div className="text-2xl font-bold text-blue-700">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
+                  <div className="text-xs sm:text-sm text-blue-600 mb-1">Tổng đơn hàng</div>
+                  <div className="text-lg sm:text-2xl font-bold text-blue-700">
                     {summary.totalOrders}
                   </div>
                   <div className="text-xs text-blue-600 mt-1">
                     {summary.completedOrders} hoàn thành
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-                  <div className="text-sm text-green-600 mb-1">Tổng doanh thu</div>
-                  <div className="text-2xl font-bold text-green-700">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-4 border border-green-200">
+                  <div className="text-xs sm:text-sm text-green-600 mb-1">Tổng doanh thu</div>
+                  <div className="text-lg sm:text-2xl font-bold text-green-700 truncate">
                     {formatCurrency(summary.totalAmount)}
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-                  <div className="text-sm text-purple-600 mb-1">Đã thu</div>
-                  <div className="text-2xl font-bold text-purple-700">
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 sm:p-4 border border-purple-200">
+                  <div className="text-xs sm:text-sm text-purple-600 mb-1">Đã thu</div>
+                  <div className="text-lg sm:text-2xl font-bold text-purple-700 truncate">
                     {formatCurrency(summary.totalPaid)}
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
-                  <div className="text-sm text-orange-600 mb-1">Còn nợ</div>
-                  <div className="text-2xl font-bold text-orange-700">
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-3 sm:p-4 border border-orange-200">
+                  <div className="text-xs sm:text-sm text-orange-600 mb-1">Còn nợ</div>
+                  <div className="text-lg sm:text-2xl font-bold text-orange-700 truncate">
                     {formatCurrency(summary.totalUnpaid)}
                   </div>
                 </div>
               </div>
 
               {/* Monthly Trend Chart */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold mb-4">Xu hướng doanh thu theo tháng</h3>
-                <ResponsiveContainer width="100%" height={300}>
+              <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold mb-4">Xu hướng doanh thu theo tháng</h3>
+                <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
                   <LineChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
@@ -430,9 +430,9 @@ export default function SalesReportsPage() {
               </div>
 
               {/* Daily Revenue Chart */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold mb-4">Doanh thu theo ngày</h3>
-                <ResponsiveContainer width="100%" height={300}>
+              <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold mb-4">Doanh thu theo ngày</h3>
+                <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
                   <BarChart data={dailyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
@@ -445,9 +445,9 @@ export default function SalesReportsPage() {
               </div>
 
               {/* Order Status Pie Chart */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold mb-4">Trạng thái đơn hàng</h3>
-                <ResponsiveContainer width="100%" height={300}>
+              <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold mb-4">Trạng thái đơn hàng</h3>
+                <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
                   <PieChart>
                     <Pie
                       data={orderStatusData}
@@ -469,10 +469,10 @@ export default function SalesReportsPage() {
               </div>
 
               {/* Top Customers and Products */}
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Top Customers */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold mb-4">Top 10 khách hàng</h3>
+                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4">Top 10 khách hàng</h3>
                   <div className="overflow-auto max-h-96">
                     <table className="min-w-full">
                       <thead className="bg-gray-50 sticky top-0">
@@ -502,8 +502,8 @@ export default function SalesReportsPage() {
                 </div>
 
                 {/* Top Products */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold mb-4">Top 10 sản phẩm bán chạy</h3>
+                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4">Top 10 sản phẩm bán chạy</h3>
                   <div className="overflow-auto max-h-96">
                     <table className="min-w-full">
                       <thead className="bg-gray-50 sticky top-0">

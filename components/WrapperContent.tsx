@@ -14,6 +14,7 @@ import { queriesToInvalidate } from "@/utils/refetchData";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  FilterOutlined,
   SearchOutlined,
   SettingOutlined,
   SyncOutlined
@@ -22,12 +23,14 @@ import {
   AutoComplete,
   Button,
   Checkbox,
+  DatePicker,
   Divider,
   Empty,
   Form,
   Input,
   Modal,
   Popover,
+  Select,
   Tooltip
 } from "antd";
 import debounce from "lodash/debounce";
@@ -141,7 +144,7 @@ const LeftControls: React.FC<LeftControlsProps> = ({
         {header.searchInput && (
           header.searchInput.suggestions ? (
             <AutoComplete
-              style={{ width: 300 }}
+              style={{ minWidth: 200, maxWidth: 350, flex: '1 1 auto' }}
               options={suggestions}
               onSearch={onSearchSuggestions}
               onSelect={(value) => setSearchTerm(value)}
@@ -153,7 +156,7 @@ const LeftControls: React.FC<LeftControlsProps> = ({
             </AutoComplete>
           ) : (
             <Input
-              style={{ width: 256 }}
+              style={{ minWidth: 200, maxWidth: 350, flex: '1 1 auto' }}
               value={searchTerm}
               placeholder={header.searchInput.placeholder}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -257,6 +260,7 @@ interface RightControlsProps {
       fields?: FilterField[];
       onReset?: () => void;
     };
+    customToolbar?: React.ReactNode;
     buttonEnds?: {
       can?: boolean;
       danger?: boolean;
@@ -352,14 +356,6 @@ const RightControls: React.FC<RightControlsProps> = ({
             </Tooltip>
           );
         })}
-
-        {header.columnSettings && (
-          <Button
-            type={hasActiveColumnSettings ? "primary" : "default"}
-            icon={<SettingOutlined />}
-            onClick={() => setIsMobileOptionsOpen(true)}
-          />
-        )}
       </div>
     );
   }
@@ -628,58 +624,58 @@ function WrapperContent<T extends object>({
         />
       </div>
 
-      {/* Mobile inline toolbar (search + custom filters + filter fields) */}
+      {/* Mobile: Search bar + Filter button */}
       {isMobileView && (header.searchInput || header.customToolbar || (header.filters?.fields && header.filters.fields.length > 0)) && (
-        <div className="space-y-3">
-          {/* Search input */}
+        <div className="flex gap-2 items-center w-full">
+          {/* Search input - chiếm phần lớn */}
           {header.searchInput && (
-            header.searchInput.suggestions ? (
-              <AutoComplete
-                style={{ width: '100%' }}
-                options={suggestions}
-                onSearch={handleSearchSuggestions}
-                onSelect={(value) => setSearchTerm(value)}
-                value={searchTerm}
-                onChange={(value) => setSearchTerm(value)}
-                placeholder={header.searchInput.placeholder}
-              >
-                <Input 
-                  prefix={<SearchOutlined />} 
-                  allowClear 
-                  size="large"
+            <div className="flex-1 min-w-0">
+              {header.searchInput.suggestions ? (
+                <AutoComplete
+                  className="w-full"
+                  options={suggestions}
+                  onSearch={handleSearchSuggestions}
+                  onSelect={(value) => setSearchTerm(value)}
+                  value={searchTerm}
+                  onChange={(value) => setSearchTerm(value)}
+                  placeholder={header.searchInput.placeholder}
+                >
+                  <Input 
+                    prefix={<SearchOutlined />} 
+                    allowClear 
+                  />
+                </AutoComplete>
+              ) : (
+                <Input
+                  className="w-full"
+                  value={searchTerm}
+                  placeholder={header.searchInput.placeholder}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  prefix={<SearchOutlined />}
+                  allowClear
                 />
-              </AutoComplete>
-            ) : (
-              <Input
-                value={searchTerm}
-                placeholder={header.searchInput.placeholder}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                prefix={<SearchOutlined />}
-                allowClear
-                size="large"
-              />
-            )
-          )}
-          
-          {/* Custom toolbar (inline filters) */}
-          {header.customToolbar && (
-            <div className="flex gap-2 items-center overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
-              {header.customToolbar}
+              )}
             </div>
           )}
-
-          {/* Filter fields inline */}
-          {header.filters?.fields && header.filters.fields.length > 0 && (
-            <FilterList
-              isMobile={true}
-              form={formFilter}
-              fields={header.filters.fields}
-              onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
-              onReset={() => {
-                header.filters?.onReset?.();
-                setSearchTerm("");
-              }}
-            />
+          
+          {/* Nút mở filter - chỉ hiện khi có filter hoặc columnSettings */}
+          {(header.customToolbar || (header.filters?.fields && header.filters.fields.length > 0) || header.columnSettings) && (
+            <Button
+              icon={<FilterOutlined />}
+              onClick={() => setIsMobileOptionsOpen(true)}
+              type={hasActiveFilters || hasActiveColumnSettings ? "primary" : "default"}
+              className="flex-shrink-0"
+            >
+              {hasActiveFilters && (
+                <span className="ml-1 bg-white text-blue-600 rounded-full px-1.5 text-xs font-bold">
+                  {Object.entries(header.filters?.query || {}).filter(([key, value]) => {
+                    if (typeof value === "string" && !key.includes("search")) return value.trim() !== "";
+                    if (Array.isArray(value)) return value.length > 0;
+                    return false;
+                  }).length}
+                </span>
+              )}
+            </Button>
           )}
         </div>
       )}
@@ -698,7 +694,7 @@ function WrapperContent<T extends object>({
         />
       )}
 
-      {/* Mobile bottom sheet for column settings only */}
+      {/* Mobile bottom sheet for filters + column settings */}
       <Modal
         title={null}
         open={isMobileOptionsOpen}
@@ -723,23 +719,117 @@ function WrapperContent<T extends object>({
         }}
         width="100%"
       >
-        <div className="flex flex-col max-h-[70vh]">
+        <div className="flex flex-col max-h-[80vh]">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
-            <h3 className="font-semibold text-lg m-0">Cài đặt hiển thị</h3>
-            <Button 
-              type="text" 
-              onClick={() => setIsMobileOptionsOpen(false)}
-              className="text-gray-500"
-            >
-              Đóng
-            </Button>
+            <h3 className="font-semibold text-lg m-0">Bộ lọc</h3>
+            <div className="flex gap-2">
+              {(header.filters?.onReset || header.customToolbar) && (
+                <Button 
+                  type="text"
+                  danger
+                  onClick={() => {
+                    formFilter.resetFields();
+                    header.filters?.onReset?.();
+                    setSearchTerm("");
+                  }}
+                >
+                  Xóa lọc
+                </Button>
+              )}
+              <Button 
+                type="primary"
+                onClick={() => setIsMobileOptionsOpen(false)}
+              >
+                Xong
+              </Button>
+            </div>
           </div>
 
-          {/* Content - Column Settings only */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {header.columnSettings && (
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Custom toolbar filters (Select từ page) */}
+            {header.customToolbar && (
               <div className="space-y-3">
+                {header.customToolbar}
+              </div>
+            )}
+
+            {/* Filter fields */}
+            {header.filters?.fields && header.filters.fields.length > 0 && (
+              <Form form={formFilter} layout="vertical" className="space-y-3">
+                {header.filters.fields.map((field) => {
+                  switch (field.type) {
+                    case "input":
+                      return (
+                        <Form.Item key={field.name} name={field.name} label={field.label} className="mb-0">
+                          <Input 
+                            placeholder={field.placeholder || field.label} 
+                            allowClear 
+                            size="large"
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                              header.filters?.onApplyFilter([{ key: field.name, value: e.target.value }]);
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    case "select":
+                      return (
+                        <Form.Item key={field.name} name={field.name} label={field.label} className="mb-0">
+                          <Select
+                            mode={field.isMultiple ? "multiple" : undefined}
+                            options={field.options || []}
+                            placeholder={field.placeholder || field.label}
+                            allowClear
+                            size="large"
+                            showSearch
+                            filterOption={(input: string, option: { label?: string } | undefined) =>
+                              (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                            }
+                            onChange={(value: string | string[] | undefined) => {
+                              header.filters?.onApplyFilter([{ key: field.name, value: value ?? "" }]);
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    case "date":
+                      return (
+                        <Form.Item key={field.name} name={field.name} label={field.label} className="mb-0">
+                          <DatePicker
+                            className="w-full"
+                            placeholder={field.placeholder || field.label}
+                            size="large"
+                            inputReadOnly
+                            onChange={(date: unknown) => {
+                              header.filters?.onApplyFilter([{ key: field.name, value: date }]);
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    case "dateRange":
+                      return (
+                        <Form.Item key={field.name} name={field.name} label={field.label} className="mb-0">
+                          <DatePicker.RangePicker 
+                            className="w-full"
+                            size="large"
+                            inputReadOnly
+                            placeholder={["Từ ngày", "Đến ngày"]}
+                            onChange={(dates: unknown) => {
+                              header.filters?.onApplyFilter([{ key: field.name, value: dates }]);
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    default:
+                      return null;
+                  }
+                })}
+              </Form>
+            )}
+
+            {/* Column Settings */}
+            {header.columnSettings && (
+              <div className="space-y-3 pt-4 border-t">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <SettingOutlined className="text-gray-500" />
@@ -757,7 +847,7 @@ function WrapperContent<T extends object>({
                   )}
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   {header.columnSettings.columns.map((column) => (
                     <label
                       key={column.key}

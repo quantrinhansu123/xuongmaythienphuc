@@ -1,10 +1,11 @@
 "use client";
 
 import { useGetCompany } from "@/hooks/useCompany";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { formatQuantity } from "@/utils/format";
 import { ArrowRightOutlined, CalendarOutlined, CheckOutlined, DeleteOutlined, LeftOutlined, PrinterOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Checkbox, Col, DatePicker, Descriptions, Form, Input, message, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Typography, type CheckboxProps } from "antd";
+import { Button, Card, Checkbox, DatePicker, Descriptions, Form, Input, message, Modal, Popconfirm, Select, Space, Spin, Table, Tag, Typography, type CheckboxProps } from "antd";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
@@ -18,6 +19,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     const queryClient = useQueryClient();
     const resolvedParams = use(params);
     const id = resolvedParams.id;
+    const isMobile = useIsMobile();
     const [isMaterialImportModalOpen, setIsMaterialImportModalOpen] = useState(false);
     const [isFinishProductModalOpen, setIsFinishProductModalOpen] = useState(false);
     const [isUpdatingStep, setIsUpdatingStep] = useState(false);
@@ -565,141 +567,147 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
     };
 
     return (
-        <div className="p-6">
-            <div className="mb-6 flex items-center justify-between">
-                <Space>
-                    <Button icon={<LeftOutlined />} onClick={() => router.back()}>
-                        Quay lại
+        <div className={isMobile ? "p-3" : "p-6"}>
+            {/* Header */}
+            <div className={`mb-4 flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
+                <div className="flex items-center gap-2">
+                    <Button icon={<LeftOutlined />} onClick={() => router.back()} size={isMobile ? "middle" : "middle"}>
+                        {!isMobile && "Quay lại"}
                     </Button>
-                    <Title level={4} style={{ margin: 0 }}>
-                        Đơn sản xuất #{data.orderCode}
+                    <Title level={isMobile ? 5 : 4} style={{ margin: 0 }}>
+                        #{data.orderCode}
                     </Title>
-                </Space>
-                <Space>
-                    <Button icon={<PrinterOutlined />} onClick={() => setShowPrintModal(true)}>
-                        In phiếu SX
-                    </Button>
-                </Space>
+                </div>
+                <Button icon={<PrinterOutlined />} onClick={() => setShowPrintModal(true)}>
+                    In phiếu SX
+                </Button>
             </div>
 
-            <Row gutter={[24, 24]}>
-                {/* Action Cards - Thay thế Steps */}
-                <Col span={24}>
-                    <Card className="mb-0" bodyStyle={{ padding: '16px' }}>
-                        <div className="flex items-center justify-between gap-4">
-                            {/* Trạng thái đơn */}
-                            <div className="flex items-center gap-3">
-                                <Tag color={data.status === "COMPLETED" ? "green" : "blue"} className="text-base px-3 py-1">
-                                    {data.status === "COMPLETED" ? "✓ Hoàn thành" : "🔄 Đang sản xuất"}
-                                </Tag>
-                                <span className="text-gray-500">|</span>
-                                <span className="text-sm text-gray-600">
-                                    Tiến độ: <strong className="text-blue-600">{formatQuantity(finishedImportsData?.totalImported || 0)}</strong>
-                                    <span className="text-gray-400"> / </span>
-                                    <strong>{formatQuantity(data.items?.[0]?.quantity || 0)}</strong> sản phẩm
-                                </span>
-                            </div>
+            <div className="space-y-4">
+                {/* Action Card */}
+                <Card size="small" className="mb-0">
+                    <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between gap-4'}`}>
+                        {/* Trạng thái đơn */}
+                        <div className={`flex ${isMobile ? 'flex-wrap' : ''} items-center gap-2`}>
+                            <Tag color={data.status === "COMPLETED" ? "green" : "blue"} className={isMobile ? "text-sm" : "text-base px-3 py-1"}>
+                                {data.status === "COMPLETED" ? "✓ Hoàn thành" : "🔄 Đang SX"}
+                            </Tag>
+                            <span className="text-sm text-gray-600">
+                                <strong className="text-blue-600">{formatQuantity(finishedImportsData?.totalImported || 0)}</strong>
+                                <span className="text-gray-400"> / </span>
+                                <strong>{formatQuantity(data.items?.[0]?.quantity || 0)}</strong>
+                            </span>
+                        </div>
 
-                            {/* Action Buttons */}
-                            {data.status !== "COMPLETED" && (
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        icon={<ArrowRightOutlined />}
-                                        onClick={() => setIsMaterialImportModalOpen(true)}
-                                        className="flex items-center gap-1"
-                                    >
-                                        📦 Xuất NVL
-                                    </Button>
+                        {/* Action Buttons */}
+                        {data.status !== "COMPLETED" && (
+                            <div className={`flex ${isMobile ? 'w-full' : ''} items-center gap-2`}>
+                                <Button
+                                    icon={<ArrowRightOutlined />}
+                                    onClick={() => setIsMaterialImportModalOpen(true)}
+                                    size={isMobile ? "middle" : "middle"}
+                                    className={isMobile ? "flex-1" : ""}
+                                >
+                                    {isMobile ? "Xuất NVL" : "📦 Xuất NVL"}
+                                </Button>
+                                <Button
+                                    type="primary"
+                                    icon={<CheckOutlined />}
+                                    onClick={() => setIsFinishProductModalOpen(true)}
+                                    size={isMobile ? "middle" : "middle"}
+                                    className={isMobile ? "flex-1" : ""}
+                                >
+                                    {isMobile ? "Nhập TP" : "🏭 Nhập TP"}
+                                </Button>
+                                {(finishedImportsData?.totalImported || 0) > 0 && (
                                     <Button
                                         type="primary"
-                                        icon={<CheckOutlined />}
-                                        onClick={() => setIsFinishProductModalOpen(true)}
-                                        className="flex items-center gap-1"
+                                        danger
+                                        onClick={handleCompleteOrder}
+                                        size={isMobile ? "small" : "middle"}
                                     >
-                                        🏭 Nhập TP
+                                        {isMobile ? "✓" : "✓ Hoàn thành đơn"}
                                     </Button>
-                                    {(finishedImportsData?.totalImported || 0) > 0 && (
-                                        <Button
-                                            type="primary"
-                                            danger
-                                            onClick={handleCompleteOrder}
-                                        >
-                                            ✓ Hoàn thành đơn
-                                        </Button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                </Col>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </Card>
 
-                <Col span={24}>
-                    <Card
-                        title="Thông tin chung"
-                        extra={
-                            <Button
-                                icon={<CalendarOutlined />}
-                                onClick={() => {
-                                    datesForm.setFieldsValue({
-                                        workerHandoverDate: data.workerHandoverDate ? dayjs(data.workerHandoverDate) : null,
-                                        fittingDate: data.fittingDate ? dayjs(data.fittingDate) : null,
-                                        completionDate: data.completionDate ? dayjs(data.completionDate) : null,
-                                        salePerson: data.salePerson || '',
-                                    });
-                                    setShowDatesModal(true);
-                                }}
-                            >
-                                Cập nhật ngày
-                            </Button>
-                        }
+                {/* Thông tin chung */}
+                <Card
+                    title="Thông tin chung"
+                    size={isMobile ? "small" : "default"}
+                    extra={
+                        <Button
+                            icon={<CalendarOutlined />}
+                            size="small"
+                            onClick={() => {
+                                datesForm.setFieldsValue({
+                                    workerHandoverDate: data.workerHandoverDate ? dayjs(data.workerHandoverDate) : null,
+                                    fittingDate: data.fittingDate ? dayjs(data.fittingDate) : null,
+                                    completionDate: data.completionDate ? dayjs(data.completionDate) : null,
+                                    salePerson: data.salePerson || '',
+                                });
+                                setShowDatesModal(true);
+                            }}
+                        >
+                            {isMobile ? "" : "Cập nhật"}
+                        </Button>
+                    }
+                >
+                    <Descriptions 
+                        bordered 
+                        column={isMobile ? 1 : 2} 
+                        size={isMobile ? "small" : "default"}
+                        labelStyle={isMobile ? { width: '40%', padding: '8px' } : undefined}
+                        contentStyle={isMobile ? { padding: '8px' } : undefined}
                     >
-                        <Descriptions bordered column={2}>
-                            <Descriptions.Item label="Mã đơn hàng">{data.orderCode}</Descriptions.Item>
-                            <Descriptions.Item label="Khách hàng">{data.customerName}</Descriptions.Item>
-                            <Descriptions.Item label="Ngày đặt">
-                                {new Date(data.orderDate).toLocaleDateString("vi-VN")}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Sản phẩm">
-                                <span className="font-semibold text-blue-700">{data.items?.[0]?.itemName}</span>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Số lượng">
-                                <span className="font-semibold">{formatQuantity(data.items?.[0]?.quantity)}</span>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Trạng thái">
-                                <Tag color={data.status === "PENDING" ? "orange" : "blue"}>{data.status}</Tag>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Kho lấy NVL">
-                                {data.sourceWarehouseName ? (
-                                    <Tag color="blue">📦 {data.sourceWarehouseName}</Tag>
-                                ) : (
-                                    <span className="text-gray-400 italic">Chưa chọn</span>
-                                )}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Kho nhận thành phẩm">
-                                {data.targetWarehouseName ? (
-                                    <Tag color="green">🏭 {data.targetWarehouseName}</Tag>
-                                ) : (
-                                    <span className="text-gray-400 italic">Chưa chọn</span>
-                                )}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Ngày giao thợ">
-                                {data.workerHandoverDate ? new Date(data.workerHandoverDate).toLocaleDateString("vi-VN") : "-"}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Ngày thử đồ">
-                                {data.fittingDate ? new Date(data.fittingDate).toLocaleDateString("vi-VN") : "-"}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Ngày lấy thành phẩm">
-                                {data.completionDate ? new Date(data.completionDate).toLocaleDateString("vi-VN") : "-"}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Sale">
-                                {data.salePerson || "-"}
-                            </Descriptions.Item>
-                        </Descriptions>
-                    </Card>
-                </Col>
+                        <Descriptions.Item label="Mã đơn">{data.orderCode}</Descriptions.Item>
+                        <Descriptions.Item label="Khách hàng">{data.customerName}</Descriptions.Item>
+                        <Descriptions.Item label="Ngày đặt">
+                            {new Date(data.orderDate).toLocaleDateString("vi-VN")}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Sản phẩm">
+                            <span className="font-semibold text-blue-700">{data.items?.[0]?.itemName}</span>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Số lượng">
+                            <span className="font-semibold">{formatQuantity(data.items?.[0]?.quantity)}</span>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Trạng thái">
+                            <Tag color={data.status === "PENDING" ? "orange" : "blue"}>{data.status}</Tag>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Kho NVL">
+                            {data.sourceWarehouseName ? (
+                                <Tag color="blue">{data.sourceWarehouseName}</Tag>
+                            ) : (
+                                <span className="text-gray-400 italic">Chưa chọn</span>
+                            )}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Kho TP">
+                            {data.targetWarehouseName ? (
+                                <Tag color="green">{data.targetWarehouseName}</Tag>
+                            ) : (
+                                <span className="text-gray-400 italic">Chưa chọn</span>
+                            )}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Ngày giao thợ">
+                            {data.workerHandoverDate ? new Date(data.workerHandoverDate).toLocaleDateString("vi-VN") : "-"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Ngày thử đồ">
+                            {data.fittingDate ? new Date(data.fittingDate).toLocaleDateString("vi-VN") : "-"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Ngày lấy thành phẩm">
+                            {data.completionDate ? new Date(data.completionDate).toLocaleDateString("vi-VN") : "-"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Sale">
+                            {data.salePerson || "-"}
+                        </Descriptions.Item>
+                    </Descriptions>
+                </Card>
 
-                <Col span={24}>
-                    <Card title="Danh sách sản phẩm">
+                {/* Danh sách sản phẩm */}
+                <Card title="Danh sách sản phẩm" size={isMobile ? "small" : "default"}>
                         <Table
                             dataSource={data.items}
                             rowKey="id"
@@ -739,10 +747,9 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             ]}
                         />
                     </Card>
-                </Col>
 
                 {/* Xuất kho NVL và Nhập kho thành phẩm - 2 cột */}
-                <Col span={12}>
+                <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
                     <Card
                         title={
                             <div className="flex items-center gap-2">
@@ -789,9 +796,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             ]}
                         />
                     </Card>
-                </Col>
 
-                <Col span={12}>
                     <Card
                         title={
                             <div className="flex items-center justify-between">
@@ -861,22 +866,24 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             ]}
                         />
                     </Card>
-                </Col>
+                </div>
 
-                <Col span={24}>
-                    <Card
-                        title="Nhân viên sản xuất"
-                        loading={isLoadingWorkers}
-                        extra={
-                            <Button
-                                type="primary"
-                                icon={<UserAddOutlined />}
-                                onClick={() => setShowWorkerModal(true)}
-                            >
-                                Thêm nhân viên
-                            </Button>
-                        }
-                    >
+                {/* Nhân viên sản xuất */}
+                <Card
+                    title="Nhân viên sản xuất"
+                    size={isMobile ? "small" : "default"}
+                    loading={isLoadingWorkers}
+                    extra={
+                        <Button
+                            type="primary"
+                            icon={<UserAddOutlined />}
+                            onClick={() => setShowWorkerModal(true)}
+                            size={isMobile ? "small" : "middle"}
+                        >
+                            {isMobile ? "" : "Thêm nhân viên"}
+                        </Button>
+                    }
+                >
                         <Table
                             dataSource={assignedWorkers}
                             rowKey="id"
@@ -942,8 +949,7 @@ export default function ProductionDetailPage({ params }: { params: Promise<{ id:
                             ]}
                         />
                     </Card>
-                </Col>
-            </Row>
+            </div>
 
             <MaterialImportModal
                 open={isMaterialImportModalOpen}

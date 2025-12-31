@@ -2,11 +2,11 @@
 import { FilterField } from "@/types";
 import { DeleteOutlined } from "@ant-design/icons";
 import {
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  Select,
+    Button,
+    DatePicker,
+    Form,
+    Input,
+    Select,
 } from "antd";
 import { FormInstance } from "antd/lib";
 
@@ -52,8 +52,8 @@ export const FilterList: React.FC<FilterListProps> = ({
   }).length;
 
   const renderField = (field: FilterField) => {
-    const size = isMobile ? "middle" : "middle";
-    const style = { minWidth: isMobile ? 140 : 160 };
+    const size = "middle";
+    const style = { minWidth: isMobile ? 120 : 150 };
 
     switch (field.type) {
       case "input":
@@ -120,7 +120,7 @@ export const FilterList: React.FC<FilterListProps> = ({
           >
             <DatePicker.RangePicker 
               size={size}
-              style={{ minWidth: isMobile ? 200 : 240 }}
+              style={{ minWidth: isMobile ? 180 : 220 }}
               inputReadOnly={isMobile}
               placeholder={["Từ ngày", "Đến ngày"]}
             />
@@ -136,6 +136,30 @@ export const FilterList: React.FC<FilterListProps> = ({
     return null;
   }
 
+  // Mobile: render trực tiếp các field (không có wrapper)
+  if (isMobile) {
+    return (
+      <Form 
+        form={form} 
+        layout="inline" 
+        onValuesChange={handleValueChange}
+        className="contents"
+      >
+        {fields.map((field) => renderField(field))}
+        {onReset && activeCount > 0 && (
+          <Button
+            onClick={handleReset}
+            icon={<DeleteOutlined />}
+            danger
+            type="text"
+            size="small"
+          />
+        )}
+      </Form>
+    );
+  }
+
+  // Desktop layout
   return (
     <Form 
       form={form} 
@@ -143,7 +167,7 @@ export const FilterList: React.FC<FilterListProps> = ({
       onValuesChange={handleValueChange}
       className="w-full"
     >
-      <div className={`flex gap-2 items-center ${isMobile ? 'overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin' : 'flex-wrap'}`}>
+      <div className="flex gap-2 items-center flex-wrap">
         {fields.map((field) => renderField(field))}
         
         {onReset && activeCount > 0 && (
@@ -154,7 +178,7 @@ export const FilterList: React.FC<FilterListProps> = ({
             type="text"
             size="middle"
           >
-            {!isMobile && "Xóa lọc"}
+            Xóa lọc
           </Button>
         )}
       </div>
