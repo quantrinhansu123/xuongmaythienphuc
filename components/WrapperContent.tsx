@@ -221,11 +221,12 @@ function WrapperContent<T extends object>({
 
   // ========== DESKTOP LAYOUT ==========
   if (!isMobile) {
-    const needsRow2 = hasFilterFields || header.customToolbarSecondRow;
+    // Chỉ cần hàng 2 khi có customToolbar VÀ có filterFields hoặc customToolbarSecondRow
+    const needsRow2 = header.customToolbar && (hasFilterFields || header.customToolbarSecondRow);
 
     return (
       <div className={`space-y-3 w-full box-border ${className}`}>
-        {/* Row 1: Back + Search + ColumnSettings + customToolbar | Refresh + Buttons */}
+        {/* Row 1: Back + Search + ColumnSettings + (customToolbar HOẶC FilterList) | Refresh + Buttons */}
         <div className="flex items-center gap-3">
           {/* LEFT */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -311,7 +312,29 @@ function WrapperContent<T extends object>({
               </Popover>
             )}
 
+            {/* Nếu có customToolbar thì hiện ở đây, FilterList xuống hàng 2 */}
             {header.customToolbar}
+
+            {/* Nếu không có customToolbar thì FilterList lên hàng 1 */}
+            {!header.customToolbar && hasFilterFields && (
+              <FilterList
+                isMobile={false}
+                form={formFilter}
+                fields={header.filters!.fields!}
+                onApplyFilter={(arr) => header.filters?.onApplyFilter(arr)}
+              />
+            )}
+
+            {!header.customToolbar && hasFilters && header.filters?.onReset && (
+              <Tooltip title="Đặt lại bộ lọc">
+                <Button
+                  disabled={isLoading || isRefetching}
+                  onClick={handleResetFilters}
+                  danger
+                  icon={<DeleteOutlined />}
+                />
+              </Tooltip>
+            )}
           </div>
 
           {/* RIGHT */}
@@ -347,7 +370,7 @@ function WrapperContent<T extends object>({
           </div>
         </div>
 
-        {/* Row 2 (chỉ hiện khi có filter hoặc customToolbarSecondRow): FilterList | Reset */}
+        {/* Row 2: Chỉ hiện khi có customToolbar VÀ có filterFields */}
         {needsRow2 && (
           <div className="flex items-center gap-3">
             {/* LEFT */}
