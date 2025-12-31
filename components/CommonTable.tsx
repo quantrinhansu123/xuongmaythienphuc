@@ -1,10 +1,10 @@
 import { IPagination } from "@/hooks/useFilter";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PropRowDetails } from "@/types/table";
-import { DeleteOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { DeleteOutlined } from "@ant-design/icons";
 import type { TableColumnsType } from "antd";
 import { App, Button, Card, Drawer, Empty, Pagination, Skeleton, Table, Tag } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 interface ICommonTableProps<T> {
   sortable?: boolean;
@@ -32,31 +32,8 @@ interface ICommonTableProps<T> {
   // New responsive options
   mobileCardRender?: (record: T, index: number) => React.ReactNode;
   mobileColumns?: (keyof T | string)[];
-  responsiveBreakpoint?: 'sm' | 'md' | 'lg';
   showMobileCards?: boolean;
 }
-
-// Hook để detect nhiều breakpoint
-const useBreakpoint = () => {
-  const [breakpoint, setBreakpoint] = useState<'xs' | 'sm' | 'md' | 'lg' | 'xl'>('lg');
-
-  useEffect(() => {
-    const checkBreakpoint = () => {
-      const width = window.innerWidth;
-      if (width < 480) setBreakpoint('xs');
-      else if (width < 640) setBreakpoint('sm');
-      else if (width < 768) setBreakpoint('md');
-      else if (width < 1024) setBreakpoint('lg');
-      else setBreakpoint('xl');
-    };
-
-    checkBreakpoint();
-    window.addEventListener('resize', checkBreakpoint);
-    return () => window.removeEventListener('resize', checkBreakpoint);
-  }, []);
-
-  return breakpoint;
-};
 
 const CommonTable = <T extends object>({
   sortable = true,
@@ -75,54 +52,14 @@ const CommonTable = <T extends object>({
   drawerWidth,
   mobileCardRender,
   mobileColumns,
-  responsiveBreakpoint = 'md',
   showMobileCards = true,
 }: ICommonTableProps<T>) => {
   const isMobile = useIsMobile();
-  const breakpoint = useBreakpoint();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { modal } = App.useApp();
-  
-  // Scroll indicators
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const dataLength = total || dataSource?.length || 0;
-
-  // Check scroll position
-  const checkScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      setCanScrollLeft(container.scrollLeft > 0);
-      setCanScrollRight(
-        container.scrollLeft < container.scrollWidth - container.clientWidth - 1
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      checkScroll();
-      container.addEventListener('scroll', checkScroll);
-      window.addEventListener('resize', checkScroll);
-      return () => {
-        container.removeEventListener('scroll', checkScroll);
-        window.removeEventListener('resize', checkScroll);
-      };
-    }
-  }, [checkScroll, dataSource]);
-
-  // Scroll handlers
-  const scrollLeft = () => {
-    scrollContainerRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
-  };
-
-  const scrollRight = () => {
-    scrollContainerRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
-  };
 
   const handlePageChange = (page: number, pageSize?: number) => {
     pagination?.onChange(page, pageSize);
@@ -431,64 +368,27 @@ const CommonTable = <T extends object>({
   return (
     <>
       <div ref={tableContainerRef} className="relative w-full">
-        {/* Scroll indicators */}
-        {isMobile && canScrollLeft && (
-          <button
-            onClick={scrollLeft}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-white/90 shadow-lg rounded-r-lg p-2 hover:bg-gray-100 transition-colors"
-            aria-label="Scroll left"
-          >
-            <LeftOutlined className="text-gray-600" />
-          </button>
-        )}
-        
-        {isMobile && canScrollRight && (
-          <button
-            onClick={scrollRight}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-white/90 shadow-lg rounded-l-lg p-2 hover:bg-gray-100 transition-colors"
-            aria-label="Scroll right"
-          >
-            <RightOutlined className="text-gray-600" />
-          </button>
-        )}
-
-        {/* Scroll hint gradient */}
-        {isMobile && canScrollRight && (
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent pointer-events-none z-10" />
-        )}
-        {isMobile && canScrollLeft && (
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white/80 to-transparent pointer-events-none z-10" />
-        )}
-
-        <div 
-          ref={scrollContainerRef}
-          className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
-        >
-          <Table<T>
-            rowKey="id"
-            bordered={true}
-            loading={loading}
-            columns={getVisibleColumns()}
-            dataSource={paginatedData}
-            pagination={false}
-            onRow={onClickRow}
-            size={isMobile ? "small" : "middle"}
-            rowSelection={rowSelection ? {
-              type: 'checkbox',
-              selectedRowKeys: rowSelection.selectedRowKeys,
-              onChange: rowSelection.onChange,
-              columnWidth: isMobile ? 40 : 50,
-            } : undefined}
-            sticky={!isMobile}
-            scroll={{
-              x: isMobile ? 'max-content' : '100%',
-            }}
-            className="min-w-full"
-            rowClassName={(_, index) => 
-              index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-            }
-          />
-        </div>
+        <Table<T>
+          rowKey="id"
+          bordered={true}
+          loading={loading}
+          columns={getVisibleColumns()}
+          dataSource={paginatedData}
+          pagination={false}
+          onRow={onClickRow}
+          size={isMobile ? "small" : "middle"}
+          rowSelection={rowSelection ? {
+            type: 'checkbox',
+            selectedRowKeys: rowSelection.selectedRowKeys,
+            onChange: rowSelection.onChange,
+            columnWidth: isMobile ? 40 : 50,
+          } : undefined}
+          sticky={!isMobile}
+          className="min-w-full"
+          rowClassName={(_, index) => 
+            index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+          }
+        />
 
         {/* Footer */}
         {paging && footerContent}

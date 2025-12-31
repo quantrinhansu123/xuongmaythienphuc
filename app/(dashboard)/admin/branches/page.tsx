@@ -234,6 +234,22 @@ export default function BranchesPage() {
                         placeholder: "Tìm kiếm chi nhánh",
                         filterKeys: ["branchCode", "branchName", "address", "phone"],
                     },
+                    filters: {
+                        query,
+                        fields: [
+                            {
+                                name: "isActive",
+                                label: "Trạng thái",
+                                type: "select",
+                                options: [
+                                    { label: "Hoạt động", value: "true" },
+                                    { label: "Khóa", value: "false" },
+                                ],
+                            },
+                        ],
+                        onApplyFilter: (arr) => updateQueries(arr),
+                        onReset: reset,
+                    },
                     columnSettings: {
                         columns: columnsCheck,
                         onChange: (c) => updateColumns(c),

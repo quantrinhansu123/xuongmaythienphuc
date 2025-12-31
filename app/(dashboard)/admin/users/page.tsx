@@ -3,7 +3,7 @@
 import CommonTable from "@/components/CommonTable";
 import UserDetailDrawer from "@/components/users/UserDetailDrawer";
 import UserFormModal, {
-  type UserFormValues,
+    type UserFormValues,
 } from "@/components/users/UserFormModal";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
@@ -12,27 +12,27 @@ import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
-  useCreateUser,
-  useDeleteUser,
-  useResetPassword,
-  useUpdateUser,
-  useUsers
+    useCreateUser,
+    useDeleteUser,
+    useResetPassword,
+    useUpdateUser,
+    useUsers
 } from "@/hooks/useUserQuery";
 import { branchService, departmentService, roleService } from "@/services/commonService";
 import type { User } from "@/services/userService";
 import {
-  DeleteOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  LockOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  UnlockOutlined,
-  UploadOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    EditOutlined,
+    LockOutlined,
+    MoreOutlined,
+    PlusOutlined,
+    UnlockOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
-import { App, Button, Dropdown, Select, Tag } from "antd";
+import { App, Button, Dropdown, Tag } from "antd";
 import { useState } from "react";
 
 export default function UsersPage() {
@@ -322,43 +322,6 @@ export default function UsersPage() {
         isNotAccessible={!can("admin.users", "view")}
         isLoading={isLoading}
         header={{
-          customToolbar: (
-            <div className="flex gap-2 items-center flex-wrap">
-              <Select
-                placeholder="Chi nhánh"
-                allowClear
-                style={{ width: 170 }}
-                value={query.branchId}
-                onChange={(val: any) => updateQueries([{ key: "branchId", value: val || "" }])}
-                options={branches.map((b: any) => ({
-                  label: b.branchName,
-                  value: b.id.toString(),
-                }))}
-              />
-              <Select
-                placeholder="Vai trò"
-                allowClear
-                style={{ width: 170 }}
-                value={query.roleId}
-                onChange={(val: any) => updateQueries([{ key: "roleId", value: val || "" }])}
-                options={roles.map((r: any) => ({
-                  label: r.roleName,
-                  value: r.id.toString(),
-                }))}
-              />
-              <Select
-                placeholder="Phòng ban"
-                allowClear
-                style={{ width: 150 }}
-                value={query.departmentId}
-                onChange={(val: any) => updateQueries([{ key: "departmentId", value: val || "" }])}
-                options={departments.map((d) => ({
-                  label: d.departmentName,
-                  value: d.id.toString(),
-                }))}
-              />
-            </div>
-          ),
           buttonEnds: can("admin.users", "create")
             ? [
               {
@@ -392,6 +355,44 @@ export default function UsersPage() {
             },
           },
           filters: {
+            fields: [
+              {
+                name: "branchId",
+                label: "Chi nhánh",
+                type: "select",
+                options: branches.map((b: any) => ({
+                  label: b.branchName,
+                  value: b.id.toString(),
+                })),
+              },
+              {
+                name: "roleId",
+                label: "Vai trò",
+                type: "select",
+                options: roles.map((r: any) => ({
+                  label: r.roleName,
+                  value: r.id.toString(),
+                })),
+              },
+              {
+                name: "departmentId",
+                label: "Phòng ban",
+                type: "select",
+                options: departments.map((d) => ({
+                  label: d.departmentName,
+                  value: d.id.toString(),
+                })),
+              },
+              {
+                name: "isActive",
+                label: "Trạng thái",
+                type: "select",
+                options: [
+                  { label: "Hoạt động", value: "true" },
+                  { label: "Khóa", value: "false" },
+                ],
+              },
+            ],
             onApplyFilter: (arr) => updateQueries(arr),
             onReset: () => reset(),
             query,

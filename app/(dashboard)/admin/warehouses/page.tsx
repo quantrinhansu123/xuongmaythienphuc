@@ -291,6 +291,41 @@ export default function WarehousesPage() {
                             "warehouseType",
                         ],
                     },
+                    filters: {
+                        query,
+                        fields: [
+                            {
+                                name: "warehouseType",
+                                label: "Loại kho",
+                                type: "select",
+                                options: [
+                                    { label: "NVL", value: "NVL" },
+                                    { label: "Thành phẩm", value: "THANH_PHAM" },
+                                    { label: "Hỗn hợp", value: "HON_HOP" },
+                                ],
+                            },
+                            {
+                                name: "branchId",
+                                label: "Chi nhánh",
+                                type: "select",
+                                options: branches.map((b: any) => ({
+                                    label: b.branchName,
+                                    value: b.id.toString(),
+                                })),
+                            },
+                            {
+                                name: "isActive",
+                                label: "Trạng thái",
+                                type: "select",
+                                options: [
+                                    { label: "Hoạt động", value: "true" },
+                                    { label: "Khóa", value: "false" },
+                                ],
+                            },
+                        ],
+                        onApplyFilter: (arr) => updateQueries(arr),
+                        onReset: reset,
+                    },
                     columnSettings: {
                         columns: columnsCheck,
                         onChange: (c) => updateColumns(c),
