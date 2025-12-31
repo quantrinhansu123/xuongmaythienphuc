@@ -605,8 +605,8 @@ function WrapperContent<T extends object>({
   ) : null;
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      <div className="flex items-center justify-between">
+    <div className={`space-y-4 w-full box-border ${className}`}>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <LeftControls
           isMobile={isMobileView}
           header={header}

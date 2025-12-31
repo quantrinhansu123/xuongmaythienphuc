@@ -10,38 +10,38 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatCurrency, formatQuantity } from "@/utils/format";
 import {
-  CalendarOutlined,
-  CheckCircleOutlined,
-  DeleteOutlined,
-  DownloadOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  ShoppingCartOutlined,
-  UserAddOutlined
+    CalendarOutlined,
+    CheckCircleOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    PlusOutlined,
+    ReloadOutlined,
+    ShoppingCartOutlined,
+    UserAddOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  Collapse,
-  DatePicker,
-  Descriptions,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Row,
-  Select,
-  Space,
-  Spin,
-  Table,
-  TableColumnsType,
-  Tag,
-  Typography
+    Alert,
+    App,
+    Button,
+    Card,
+    Checkbox,
+    Col,
+    Collapse,
+    DatePicker,
+    Descriptions,
+    Form,
+    Input,
+    InputNumber,
+    Modal,
+    Row,
+    Select,
+    Space,
+    Spin,
+    Table,
+    TableColumnsType,
+    Tag,
+    Typography
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useRouter } from "next/navigation";
@@ -2619,13 +2619,14 @@ export default function OrdersPage() {
         }}
       >
         <div className="flex gap-4">
-          <div className={`space-y-4 transition-all duration-300`}>
+          <div className={`flex-1 min-w-0 space-y-4 transition-all duration-300`}>
             <CommonTable
               onRowClick={(record: Order) => router.push(`/sales/orders/${record.id}`)}
               columns={getVisibleColumns()}
               dataSource={filteredOrders}
               loading={permLoading || isLoading || isFetching}
               pagination={{ ...pagination, onChange: handlePageChange }}
+              mobileColumns={["orderCode", "customerName", "finalAmount", "status"]}
             />
           </div>
 

@@ -11,25 +11,26 @@ import { useTheme } from "@/providers/AppThemeProvider";
 import { queryClient } from "@/providers/ReactQueryProvider";
 import { useSiteTitleStore } from "@/stores/setSiteTitle";
 import {
-    DashboardOutlined,
-    DesktopOutlined,
-    LogoutOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
-    UserOutlined
+  DashboardOutlined,
+  DesktopOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuOutlined,
+  MenuUnfoldOutlined,
+  UserOutlined
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import type { MenuProps } from "antd";
 import {
-    Avatar,
-    Breadcrumb,
-    Button,
-    Drawer,
-    Dropdown,
-    Layout,
-    Menu,
-    Typography,
-    theme
+  Avatar,
+  Breadcrumb,
+  Button,
+  Drawer,
+  Dropdown,
+  Layout,
+  Menu,
+  Typography,
+  theme
 } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -37,6 +38,32 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
+
+// Storage key cho sidebar state
+const SIDEBAR_STATE_KEY = "pos_sidebar_state";
+
+// Sidebar states: 'expanded' | 'collapsed' | 'hidden'
+type SidebarState = 'expanded' | 'collapsed' | 'hidden';
+
+// Helper để lấy sidebar state từ sessionStorage
+const getSavedSidebarState = (): SidebarState => {
+  if (typeof window === 'undefined') return 'expanded';
+  try {
+    const saved = sessionStorage.getItem(SIDEBAR_STATE_KEY);
+    if (saved === 'expanded' || saved === 'collapsed' || saved === 'hidden') {
+      return saved;
+    }
+  } catch {}
+  return 'expanded';
+};
+
+// Helper để lưu sidebar state vào sessionStorage
+const saveSidebarState = (state: SidebarState) => {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(SIDEBAR_STATE_KEY, state);
+  } catch {}
+};
 
 interface User {
   id: number;
@@ -85,15 +112,26 @@ export default function DashboardLayout({
   const { themeName, setThemeName } = useTheme();
   const { token } = theme.useToken();
   const isMobile = useIsMobile();
-  // Mobile mặc định đóng sidebar, desktop mặc định mở
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  // Khi chuyển từ mobile sang desktop, mở sidebar
+  // Desktop: 3 trạng thái sidebar (expanded -> collapsed -> hidden)
+  // Mobile: chỉ dùng Drawer (mở/đóng)
+  const [sidebarState, setSidebarState] = useState<SidebarState>('expanded');
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  
+  // Load saved state on mount (chỉ desktop)
   useEffect(() => {
     if (!isMobile) {
-      setSidebarOpen(true);
+      setSidebarState(getSavedSidebarState());
     }
   }, [isMobile]);
+  
+  // Save state khi thay đổi (chỉ desktop)
+  useEffect(() => {
+    if (!isMobile) {
+      saveSidebarState(sidebarState);
+    }
+  }, [sidebarState, isMobile]);
+  
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
   // Fetch current user
@@ -404,15 +442,39 @@ export default function DashboardLayout({
     setOpenKeys(latestKey ? [latestKey] : []);
   }, [openKeys]);
 
-  // Handle sidebar toggle
+  // Handle sidebar toggle - 3 cấp: expanded -> collapsed -> hidden -> expanded
   const toggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => !prev);
+    setSidebarState((prev) => {
+      if (prev === 'expanded') return 'collapsed';
+      if (prev === 'collapsed') return 'hidden';
+      return 'expanded';
+    });
   }, []);
 
-  // Handle mobile menu close
-  const closeMobileSidebar = useCallback(() => {
-    setSidebarOpen(false);
+  // Handle mobile drawer
+  const openMobileDrawer = useCallback(() => {
+    setMobileDrawerOpen(true);
   }, []);
+  
+  const closeMobileDrawer = useCallback(() => {
+    setMobileDrawerOpen(false);
+  }, []);
+  
+  // Tính toán margin left dựa trên sidebar state
+  const contentMarginLeft = useMemo(() => {
+    if (isMobile) return 0;
+    if (sidebarState === 'hidden') return 0;
+    if (sidebarState === 'collapsed') return 80;
+    return 240;
+  }, [isMobile, sidebarState]);
+  
+  // Icon cho nút toggle
+  const toggleIcon = useMemo(() => {
+    if (isMobile) return <MenuOutlined />;
+    if (sidebarState === 'expanded') return <MenuFoldOutlined />;
+    if (sidebarState === 'collapsed') return <MenuFoldOutlined />;
+    return <MenuUnfoldOutlined />;
+  }, [isMobile, sidebarState]);
 
   if (loading) {
     return (
@@ -424,11 +486,12 @@ export default function DashboardLayout({
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      {!isMobile && (
+      {/* Desktop Sidebar - 3 states: expanded, collapsed, hidden */}
+      {!isMobile && sidebarState !== 'hidden' && (
         <Sider
           trigger={null}
           collapsible
-          collapsed={!sidebarOpen}
+          collapsed={sidebarState === 'collapsed'}
           width={240}
           style={{
             overflow: "auto",
@@ -440,7 +503,7 @@ export default function DashboardLayout({
           }}
         >
           <div style={{ height: 64, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {sidebarOpen ? (
+            {sidebarState === 'expanded' ? (
               <Text style={{ color: token.colorPrimary, fontSize: 18, fontWeight: "bold" }}>
                 POS System
               </Text>
@@ -458,12 +521,13 @@ export default function DashboardLayout({
         </Sider>
       )}
 
+      {/* Mobile Drawer */}
       {isMobile && (
         <Drawer
           title={<Text style={{ color: token.colorPrimary, fontSize: 18, fontWeight: "bold" }}>POS System</Text>}
           placement="left"
-          onClose={closeMobileSidebar}
-          open={sidebarOpen}
+          onClose={closeMobileDrawer}
+          open={mobileDrawerOpen}
           closable={true}
           width={240}
         >
@@ -474,7 +538,7 @@ export default function DashboardLayout({
               openKeys={openKeys}
               onOpenChange={handleOpenChange}
               items={antdMenuItems}
-              onClick={closeMobileSidebar}
+              onClick={closeMobileDrawer}
             />
             <div style={{ padding: 12, display: "flex", justifyContent: "center" }}>
               <Dropdown menu={{ items: [{ key: "user-info", label: <div className="flex flex-col items-center p-2"><Text strong>{user?.fullName}</Text><Text type="secondary" style={{ fontSize: 12 }}>{user?.roleCode}</Text></div> }, ...userMenuItems] }} placement="topLeft">
@@ -491,7 +555,7 @@ export default function DashboardLayout({
         </Drawer>
       )}
 
-      <Layout style={{ marginLeft: !isMobile && sidebarOpen ? 240 : isMobile ? 0 : 80, transition: "margin-left 0.2s" }}>
+      <Layout style={{ marginLeft: contentMarginLeft, transition: "margin-left 0.2s" }}>
         <Header
           style={{
             padding: "0 24px",
@@ -506,8 +570,12 @@ export default function DashboardLayout({
           }}
         >
           <div className="flex gap-3 items-center">
-            <Button type="text" onClick={toggleSidebar} icon={sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />} />
-            <Breadcrumb items={breadcrumbItems} />
+            <Button 
+              type="text" 
+              onClick={isMobile ? openMobileDrawer : toggleSidebar} 
+              icon={toggleIcon} 
+            />
+            {!isMobile && <Breadcrumb items={breadcrumbItems} />}
           </div>
 
           {!isMobile && (
