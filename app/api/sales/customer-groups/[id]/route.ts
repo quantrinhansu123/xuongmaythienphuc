@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { hasPermission, error } = await requirePermission('sales.customers', 'view');
+    const { hasPermission, user, error } = await requirePermission('sales.customer-groups', 'view');
     if (!hasPermission) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -19,6 +19,15 @@ export async function GET(
     const resolvedParams = await params;
     const groupId = parseInt(resolvedParams.id);
 
+    // Filter theo chi nhánh (trừ ADMIN)
+    let whereClause = 'WHERE cg.id = $1';
+    const params_query: any[] = [groupId];
+
+    if (user.roleCode !== 'ADMIN') {
+      whereClause += ' AND cg.branch_id = $2';
+      params_query.push(user.branchId);
+    }
+
     const result = await query(
       `SELECT 
         cg.id,
@@ -26,13 +35,16 @@ export async function GET(
         cg.group_name as "groupName",
         cg.price_multiplier as "priceMultiplier",
         cg.description,
+        cg.branch_id as "branchId",
+        b.branch_name as "branchName",
         cg.created_at as "createdAt",
-        COUNT(c.id) as "customerCount"
+        COUNT(c.id)::int as "customerCount"
        FROM customer_groups cg
        LEFT JOIN customers c ON c.customer_group_id = cg.id
-       WHERE cg.id = $1
-       GROUP BY cg.id, cg.group_code, cg.group_name, cg.price_multiplier, cg.description, cg.created_at`,
-      [groupId]
+       LEFT JOIN branches b ON b.id = cg.branch_id
+       ${whereClause}
+       GROUP BY cg.id, cg.group_code, cg.group_name, cg.price_multiplier, cg.description, cg.branch_id, b.branch_name, cg.created_at`,
+      params_query
     );
 
     if (result.rows.length === 0) {
@@ -61,7 +73,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { hasPermission, error } = await requirePermission('sales.customers', 'edit');
+    const { hasPermission, user, error } = await requirePermission('sales.customer-groups', 'edit');
     if (!hasPermission) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -73,6 +85,20 @@ export async function PUT(
     const groupId = parseInt(resolvedParams.id);
     const body = await request.json();
     const { groupName, priceMultiplier, description, categoryPrices } = body;
+
+    // Kiểm tra quyền truy cập nhóm (theo chi nhánh)
+    if (user.roleCode !== 'ADMIN') {
+      const checkAccess = await query(
+        'SELECT id FROM customer_groups WHERE id = $1 AND branch_id = $2',
+        [groupId, user.branchId]
+      );
+      if (checkAccess.rows.length === 0) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Không có quyền sửa nhóm này'
+        }, { status: 403 });
+      }
+    }
 
     // Cập nhật thông tin nhóm
     await query(
@@ -121,7 +147,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { hasPermission, error } = await requirePermission('sales.customers', 'delete');
+    const { hasPermission, user, error } = await requirePermission('sales.customer-groups', 'delete');
     if (!hasPermission) {
       return NextResponse.json<ApiResponse>({
         success: false,
@@ -131,6 +157,20 @@ export async function DELETE(
 
     const resolvedParams = await params;
     const groupId = parseInt(resolvedParams.id);
+
+    // Kiểm tra quyền truy cập nhóm (theo chi nhánh)
+    if (user.roleCode !== 'ADMIN') {
+      const checkAccess = await query(
+        'SELECT id FROM customer_groups WHERE id = $1 AND branch_id = $2',
+        [groupId, user.branchId]
+      );
+      if (checkAccess.rows.length === 0) {
+        return NextResponse.json<ApiResponse>({
+          success: false,
+          error: 'Không có quyền xóa nhóm này'
+        }, { status: 403 });
+      }
+    }
 
     // Kiểm tra có khách hàng không
     const checkCustomers = await query(
