@@ -6,15 +6,13 @@ import ImportForm from "@/components/inventory/ImportForm";
 import WrapperContent from "@/components/WrapperContent";
 import useColumn from "@/hooks/useColumn";
 import { useFileExport } from "@/hooks/useFileExport";
-import { useFileImport } from "@/hooks/useFileImport";
 import useFilter from "@/hooks/useFilter";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatQuantity } from "@/utils/format";
 import {
   DownloadOutlined,
   EditOutlined,
-  PlusOutlined,
-  UploadOutlined
+  PlusOutlined
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TableColumnsType } from "antd";
@@ -320,7 +318,6 @@ export default function Page() {
   ];
 
   const { exportToXlsx } = useFileExport(exportColumns);
-  const { openFileDialog } = useFileImport();
 
   const filtered = applyFilter<ImportTransaction>(imports, ['startDate', 'endDate']);
 
@@ -339,19 +336,6 @@ export default function Page() {
       relatedCustomerName: item.relatedCustomerName || '',
     }));
     exportToXlsx(dataToExport, 'phieu-nhap-kho');
-  };
-
-  const handleImportExcel = () => {
-    openFileDialog(
-      (data) => {
-        console.log('Imported data:', data);
-        // TODO: Xử lý dữ liệu import và gọi API
-        alert(`Đã đọc ${data.length} dòng. Chức năng xử lý dữ liệu đang được phát triển.`);
-      },
-      (error) => {
-        console.error('Import error:', error);
-      }
-    );
   };
 
   if (!can("inventory.import", "view")) {
@@ -431,12 +415,6 @@ export default function Page() {
             </div>
           ),
           buttonEnds: [
-            {
-              type: 'default',
-              name: 'Nhập Excel',
-              onClick: handleImportExcel,
-              icon: <UploadOutlined />,
-            },
             {
               type: 'default',
               name: 'Xuất Excel',
